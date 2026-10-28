@@ -1,17 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useTranslations } from 'next-intl';
+import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
-import { Menu, Bot } from 'lucide-react';
 import { GitHubIcon } from '@/components/ui/icons';
 import { LanguageSelector } from './LanguageSelector';
+import { ThemeToggle } from './ThemeToggle';
+import { MenuToggle } from './MenuToggle';
 import { MobileDrawer } from './MobileDrawer';
 
 export function Navbar() {
   const t = useTranslations('navigation');
   const tCommon = useTranslations('common');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
 
   return (
     <>
@@ -23,18 +26,25 @@ export function Navbar() {
         {tCommon('skipToContent')}
       </a>
 
-      <header className="sticky top-0 z-40 w-full border-b border-border/80 bg-background/80 backdrop-blur-md">
+      <header className="sticky top-0 z-50 w-full border-b border-border/80 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Brand Logo & Title */}
           <Link
             href="/"
-            className="flex items-center gap-2 font-bold tracking-tight text-foreground transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-primary"
+            className="group flex items-center gap-2.5 font-bold tracking-tight text-foreground transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-primary"
             aria-label="chatflow-agent home"
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
-              <Bot className="h-4 w-4" aria-hidden="true" />
-            </div>
-            <span className="text-base sm:text-lg">chatflow-agent</span>
+            <Image
+              src="/brand/logo-symbol.svg"
+              alt="chatflow-agent logo"
+              width={32}
+              height={32}
+              className="h-8 w-8 object-contain transition-transform duration-200 group-hover:scale-105"
+              priority
+            />
+            <span className="text-base sm:text-lg font-bold">
+              chatflow<span className="bg-gradient-to-r from-blue-500 to-violet-500 bg-clip-text text-transparent">-agent</span>
+            </span>
           </Link>
 
           {/* Desktop Navigation Links */}
@@ -53,38 +63,40 @@ export function Navbar() {
             </Link>
           </nav>
 
-          {/* Right actions: LanguageSelector, GitHub link, Mobile hamburger */}
-          <div className="flex items-center gap-3">
+          {/* Right actions: LanguageSelector, ThemeToggle, GitHub link, MenuToggle */}
+          <div className="flex items-center gap-2 sm:gap-3">
             <div className="hidden sm:block">
               <LanguageSelector />
             </div>
+
+            <ThemeToggle />
 
             <a
               href="https://github.com/GustavoBaranda/chatflow-agent"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+              className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
               aria-label={t('github')}
             >
               <GitHubIcon className="h-4 w-4" />
             </a>
 
-            {/* Mobile Hamburger Button */}
-            <button
-              type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary md:hidden"
-              onClick={() => setIsMobileOpen(true)}
-              aria-expanded={isMobileOpen}
-              aria-label={t('menu')}
-            >
-              <Menu className="h-4 w-4" aria-hidden="true" />
-            </button>
+            {/* Mobile Animated Hamburger Button */}
+            <MenuToggle
+              ref={menuToggleRef}
+              active={isMobileOpen}
+              onToggle={() => setIsMobileOpen((prev) => !prev)}
+            />
           </div>
         </div>
       </header>
 
       {/* Mobile Drawer */}
-      <MobileDrawer isOpen={isMobileOpen} onClose={() => setIsMobileOpen(false)} />
+      <MobileDrawer
+        isOpen={isMobileOpen}
+        onClose={() => setIsMobileOpen(false)}
+        triggerRef={menuToggleRef}
+      />
     </>
   );
 }

@@ -10,10 +10,16 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
     },
+    server: {
+      deps: {
+        inline: ['next-intl'],
+      },
+    },
   },
   resolve: {
-    alias: {
-      '@': path.resolve(import.meta.dirname, './src'),
-    },
+    alias: [
+      { find: '@', replacement: path.resolve(import.meta.dirname, './src') },
+      { find: /^next\/navigation$/, replacement: 'next/navigation.js' },
+    ],
   },
 });

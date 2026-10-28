@@ -7,6 +7,11 @@ const withMDX = createMDX();
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  webpack: (config) => {
+    // Disable Webpack filesystem cache to prevent Windows EPERM mkdir file-lock races in sandbox
+    config.cache = false;
+    return config;
+  },
 };
 
 export default withNextIntl(withMDX(nextConfig));

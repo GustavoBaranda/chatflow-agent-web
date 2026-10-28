@@ -3,6 +3,8 @@ import { getMessages, setRequestLocale } from 'next-intl/server';
 import { NextIntlClientProvider } from 'next-intl';
 import { routing } from '@/i18n/routing';
 import { getLanguage } from '@/config/languages';
+import { Navbar } from '@/components/navigation/Navbar';
+import { Footer } from '@/components/navigation/Footer';
 import type { Metadata } from 'next';
 import '../globals.css';
 
@@ -60,7 +62,9 @@ export default async function LocaleLayout({
     <html lang={locale} dir={lang.direction}>
       <body className="flex min-h-screen flex-col bg-background text-foreground antialiased selection:bg-primary/20">
         <NextIntlClientProvider messages={messages}>
+          <Navbar />
           {children}
+          <Footer />
         </NextIntlClientProvider>
       </body>
     </html>

@@ -82,26 +82,43 @@
 
 ---
 
-## 4. Local Git & Commit Standards
+## 4. Mandatory Git Commit Policy
 
-When Phase 1 initiates and local Git commits are permitted:
-1. **Granular Commits:** Make small, atomic, and descriptive local commits. Each commit must address a single responsibility.
-2. **Conventional Commits Specification:** Format all commit messages in English according to the Conventional Commits format:
-   - `feat(i18n): implement explicit locale prefixes and fallback SEO rules`
-   - `fix(nav): correct mobile drawer focus trapping`
-   - `docs(quick-start): add installation guide verified with sdk v0.1`
-   - `chore(tooling): configure pnpm, vitest, and playwright test runners`
-3. **No Secret Commits:** Ensure `.gitignore` ignores `.env*`, `.next/`, `node_modules/`, `coverage/`, and OS temporary files.
+This policy is mandatory and governs all development across all phases:
+
+1. **Small, Atomic, and Specific Commits:** Make granular local commits grouped strictly by technical responsibility.
+2. **No Monolithic Phase Commits:** Never bundle all changes of an entire phase into a single commit.
+3. **Logical Work Units:** Each commit must represent a single logical unit of work with a clearly identifiable purpose.
+4. **Conventional Commits in English:** Format all commit messages in English using the Conventional Commits specification:
+   - `feat(scope): ...`
+   - `fix(scope): ...`
+   - `refactor(scope): ...`
+   - `test(scope): ...`
+   - `docs(scope): ...`
+   - `chore(scope): ...`
+5. **Separation of Concerns:** Separate configuration, implementation, testing, documentation, and refactorings into dedicated commits whenever appropriate.
+6. **Pre-Commit Verification:** Before staging and committing, inspect changes with `git diff --staged` and run all relevant checks (`pnpm run verify`, `lint`, `typecheck`, etc.).
+7. **Clean Staging:** Do not stage or include files unrelated to the specific responsibility of the commit.
+8. **Zero AI Attribution Trailers:** Do NOT add `Co-Authored-By` trailers, automated tool signatures, or AI attribution markers to commit messages.
+9. **Exclusively Local Commits:** Keep all commits strictly local. Never configure remotes, push code, open PRs, or publish the repository without explicit user authorization.
+10. **Phase Completion Reporting:** At the conclusion of each phase, present:
+    - List of commits performed.
+    - Short SHA-1 hash of each commit.
+    - Files modified in each commit.
+    - Verifications executed.
+    - Final state of `git status`.
+11. **Strict Phase Gate Authorization:** Never advance to the next phase without explicit user authorization.
 
 ---
 
 ## 5. Verification Checklist Before Marking Steps Complete
 
-Before asking the user to review deliverables or requesting approval to advance to the next phase, verify:
+Before requesting phase review or approval to advance:
 * `pnpm run lint` (ESLint passes with 0 errors and 0 warnings).
 * `pnpm run typecheck` (TypeScript compiles with 0 errors).
 * `pnpm run test` (Vitest unit tests pass).
 * `pnpm run test:e2e` (Playwright E2E tests pass).
-* `pnpm run check:i18n` (No missing translation keys between language files).
-* `pnpm run check:translations` (Audit translation states: up to date, outdated, missing).
+* `pnpm run check:i18n` (No missing translation keys between language files, when applicable).
+* `pnpm run check:translations` (Audit translation states, when applicable).
 * Verify that only files permitted for the current phase have been modified or created.
+* Review git log and staged state to ensure compliance with the Mandatory Git Commit Policy.

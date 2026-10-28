@@ -228,3 +228,30 @@ To enable frictionless contributions from worldwide developers and technical wri
    pnpm run typecheck
    ```
 4. **Submit PR:** Use conventional title: `i18n(es): translate concepts/sessions`.
+
+### 2.3 Mandatory Git Commit Policy
+
+All development across all phases is governed by this strict commit protocol:
+
+1. **Atomic & Specific Commits:** Make small, granular local commits grouped strictly by technical responsibility.
+2. **No Monolithic Phase Commits:** Never bundle all changes of an entire phase into a single commit.
+3. **Logical Work Units:** Each commit must represent a single logical unit of work with a clearly identifiable purpose.
+4. **Conventional Commits in English:**
+   - `feat(scope): ...`
+   - `fix(scope): ...`
+   - `refactor(scope): ...`
+   - `test(scope): ...`
+   - `docs(scope): ...`
+   - `chore(scope): ...`
+5. **Separation of Concerns:** Keep configuration, implementation, testing, documentation, and refactorings in dedicated commits whenever appropriate.
+6. **Pre-Commit Verification:** Before staging, inspect changes with `git diff --staged` and run relevant quality checks (`pnpm run verify`, `lint`, `typecheck`).
+7. **Clean Staging:** Never include files unrelated to the specific responsibility of the commit.
+8. **No AI Attribution Trailers:** Do NOT append `Co-Authored-By` trailers or automated AI tool signatures to commit messages.
+9. **Exclusively Local Commits:** Keep all commits strictly local. Never configure remotes, push code, create PRs, or publish the repository without explicit authorization.
+10. **Phase Conclusion Reporting:** At the end of each phase, present:
+    - List of commits performed.
+    - Short SHA-1 hash of each commit.
+    - Files modified in each commit.
+    - Verifications executed.
+    - Final state of `git status`.
+11. **Phase Gate Authorization:** Never advance to the next phase without explicit user authorization.

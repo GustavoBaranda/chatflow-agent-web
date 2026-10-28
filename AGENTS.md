@@ -82,32 +82,53 @@
 
 ---
 
-## 4. Mandatory Git Commit Policy
+## 4. Mandatory Version Control & Atomic Commit Policy
 
-This policy is mandatory and governs all development across all phases:
+This policy is permanent and strictly governs all development across all phases of `chatflow-agent-web`:
 
+### 4.1 Core Commit Rules
 1. **Small, Atomic, and Specific Commits:** Make granular local commits grouped strictly by technical responsibility.
 2. **No Monolithic Phase Commits:** Never bundle all changes of an entire phase into a single commit.
-3. **Logical Work Units:** Each commit must represent a single logical unit of work with a clearly identifiable purpose.
+3. **Logical Work Units:** Each commit must represent a single, functionally coherent, and easily reviewable unit of work with a clearly identifiable purpose.
 4. **Conventional Commits in English:** Format all commit messages in English using the Conventional Commits specification:
-   - `feat(scope): ...`
-   - `fix(scope): ...`
-   - `refactor(scope): ...`
-   - `test(scope): ...`
-   - `docs(scope): ...`
-   - `chore(scope): ...`
-5. **Separation of Concerns:** Separate configuration, implementation, testing, documentation, and refactorings into dedicated commits whenever appropriate.
-6. **Pre-Commit Verification:** Before staging and committing, inspect changes with `git diff --staged` and run all relevant checks (`pnpm run verify`, `lint`, `typecheck`, etc.).
-7. **Clean Staging:** Do not stage or include files unrelated to the specific responsibility of the commit.
+   - `feat(scope): description`
+   - `fix(scope): description`
+   - `refactor(scope): description`
+   - `test(scope): description`
+   - `docs(scope): description`
+   - `chore(scope): description`
+5. **Separation of Concerns:** Separate configuration, implementation, testing, documentation, and refactorings when they constitute independent responsibilities. Do not artificially fragment changes that are fundamentally inseparable.
+6. **Pre-Commit Verification Workflow:** Before each commit:
+   - Review `git status`.
+   - Inspect staged changes via `git diff --staged`.
+   - Run all relevant verification checks (`pnpm run verify`, `lint`, `typecheck`, etc.).
+   - Confirm that only files directly related to the specific objective of the commit are included.
+7. **Clean Staging:** Never include modifications outside the scope of the immediate unit of work.
 8. **Zero AI Attribution Trailers:** Do NOT add `Co-Authored-By` trailers, automated tool signatures, or AI attribution markers to commit messages.
-9. **Exclusively Local Commits:** Keep all commits strictly local. Never configure remotes, push code, open PRs, or publish the repository without explicit user authorization.
-10. **Phase Completion Reporting:** At the conclusion of each phase, present:
-    - List of commits performed.
-    - Short SHA-1 hash of each commit.
-    - Files modified in each commit.
-    - Verifications executed.
-    - Final state of `git status`.
-11. **Strict Phase Gate Authorization:** Never advance to the next phase without explicit user authorization.
+9. **Exclusively Local Commits:** Keep all commits strictly local.
+10. **Zero Remote Operations:** Do NOT configure remotes, execute `git push`, open PRs, create releases, or deploy the site without explicit user authorization.
+11. **History Preservation:** Do NOT rewrite, rebase, or amend previous commits without explicit authorization.
+
+### 4.2 Phase-by-Phase Commit Organization
+Each phase must be executed through independent commits grouped by technical responsibility. Commits must never be accumulated until the end of a phase. For example, during Phase 2, commits may include:
+- `feat(i18n): configure localized routing`
+- `feat(i18n): add translation catalogs`
+- `feat(layout): implement localized root layout`
+- `feat(navigation): implement responsive navigation`
+- `test(i18n): add locale routing tests`
+
+*(Note: These examples are illustrative; the actual sequence and count must reflect the discrete logical units implemented).*
+
+### 4.3 Mandatory Phase Completion Reporting
+Before requesting authorization to advance to the next phase, present:
+1. Summary of implemented features and deliverables.
+2. List of local commits performed with short SHA-1 hashes.
+3. Files included in each commit.
+4. Tests and verifications executed (with output/results).
+5. Output of `git status`.
+6. Known issues and pending tasks.
+7. Explicit confirmation that no remote operations were performed.
+8. Strict phase gate enforcement: wait for explicit user authorization before proceeding.
 
 ---
 
@@ -121,4 +142,4 @@ Before requesting phase review or approval to advance:
 * `pnpm run check:i18n` (No missing translation keys between language files, when applicable).
 * `pnpm run check:translations` (Audit translation states, when applicable).
 * Verify that only files permitted for the current phase have been modified or created.
-* Review git log and staged state to ensure compliance with the Mandatory Git Commit Policy.
+* Review git log and staged state to ensure compliance with the Mandatory Version Control & Atomic Commit Policy.

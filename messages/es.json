@@ -1,0 +1,42 @@
+{
+  "common": {
+    "title": "chatflow-agent",
+    "description": "Agentes de IA conversacional, herramientas, sesiones e integraciones de canales en Python.",
+    "skipToContent": "Saltar al contenido"
+  },
+  "navigation": {
+    "home": "Inicio",
+    "docs": "Documentación",
+    "concepts": "Conceptos",
+    "guides": "Guías",
+    "api": "Referencia API",
+    "community": "Comunidad",
+    "github": "GitHub",
+    "menu": "Alternar menú de navegación",
+    "closeMenu": "Cerrar menú de navegación"
+  },
+  "languageSelector": {
+    "label": "Idioma",
+    "currentLanguage": "Idioma actual: {language}",
+    "changeLanguage": "Cambiar idioma"
+  },
+  "theme": {
+    "toggle": "Alternar tema",
+    "light": "Claro",
+    "dark": "Oscuro",
+    "system": "Sistema"
+  },
+  "footer": {
+    "tagline": "Plataforma oficial de documentación para chatflow-agent, la librería de código abierto en Python para agentes de IA conversacional.",
+    "license": "Publicado bajo la Licencia MIT.",
+    "builtWith": "Construido con Next.js, Fumadocs y next-intl.",
+    "copyright": "© {year} colaboradores de chatflow-agent.",
+    "links": {
+      "documentation": "Documentación",
+      "quickStart": "Inicio Rápido",
+      "contributing": "Contribuir",
+      "github": "Repositorio en GitHub",
+      "changelog": "Historial de Cambios"
+    }
+  }
+}

@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
+
 @theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -14,26 +16,30 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #0f172a;
+  --foreground: #090e1a;
   --primary: #2563eb;
   --primary-foreground: #ffffff;
-  --muted: #f8fafc;
+  --muted: #f1f5f9;
   --muted-foreground: #64748b;
   --border: #e2e8f0;
   --card: #ffffff;
-  --card-foreground: #0f172a;
+  --card-foreground: #090e1a;
+  --accent-cyan: #00d2f0;
+  --accent-violet: #7c3aed;
 }
 
 .dark {
-  --background: #090d16;
+  --background: #060b18;
   --foreground: #f8fafc;
   --primary: #3b82f6;
   --primary-foreground: #ffffff;
-  --muted: #1e293b;
+  --muted: #0f172a;
   --muted-foreground: #94a3b8;
   --border: #1e293b;
-  --card: #0f172a;
+  --card: #0b1120;
   --card-foreground: #f8fafc;
+  --accent-cyan: #00e5ff;
+  --accent-violet: #8b5cf6;
 }
 
 body {
@@ -43,4 +49,25 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* Soft scroll lock when mobile drawer is open */
+html.menu-open,
+html.menu-open body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* View Transitions API smooth theme transition */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.35s;
+  animation-timing-function: ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
 }

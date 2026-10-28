@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js build output
+.next/
+out/
+
+# Production build artifacts
+build/
+dist/
+
+# Testing & Coverage
+coverage/
+test-results/
+playwright-report/
+blob-report/
+.nyc_output/
+
+# Environment files (Strict security: never commit secrets)
+.env
+.env*.local
+.env.development
+.env.test
+.env.production
+
+# IDE and Editor configurations
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs & Debugging
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# TypeScript build cache
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Fumadocs build cache
+.source/

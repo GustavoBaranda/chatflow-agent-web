@@ -3,7 +3,6 @@ export interface Language {
   name: string;
   localName: string;
   direction: 'ltr' | 'rtl';
-  flag: string;
 }
 
 export const SUPPORTED_LANGUAGES: Language[] = [
@@ -12,14 +11,18 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'English',
     localName: 'English',
     direction: 'ltr',
-    flag: '🇺🇸',
   },
   {
     code: 'es',
     name: 'Spanish',
     localName: 'Español',
     direction: 'ltr',
-    flag: '🇪🇸',
+  },
+  {
+    code: 'pt-BR',
+    name: 'Portuguese (Brazil)',
+    localName: 'Português (Brasil)',
+    direction: 'ltr',
   },
 ];
 

@@ -98,7 +98,6 @@ export function LanguageSelector() {
                 }`}
               >
                 <span className="flex items-center gap-1.5">
-                  <span aria-hidden="true">{lang.flag}</span>
                   <span>{lang.localName}</span>
                 </span>
                 {isSelected && <Check className="h-3.5 w-3.5 text-primary" aria-hidden="true" />}

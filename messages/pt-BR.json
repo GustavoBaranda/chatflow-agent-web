@@ -1,0 +1,53 @@
+{
+  "common": {
+    "title": "chatflow-agent",
+    "description": "Agentes de IA conversacional, ferramentas, sessões e integrações de canais em Python.",
+    "skipToContent": "Pular para o conteúdo"
+  },
+  "navigation": {
+    "home": "Início",
+    "docs": "Documentação",
+    "concepts": "Conceitos",
+    "guides": "Guias",
+    "api": "Referência da API",
+    "community": "Comunidade",
+    "github": "GitHub",
+    "menu": "Alternar menu de navegação",
+    "closeMenu": "Fechar menu de navegação"
+  },
+  "languageSelector": {
+    "label": "Idioma",
+    "currentLanguage": "Idioma atual: {language}",
+    "changeLanguage": "Alterar idioma"
+  },
+  "theme": {
+    "toggle": "Alternar tema",
+    "light": "Claro",
+    "dark": "Escuro",
+    "system": "Sistema"
+  },
+  "footer": {
+    "tagline": "Plataforma oficial de documentação para chatflow-agent, a biblioteca de código aberto em Python para agentes de IA conversacional.",
+    "license": "Distribuído sob a Licença MIT.",
+    "builtWith": "Construído com Next.js, Fumadocs e next-intl.",
+    "copyright": "© {year} colaboradores do chatflow-agent.",
+    "links": {
+      "documentation": "Documentação",
+      "quickStart": "Início Rápido",
+      "contributing": "Contribuir",
+      "github": "Repositório no GitHub",
+      "changelog": "Notas de Versão"
+    }
+  },
+  "about": {
+    "title": "Sobre o chatflow-agent",
+    "subtitle": "Criado para capacitar desenvolvedores a construir agentes conversacionais resilientes, com gerenciamento de estado e múltiplos canais em Python.",
+    "creatorTitle": "Criador e Mantenedor Principal",
+    "creatorName": "Gustavo Baranda",
+    "creatorBio": "Projetou e mantém o chatflow-agent, focando em fluxos declarativos de agentes, gerenciamento robusto de sessões e conectividade multicanal perfeita.",
+    "creatorProfile": "Perfil no GitHub",
+    "communityTitle": "Comunidade e Código Aberto",
+    "communityDescription": "O chatflow-agent prospera graças à colaboração da comunidade global. Desenvolvedores do mundo todo contribuem com recursos, melhoram a documentação e compartilham feedback.",
+    "communityContribute": "Participe no GitHub"
+  }
+}

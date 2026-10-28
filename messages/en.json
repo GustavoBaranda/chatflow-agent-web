@@ -38,5 +38,16 @@
       "github": "GitHub Repository",
       "changelog": "Changelog"
     }
+  },
+  "about": {
+    "title": "About chatflow-agent",
+    "subtitle": "Built to empower developers with resilient, stateful, and multi-channel conversational agents in Python.",
+    "creatorTitle": "Creator & Lead Maintainer",
+    "creatorName": "Gustavo Baranda",
+    "creatorBio": "Architected and maintains chatflow-agent, focusing on declarative agent workflows, robust session management, and seamless multi-channel connectivity.",
+    "creatorProfile": "GitHub Profile",
+    "communityTitle": "Community & Open Source",
+    "communityDescription": "chatflow-agent thrives through global community collaboration. Developers around the world contribute features, improve documentation, and share feedback.",
+    "communityContribute": "Get Involved on GitHub"
   }
 }

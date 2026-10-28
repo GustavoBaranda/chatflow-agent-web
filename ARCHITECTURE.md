@@ -15,10 +15,12 @@
 ### Confirmed Architectural Directives
 1. **Exclusively Local Boundary:** Zero remote pushes, zero remote releases, zero cloud deployments during initial development.
 2. **Package Manager Standard:** Strict adoption of **`pnpm`** (`>=9.15.0`) for fast, deterministic, space-efficient dependency management with frozen lockfiles.
-3. **Explicit Locale Routing:** All languages carry explicit route prefixes (`/en/`, `/es/`). Visiting `/` deterministically negotiates and redirects to the appropriate prefixed route (`/en/...` or `/es/...`).
+3. **Explicit Locale Routing & Launch Locales:** Three launch languages supported: English (`/en/`, authoritative base), Spanish (`/es/`, launch supported), and Brazilian Portuguese (`/pt-BR/`, launch supported). Visiting `/` deterministically negotiates and redirects to the appropriate prefixed route (`/en/...`, `/es/...`, or `/pt-BR/...`).
 4. **Authoritative Python SDK Source:** All API references, method signatures, parameter names, and runnable code examples must be verified against published releases/tags of [https://github.com/GustavoBaranda/chatflow-agent](https://github.com/GustavoBaranda/chatflow-agent). Hallucinating or inventing Python SDK capabilities is strictly prohibited.
 5. **Decoupled Architecture:** The web platform has zero runtime dependency on the Python SDK package or backend databases for the initial MVP.
 6. **Future Playground Boundary:** The interactive agent playground is maintained solely as an architectural boundary. No playground components, runtimes, or dependencies are introduced in this phase.
+7. **Creator & Maintainer Recognition:** Gustavo Baranda is prominently recognized as the **Creator & Lead Maintainer** of `chatflow-agent`, linking to his GitHub profile ([https://github.com/GustavoBaranda](https://github.com/GustavoBaranda)), alongside transparent community acknowledgment.
+8. **Flagless Native Language Naming:** The language selection UI uses native language names (`English`, `Español`, `Português (Brasil)`) without emoji flags to ensure cross-platform accessibility and prevent nationality-to-language stereotyping.
 
 ---
 
@@ -125,8 +127,10 @@ export default async function Page({ params }: PageProps) {
 Every route is strictly scoped by its locale identifier:
 
 * **English (Authoritative Base):** `https://chatflowagent.org/en/docs/quick-start`
-* **Spanish (First Localized):** `https://chatflowagent.org/es/docs/quick-start`
-* **Root Redirection:** A request to `https://chatflowagent.org/` inspects the user's `Accept-Language` header and returns a `307 Temporary Redirect` (or permanent redirect in production edge middleware) to `/en/` or `/es/`.
+* **Spanish (Launch Supported):** `https://chatflowagent.org/es/docs/quick-start`
+* **Brazilian Portuguese (Launch Supported):** `https://chatflowagent.org/pt-BR/docs/quick-start`
+* **Root Redirection:** A request to `https://chatflowagent.org/` inspects the user's `Accept-Language` header and returns a `307 Temporary Redirect` (or permanent redirect in production edge middleware) to `/en/`, `/es/`, or `/pt-BR/`.
+* **Dynamic Configuration:** All locales are configured dynamically in `src/config/languages.ts` and consumed by `src/i18n/routing.ts`. Adding new languages requires zero modifications to core routing logic.
 
 ### 4.2 Outdated Translation Detection Mechanism
 Translations can easily become stale when authoritative English documentation is updated. Relying solely on `sdkVersion` fails when conceptual guides, code samples, or explanations are refined without an SDK release.

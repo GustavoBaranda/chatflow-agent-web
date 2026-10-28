@@ -54,21 +54,25 @@
   * `src/components/playground/`: **RESERVED BOUNDARY ONLY** (Do not populate in initial phases).
 
 ### 2.4 Internationalization (i18n) & SEO Rules
-* **Never Hardcode Text:** Never insert raw English or Spanish text directly into React JSX/TSX components.
-* **Explicit Route Prefixes:** All routes must contain explicit language prefixes (`/en/...`, `/es/...`).
+* **Launch Languages:** The platform launches with three supported locales: English (`en`, authoritative source), Spanish (`es`, supported launch language), and Brazilian Portuguese (`pt-BR`, supported launch language).
+* **Never Hardcode Text:** Never insert raw localized text directly into React JSX/TSX components.
+* **Explicit Route Prefixes:** All routes must contain explicit language prefixes (`/en/...`, `/es/...`, `/pt-BR/...`).
+* **Flagless Native Language Naming:** Language selection UI must display native language names (`English`, `Español`, `Português (Brasil)`) without emoji flags, ensuring accessibility across platforms and avoiding country-to-language conflation.
 * **Two Separate Translation Domains:**
   1. **UI Chrome Strings:** Use `next-intl` hooks (`useTranslations`) and message catalogs in `messages/[locale].json`.
   2. **Technical Documentation:** Maintain distinct MDX source trees in `content/docs/[locale]/`.
 * **Deterministic Fallback & SEO Policy:**
-  * When a requested page in a localized language (e.g., `es`) does not exist:
+  * When a requested page in a localized language (e.g., `es` or `pt-BR`) does not exist:
     1. Render the authoritative English version.
     2. Display the `TranslationNotice` banner clearly stating that the page is in English.
-    3. Set `<meta name="robots" content="noindex, follow" />` on the fallback page to prevent search engines from indexing English duplicate content on a Spanish URL.
+    3. Set `<meta name="robots" content="noindex, follow" />` on the fallback page to prevent search engines from indexing English duplicate content on a localized URL.
     4. Do not include missing language routes in `hreflang` tags or `sitemap.xml`.
   * Never render a broken route, empty layout, or silent 404 for existing authoritative content.
 * **Outdated Translation Handling:**
   * Localized MDX frontmatter must track `sourceRevision` and `sourceHash`.
   * If the English original changes, render the `OutdatedNotice` banner to alert the user.
+* **Creator & Maintainer Recognition:**
+  * Gustavo Baranda is recognized as the **Creator & Lead Maintainer** of `chatflow-agent`, with profile link to `https://github.com/GustavoBaranda`, alongside visible attribution to open-source community contributors.
 
 ---
 

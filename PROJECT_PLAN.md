@@ -63,23 +63,25 @@ flowchart LR
 ---
 
 ### Phase 2: Multilingual Infrastructure & Application Shell
-* **Goal:** Build the locale-aware application shell, middleware with explicit language prefixes, and navigation chrome.
+* **Goal:** Build the locale-aware application shell, middleware with explicit language prefixes, and navigation chrome supporting English (`en`), Spanish (`es`), and Brazilian Portuguese (`pt-BR`).
 * **Deliverables:**
-  - `src/middleware.ts` configured with `next-intl/middleware` and `localePrefix: 'always'` (`/en/...`, `/es/...`).
-  - Redirection logic from `/` to `/en/` or `/es/` based on request header negotiation.
-  - `src/lib/i18n.ts` and base catalogs: `messages/en.json`, `messages/es.json`.
-  - Root layout (`src/app/[locale]/layout.tsx`) with `setRequestLocale(locale)`, async `params` resolution, directional attributes (`dir="ltr"`), and font optimization.
+  - `src/middleware.ts` configured with `next-intl/middleware` and `localePrefix: 'always'` (`/en/...`, `/es/...`, `/pt-BR/...`).
+  - Redirection logic from `/` to `/en/`, `/es/`, or `/pt-BR/` based on request header negotiation.
+  - Extensible language configuration (`src/config/languages.ts`) and base catalogs: `messages/en.json`, `messages/es.json`, `messages/pt-BR.json`.
+  - Root layout (`src/app/[locale]/layout.tsx`) with `setRequestLocale(locale)`, async `params` resolution, directional attributes (`dir="ltr"`), dynamic alternates and hreflang for all locales.
+  - Visible, accessible Homepage **About** section recognizing Gustavo Baranda as **Creator & Lead Maintainer** ([https://github.com/GustavoBaranda](https://github.com/GustavoBaranda)) and celebrating community contributors.
   - Accessible navigation components:
     - `Navbar` with brand logo, docs links, community links, and theme toggle.
-    - `LanguageSelector` dropdown with full keyboard navigation and active language indicator.
-    - `MobileDrawer` for responsive viewports.
+    - `LanguageSelector` dropdown displaying native language names (`English`, `Español`, `Português (Brasil)`) without flags, with full keyboard navigation and active indicator.
+    - `MobileDrawer` for responsive viewports with animated hamburger-to-X toggle.
     - `Footer` with MIT license note, repository link, and community links.
 * **Measurable Acceptance Criteria:**
-  - Navigating to `/` returns a `307` redirect to `/en/` or `/es/`.
-  - Switching languages via `LanguageSelector` preserves the current pathname (e.g., `/en/docs` $\rightarrow$ `/es/docs`).
+  - Navigating to `/` returns a `307` redirect to `/en/`, `/es/`, or `/pt-BR/`.
+  - Switching languages via `LanguageSelector` preserves the current pathname across all three languages.
+  - 100% key parity across `messages/en.json`, `messages/es.json`, and `messages/pt-BR.json`.
   - All interactive elements pass keyboard focus tests (`focus-visible`).
-  - Vitest unit tests verify locale negotiation and translation message extraction.
-  - Playwright E2E tests verify language selector functionality and mobile drawer opening/closing.
+  - Vitest unit tests verify locale negotiation, language metadata, and message key parity for all three locales.
+  - Playwright E2E tests verify language selector functionality, mobile drawer opening/closing, and language switching.
 
 ---
 
@@ -104,24 +106,23 @@ flowchart LR
 
 ---
 
-### Phase 4: Spanish Localization, Fallbacks & Translation Synchronization
-* **Goal:** Implement full Spanish localization, fallback handling with SEO protections, and automated translation staleness detection.
+### Phase 4: Localization, Fallbacks & Multilingual Synchronization (ES & pt-BR)
+* **Goal:** Implement full Spanish and Brazilian Portuguese documentation localization, fallback handling with SEO protections, and automated translation staleness detection.
 * **Deliverables:**
-  - 100% UI key parity in `messages/es.json`.
-  - Initial Spanish documentation set in `content/docs/es/` (Introduction, Quickstart, Core Concepts) containing `sourceRevision` and `sourceHash` frontmatter.
+  - 100% UI key parity in `messages/es.json` and `messages/pt-BR.json`.
+  - Initial localized documentation sets in `content/docs/es/` and `content/docs/pt-BR/` (Introduction, Quickstart, Core Concepts) containing `sourceRevision` and `sourceHash` frontmatter.
   - Deterministic fallback banner component (`src/components/docs/TranslationNotice.tsx`).
   - Outdated translation banner component (`src/components/docs/OutdatedNotice.tsx`).
   - Fallback logic in `src/app/[locale]/docs/[[...slug]]/page.tsx`:
-    - Renders English MDX if Spanish translation is absent.
+    - Renders English MDX if localized translation is absent.
     - Injects `TranslationNotice` with link to contribute.
     - Sets `<meta name="robots" content="noindex, follow" />` on fallback pages to prevent duplicate content indexing.
-    - Excludes fallback routes from Spanish `hreflang` alternates and Spanish `sitemap.xml` entries.
-  - Translation validation script: `scripts/check-translation-keys.ts` (`pnpm run check:i18n`).
-  - Translation staleness detection script: `scripts/check-translations.ts` (`pnpm run check:translations`).
+    - Excludes fallback routes from localized `hreflang` alternates and sitemap entries.
+  - Translation validation script: `scripts/check-i18n.mjs` (`pnpm run check:i18n`).
 * **Measurable Acceptance Criteria:**
-  - `pnpm run check:i18n` confirms 100% key parity between `messages/en.json` and `messages/es.json`.
-  - `pnpm run check:translations` detects and reports `UP_TO_DATE`, `OUTDATED`, `MISSING`, and `ORPHANED` states.
-  - Visiting an untranslated Spanish slug renders the English fallback with `TranslationNotice` and `noindex` directive.
+  - `pnpm run check:i18n` confirms 100% key parity across `messages/en.json`, `messages/es.json`, and `messages/pt-BR.json`.
+  - Auditing detects and reports missing, incomplete, and outdated translation states across JSON catalogs and MDX files.
+  - Visiting an untranslated localized slug renders the English fallback with `TranslationNotice` and `noindex` directive.
   - E2E tests verify the fallback notice behavior and contribution link.
 
 ---

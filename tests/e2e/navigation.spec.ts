@@ -200,4 +200,35 @@ test.describe('Navigation and Localization Suite', () => {
     await expect(drawer.locator('a[href="/pt-BR/docs"]')).toContainText('Documentação');
     await expect(drawer.locator('a[href="/pt-BR/community"]')).toContainText('Comunidade');
   });
+
+  test('should include official favicon, SVG icon, and Apple Touch Icon across localized routes (/en, /es, /pt-BR)', async ({ page }) => {
+    for (const locale of ['en', 'es', 'pt-BR']) {
+      await page.goto(`/${locale}`);
+
+      const iconIco = page.locator('link[rel="icon"][href*="favicon.ico"]').first();
+      await expect(iconIco).toBeAttached();
+
+      const iconSvg = page.locator('link[rel="icon"][type="image/svg+xml"]').first();
+      await expect(iconSvg).toBeAttached();
+
+      const appleIcon = page.locator('link[rel="apple-touch-icon"]').first();
+      await expect(appleIcon).toBeAttached();
+
+      const manifest = page.locator('link[rel="manifest"]').first();
+      await expect(manifest).toBeAttached();
+    }
+  });
+
+  test('should serve favicon.ico, icon.svg, and apple-touch-icon.png with 200 OK status', async ({ request }) => {
+    const faviconRes = await request.get('/favicon.ico');
+    expect(faviconRes.status()).toBe(200);
+
+    const svgRes = await request.get('/icon.svg');
+    expect(svgRes.status()).toBe(200);
+    expect(svgRes.headers()['content-type']).toMatch(/image\/svg\+xml/);
+
+    const appleRes = await request.get('/apple-touch-icon.png');
+    expect(appleRes.status()).toBe(200);
+    expect(appleRes.headers()['content-type']).toMatch(/image\/png/);
+  });
 });

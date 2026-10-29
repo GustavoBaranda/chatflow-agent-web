@@ -3,11 +3,11 @@ import { test, expect } from '@playwright/test';
 test.describe('Navigation and Localization Suite', () => {
   test('should redirect root path to an authoritative localized route with explicit prefix', async ({ page }) => {
     await page.goto('/');
-    // Must redirect to /en or /es
-    await expect(page).toHaveURL(/\/(en|es)/);
+    // Must redirect to /en, /es, or /pt-BR
+    await expect(page).toHaveURL(/\/(en|es|pt-BR)/);
   });
 
-  test('should render English layout with header, brand, and skip link', async ({ page }) => {
+  test('should render English layout with header, brand, skip link, and About section', async ({ page }) => {
     await page.goto('/en');
 
     // Skip to content link
@@ -31,6 +31,15 @@ test.describe('Navigation and Localization Suite', () => {
     const themeBtn = page.locator('header button[aria-pressed]').first();
     await expect(themeBtn).toBeVisible();
 
+    // Visible About section recognizing Gustavo Baranda as Creator & Lead Maintainer
+    const aboutSection = page.locator('section[aria-labelledby="about-heading"]');
+    await expect(aboutSection).toBeVisible();
+    await expect(aboutSection).toContainText('Gustavo Baranda');
+    await expect(aboutSection).toContainText('Creator & Lead Maintainer');
+
+    const creatorLink = aboutSection.locator('a[href="https://github.com/GustavoBaranda"]');
+    await expect(creatorLink).toBeVisible();
+
     // Footer
     const footer = page.locator('footer');
     await expect(footer).toBeVisible();
@@ -48,7 +57,7 @@ test.describe('Navigation and Localization Suite', () => {
     const langBtn = page.locator('header button[aria-label="Change language"]').first();
     await langBtn.click();
 
-    // Select Spanish option
+    // Select Spanish option (native name, flagless)
     const esOption = page.locator('ul[role="listbox"] li', { hasText: 'Español' });
     await expect(esOption).toBeVisible();
     await esOption.click();
@@ -59,6 +68,62 @@ test.describe('Navigation and Localization Suite', () => {
     // Document lang attribute should be 'es'
     const htmlLang = await page.locator('html').getAttribute('lang');
     expect(htmlLang).toBe('es');
+
+    // About section should be translated in Spanish
+    const aboutSection = page.locator('section[aria-labelledby="about-heading"]');
+    await expect(aboutSection).toContainText('Creador y Mantenedor Principal');
+  });
+
+  test('should switch language from English to Brazilian Portuguese and render localized metadata and About section', async ({ page }) => {
+    await page.goto('/en');
+
+    // Open language selector
+    const langBtn = page.locator('header button[aria-label="Change language"]').first();
+    await langBtn.click();
+
+    // Select Brazilian Portuguese option (native name, flagless)
+    const ptOption = page.locator('ul[role="listbox"] li', { hasText: 'Português (Brasil)' });
+    await expect(ptOption).toBeVisible();
+    await ptOption.click();
+
+    // URL should now be /pt-BR
+    await expect(page).toHaveURL(/\/pt-BR/);
+
+    // Document lang attribute should be 'pt-BR'
+    const htmlLang = await page.locator('html').getAttribute('lang');
+    expect(htmlLang).toBe('pt-BR');
+
+    // Portuguese description
+    await expect(page.locator('main p').first()).toContainText('Agentes de IA conversacional');
+
+    // About section translated in Portuguese with Gustavo Baranda attribution
+    const aboutSection = page.locator('section[aria-labelledby="about-heading"]');
+    await expect(aboutSection).toBeVisible();
+    await expect(aboutSection).toContainText('Sobre o chatflow-agent');
+    await expect(aboutSection).toContainText('Criador e Mantenedor Principal');
+    await expect(aboutSection).toContainText('Gustavo Baranda');
+
+    const creatorLink = aboutSection.locator('a[href="https://github.com/GustavoBaranda"]');
+    await expect(creatorLink).toBeVisible();
+  });
+
+  test('should include canonical and hreflang alternate links for all three launch locales', async ({ page }) => {
+    await page.goto('/pt-BR');
+
+    const canonical = await page.locator('link[rel="canonical"]').getAttribute('href');
+    expect(canonical).toContain('/pt-BR');
+
+    const hreflangPt = page.locator('link[rel="alternate"][hreflang="pt-BR"]');
+    await expect(hreflangPt).toBeAttached();
+
+    const hreflangEs = page.locator('link[rel="alternate"][hreflang="es"]');
+    await expect(hreflangEs).toBeAttached();
+
+    const hreflangEn = page.locator('link[rel="alternate"][hreflang="en"]');
+    await expect(hreflangEn).toBeAttached();
+
+    const hreflangDefault = page.locator('link[rel="alternate"][hreflang="x-default"]');
+    await expect(hreflangDefault).toBeAttached();
   });
 
   test('should toggle theme and update html class', async ({ page }) => {
@@ -118,5 +183,21 @@ test.describe('Navigation and Localization Suite', () => {
     await expect(drawer).not.toBeVisible();
     // After closing, label returns to Toggle navigation menu
     await expect(hamburger).toBeVisible();
+  });
+
+  test('should render localized drawer navigation in Brazilian Portuguese', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/pt-BR');
+
+    const hamburger = page.locator('header button[aria-label="Alternar menu de navegação"]');
+    await expect(hamburger).toBeVisible();
+    await hamburger.click();
+
+    const drawer = page.locator('div[role="dialog"]');
+    await expect(drawer).toBeVisible();
+
+    await expect(drawer.locator('a[href="/pt-BR"]')).toContainText('Início');
+    await expect(drawer.locator('a[href="/pt-BR/docs"]')).toContainText('Documentação');
+    await expect(drawer.locator('a[href="/pt-BR/community"]')).toContainText('Comunidade');
   });
 });

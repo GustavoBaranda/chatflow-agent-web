@@ -3,11 +3,14 @@ import { SUPPORTED_LANGUAGES, SUPPORTED_LOCALES, DEFAULT_LOCALE, getLanguage } f
 import { routing } from '@/i18n/routing';
 import enMessages from '../../messages/en.json';
 import esMessages from '../../messages/es.json';
+import ptBRMessages from '../../messages/pt-BR.json';
 
 describe('i18n Configuration & Routing', () => {
-  it('should support English and Spanish locales', () => {
+  it('should support English, Spanish, and Brazilian Portuguese launch locales', () => {
     expect(SUPPORTED_LOCALES).toContain('en');
     expect(SUPPORTED_LOCALES).toContain('es');
+    expect(SUPPORTED_LOCALES).toContain('pt-BR');
+    expect(SUPPORTED_LANGUAGES).toHaveLength(3);
   });
 
   it('should set English as the authoritative default locale', () => {
@@ -22,6 +25,7 @@ describe('i18n Configuration & Routing', () => {
   it('should return correct language metadata with getLanguage', () => {
     const en = getLanguage('en');
     expect(en.name).toBe('English');
+    expect(en.localName).toBe('English');
     expect(en.direction).toBe('ltr');
 
     const es = getLanguage('es');
@@ -29,11 +33,16 @@ describe('i18n Configuration & Routing', () => {
     expect(es.localName).toBe('Español');
     expect(es.direction).toBe('ltr');
 
+    const ptBR = getLanguage('pt-BR');
+    expect(ptBR.name).toBe('Portuguese (Brazil)');
+    expect(ptBR.localName).toBe('Português (Brasil)');
+    expect(ptBR.direction).toBe('ltr');
+
     const fallback = getLanguage('unknown');
     expect(fallback.code).toBe('en');
   });
 
-  it('should have 100% translation key parity between English and Spanish catalogs', () => {
+  it('should have 100% translation key parity across English, Spanish, and Brazilian Portuguese catalogs', () => {
     function getKeys(obj: Record<string, unknown>, prefix = ''): string[] {
       return Object.keys(obj).flatMap((key) => {
         const val = obj[key];
@@ -47,8 +56,19 @@ describe('i18n Configuration & Routing', () => {
 
     const enKeys = getKeys(enMessages as Record<string, unknown>).sort();
     const esKeys = getKeys(esMessages as Record<string, unknown>).sort();
+    const ptBRKeys = getKeys(ptBRMessages as Record<string, unknown>).sort();
 
     expect(esKeys).toEqual(enKeys);
+    expect(ptBRKeys).toEqual(enKeys);
+  });
+
+  it('should include Creator & Lead Maintainer attribution keys for Gustavo Baranda across all catalogs', () => {
+    expect(enMessages.about.creatorName).toBe('Gustavo Baranda');
+    expect(esMessages.about.creatorName).toBe('Gustavo Baranda');
+    expect(ptBRMessages.about.creatorName).toBe('Gustavo Baranda');
+
+    expect(enMessages.about.creatorTitle).toBeTruthy();
+    expect(esMessages.about.creatorTitle).toBeTruthy();
+    expect(ptBRMessages.about.creatorTitle).toBeTruthy();
   });
 });
-

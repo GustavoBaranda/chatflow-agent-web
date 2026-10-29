@@ -12,7 +12,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "fumadocs-mdx && next build --webpack",
-    "start": "next start -p 3100",
+    "start": "next start -p 3001",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

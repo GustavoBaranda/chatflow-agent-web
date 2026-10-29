@@ -116,11 +116,12 @@ describe('Resilience & Maintenance Utilities', () => {
     };
 
     const html = renderToString(
-      React.createElement(
-        NextIntlClientProvider,
-        { locale: 'en', messages: enMessages, timeZone: 'UTC' },
-        React.createElement(LocalizedError, { error: sensitiveError, reset })
-      )
+      React.createElement(NextIntlClientProvider, {
+        locale: 'en',
+        messages: enMessages,
+        timeZone: 'UTC',
+        children: React.createElement(LocalizedError, { error: sensitiveError, reset }),
+      })
     );
 
     // Assert zero sensitive leak
@@ -144,22 +145,24 @@ describe('Resilience & Maintenance Utilities', () => {
 
     // Spanish
     const esHtml = renderToString(
-      React.createElement(
-        NextIntlClientProvider,
-        { locale: 'es', messages: esMessages, timeZone: 'UTC' },
-        React.createElement(LocalizedError, { error, reset: () => {} })
-      )
+      React.createElement(NextIntlClientProvider, {
+        locale: 'es',
+        messages: esMessages,
+        timeZone: 'UTC',
+        children: React.createElement(LocalizedError, { error, reset: () => {} }),
+      })
     );
     expect(esHtml).toContain(esMessages.error.title);
     expect(esHtml).toContain(esMessages.error.retry);
 
     // Portuguese
     const ptHtml = renderToString(
-      React.createElement(
-        NextIntlClientProvider,
-        { locale: 'pt-BR', messages: ptBRMessages, timeZone: 'UTC' },
-        React.createElement(LocalizedError, { error, reset: () => {} })
-      )
+      React.createElement(NextIntlClientProvider, {
+        locale: 'pt-BR',
+        messages: ptBRMessages,
+        timeZone: 'UTC',
+        children: React.createElement(LocalizedError, { error, reset: () => {} }),
+      })
     );
     expect(ptHtml).toContain(ptBRMessages.error.title);
     expect(ptHtml).toContain(ptBRMessages.error.retry);

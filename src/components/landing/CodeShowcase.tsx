@@ -71,7 +71,7 @@ export function CodeShowcase() {
           <div className="flex items-center gap-3 overflow-x-auto text-left font-mono text-sm text-foreground">
             <Terminal className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
             <span className="text-muted-foreground select-none">$</span>
-            <span className="font-semibold text-primary">pip install chatflow-agent</span>
+            <code className="font-semibold text-primary">pip install chatflow-agent</code>
           </div>
           <button
             type="button"
@@ -179,3 +179,4 @@ export function CodeShowcase() {
     </section>
   );
 }
+

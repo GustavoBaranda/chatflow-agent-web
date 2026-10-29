@@ -1,13 +1,12 @@
 import { notFound } from 'next/navigation';
 import { getMessages, setRequestLocale } from 'next-intl/server';
 import { NextIntlClientProvider } from 'next-intl';
-import { AppProviders } from '@/components/providers/AppProviders';
 import { routing } from '@/i18n/routing';
 import { getLanguage } from '@/config/languages';
 import { Navbar } from '@/components/navigation/Navbar';
 import { Footer } from '@/components/navigation/Footer';
+import { LocaleHtmlUpdater } from '@/components/navigation/LocaleHtmlUpdater';
 import type { Metadata } from 'next';
-import '../globals.css';
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -41,24 +40,10 @@ export async function generateMetadata({
       default: 'chatflow-agent — Conversational AI Agents in Python',
     },
     description,
-    metadataBase: new URL('https://chatflowagent.org'),
     alternates: {
       canonical: `/${locale}`,
       languages,
     },
-    icons: {
-      icon: [
-        { url: '/favicon.ico', sizes: 'any' },
-        { url: '/icon.svg', type: 'image/svg+xml' },
-        { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-        { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      ],
-      apple: [
-        { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
-      ],
-      shortcut: '/favicon.ico',
-    },
-    manifest: '/site.webmanifest',
   };
 }
 
@@ -81,19 +66,11 @@ export default async function LocaleLayout({
   const lang = getLanguage(locale);
 
   return (
-    <html lang={locale} dir={lang.direction} suppressHydrationWarning>
-      <body
-        className="flex min-h-screen flex-col bg-background text-foreground antialiased selection:bg-primary/20"
-        suppressHydrationWarning
-      >
-        <NextIntlClientProvider messages={messages}>
-          <AppProviders direction={lang.direction}>
-            <Navbar />
-            {children}
-            <Footer />
-          </AppProviders>
-        </NextIntlClientProvider>
-      </body>
-    </html>
+    <NextIntlClientProvider messages={messages}>
+      <LocaleHtmlUpdater locale={locale} direction={lang.direction} />
+      <Navbar />
+      {children}
+      <Footer />
+    </NextIntlClientProvider>
   );
 }

@@ -41,14 +41,29 @@
     }
   },
   "about": {
+    "metaTitle": "About chatflow-agent — Creator, Vision & Open Source",
+    "metaDescription": "Learn about chatflow-agent, the lightweight async multi-agent Python framework created by Gustavo Baranda, its design principles, and its open source community.",
     "title": "About chatflow-agent",
-    "subtitle": "Built to empower developers with resilient, stateful, and multi-channel conversational agents in Python.",
+    "subtitle": "A lightweight, asynchronous Python multi-agent framework designed for building conversational workflows with native handoffs and multi-channel connectivity.",
+    "originTitle": "Origin & Purpose",
+    "originP1": "chatflow-agent was created to address a clear gap in conversational AI development: connecting LLMs to real-world communication channels without introducing bloated, monolithic orchestration layers.",
+    "originP2": "Instead of imposing complex distributed systems, chatflow-agent focuses on pure Python simplicity, native asynchronous concurrency via asyncio, and reliable SQLite-backed session persistence with turn rollback safety.",
+    "principlesTitle": "Core Architectural Principles",
+    "p1Title": "Lightweight & Asynchronous",
+    "p1Desc": "Engineered from the ground up on standard Python asyncio to handle high-concurrency conversational turns with low overhead.",
+    "p2Title": "Native Multi-Agent Handoffs",
+    "p2Desc": "Orchestrate context-aware transitions between specialized agents seamlessly, preserving history and conversational context.",
+    "p3Title": "Real-World Channels",
+    "p3Desc": "Production-ready connectors for WhatsApp, Telegram, Webhooks with HMAC signature verification, and command-line interfaces.",
+    "p4Title": "State & Memory Integrity",
+    "p4Desc": "Built-in SQLite session persistence with strict sequential turn processing to eliminate race conditions and corrupted histories.",
+    "leadershipTitle": "Project Leadership",
     "creatorTitle": "Creator & Lead Maintainer",
     "creatorName": "Gustavo Baranda",
-    "creatorBio": "Architected and maintains chatflow-agent, focusing on declarative agent workflows, robust session management, and seamless multi-channel connectivity.",
+    "creatorBio": "Architect and lead maintainer of chatflow-agent. Designed the core async multi-agent runtime, native handoff mechanisms, and channel adapters to make robust conversational AI accessible to developers worldwide.",
     "creatorProfile": "GitHub Profile",
-    "communityTitle": "Community & Open Source",
-    "communityDescription": "chatflow-agent thrives through global community collaboration. Developers around the world contribute features, improve documentation, and share feedback.",
+    "communityTitle": "Global Community & Open Source",
+    "communityDescription": "chatflow-agent thrives thanks to contributions from the global open-source community. Developers, translators, testers, and users worldwide help improve the framework with every release.",
     "communityContribute": "Get Involved on GitHub"
   }
 }

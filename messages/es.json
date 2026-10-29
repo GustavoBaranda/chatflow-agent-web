@@ -96,5 +96,10 @@
     "communityTeaserDesc": "chatflow-agent es un proyecto de código abierto publicado bajo Licencia MIT, creado y liderado por Gustavo Baranda junto a colaboradores de todo el mundo.",
     "learnMoreAbout": "Conocé más sobre el proyecto y su creador",
     "joinCommunity": "Explorá las discusiones de la comunidad"
+  },
+  "notFound": {
+    "title": "Página no encontrada",
+    "description": "La página que estás buscando no existe o ha sido movida.",
+    "returnHome": "Volver al inicio"
   }
 }

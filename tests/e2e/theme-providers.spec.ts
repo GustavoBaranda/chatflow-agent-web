@@ -144,4 +144,86 @@ test.describe('Theme System, Providers & Console Integrity Suite', () => {
 
     expect(hasAsyncThemeScript).toBe(true);
   });
+
+  test('should serve correct initial SSR html lang attribute directly in server response for each locale', async ({ request }) => {
+    const enRes = await request.get('/en');
+    const enHtml = await enRes.text();
+    expect(enHtml).toMatch(/<html[^>]*\slang="en"/);
+
+    const esRes = await request.get('/es');
+    const esHtml = await esRes.text();
+    expect(esHtml).toMatch(/<html[^>]*\slang="es"/);
+
+    const ptRes = await request.get('/pt-BR');
+    const ptHtml = await ptRes.text();
+    expect(ptHtml).toMatch(/<html[^>]*\slang="pt-BR"/);
+  });
+
+  test('should switch languages via UI LanguageSelector repeatedly without script warnings or remount errors', async ({ page }) => {
+    const consoleErrors: string[] = [];
+    page.on('pageerror', (err) => consoleErrors.push(err.message));
+    page.on('console', (msg) => {
+      if (msg.type() === 'error' && !msg.text().includes('net::ERR_')) {
+        consoleErrors.push(msg.text());
+      }
+    });
+
+    await page.goto('/en');
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+
+    // Attach marker to window to verify client-side navigation without full page reload
+    await page.evaluate(() => {
+      (window as unknown as { __spa_persistent_marker: string }).__spa_persistent_marker = 'chatflow_active_spa';
+    });
+
+    // 1. Switch to Spanish via UI dropdown
+    await page.locator('header button[aria-label="Change language"]').click();
+    await page.locator('role=option[name="Español"]').click();
+    await page.waitForURL(/\/es/);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+    await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+
+    // Verify window marker persisted (proves client-side navigation, no full reload)
+    const markerAfterEs = await page.evaluate(
+      () => (window as unknown as { __spa_persistent_marker?: string }).__spa_persistent_marker
+    );
+    expect(markerAfterEs).toBe('chatflow_active_spa');
+
+    // 2. Switch to Brazilian Portuguese via UI dropdown
+    await page.locator('header button[aria-label="Cambiar idioma"]').click();
+    await page.locator('role=option[name="Português (Brasil)"]').click();
+    await page.waitForURL(/\/pt-BR/);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
+
+    // Verify window marker still persisted
+    const markerAfterPt = await page.evaluate(
+      () => (window as unknown as { __spa_persistent_marker?: string }).__spa_persistent_marker
+    );
+    expect(markerAfterPt).toBe('chatflow_active_spa');
+
+    // 3. Switch back to English via UI dropdown
+    await page.locator('header button[aria-label="Alterar idioma"]').click();
+    await page.locator('role=option[name="English"]').click();
+    await page.waitForURL(/\/en/);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+
+    // Verify window marker still persisted
+    const markerAfterEn = await page.evaluate(
+      () => (window as unknown as { __spa_persistent_marker?: string }).__spa_persistent_marker
+    );
+    expect(markerAfterEn).toBe('chatflow_active_spa');
+
+    // 4. Switch back to Spanish once more
+    await page.locator('header button[aria-label="Change language"]').click();
+    await page.locator('role=option[name="Español"]').click();
+    await page.waitForURL(/\/es/);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+
+    // Confirm absolutely zero console errors or script tag warnings
+    const scriptTagWarnings = consoleErrors.filter((e) => e.includes('Encountered a script tag'));
+    expect(scriptTagWarnings).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+  });
 });

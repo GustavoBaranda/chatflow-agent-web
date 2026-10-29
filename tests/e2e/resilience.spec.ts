@@ -121,5 +121,17 @@ test.describe('Resilience, Error Boundaries & Maintenance Suite', () => {
     expect(res?.status()).toBe(200);
     expect(page.url()).toContain('/en');
   });
+
+  test('should verify autonomous static fallback file exists and has zero external dependencies', async () => {
+    const filePath = path.resolve('public/maintenance.html');
+    expect(fs.existsSync(filePath)).toBe(true);
+    const content = fs.readFileSync(filePath, 'utf-8');
+    expect(content).toContain('<!DOCTYPE html>');
+    expect(content).toContain('pip install chatflow-agent');
+    expect(content).toContain('https://github.com/GustavoBaranda/chatflow-agent');
+    // Ensure zero external CDN or third party scripts/stylesheets
+    expect(content).not.toMatch(/<link[^>]+rel=["']stylesheet["'][^>]+href=["']https?:\/\//);
+    expect(content).not.toMatch(/<script[^>]+src=["']https?:\/\//);
+  });
 });
 

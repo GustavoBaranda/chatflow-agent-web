@@ -313,4 +313,11 @@ test.describe('Navigation, Home, and About Suite', () => {
     expect(appleRes.status()).toBe(200);
     expect(appleRes.headers()['content-type']).toMatch(/image\/png/);
   });
+
+  test('should render localized 404 Not Found page for nonexistent routes within a locale without hydration errors', async ({ page }) => {
+    await page.goto('/pt-BR/non-existent-page');
+    await expect(page.locator('h1')).toContainText('Página não encontrada');
+    await expect(page.locator('a:has-text("Voltar ao início")')).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
+  });
 });

@@ -71,4 +71,18 @@ describe('i18n Configuration & Routing', () => {
     expect(esMessages.about.creatorTitle).toBeTruthy();
     expect(ptBRMessages.about.creatorTitle).toBeTruthy();
   });
+
+  it('should include verified SDK capabilities and installation keys in home namespace across all catalogs', () => {
+    expect(enMessages.home.badge).toContain('v0.3.4');
+    expect(esMessages.home.badge).toContain('v0.3.4');
+    expect(ptBRMessages.home.badge).toContain('v0.3.4');
+
+    expect(enMessages.home.featHandoffsTitle).toBeTruthy();
+    expect(esMessages.home.featHandoffsTitle).toBeTruthy();
+    expect(ptBRMessages.home.featHandoffsTitle).toBeTruthy();
+
+    expect(enMessages.navigation.about).toBe('About');
+    expect(esMessages.navigation.about).toBe('Acerca de');
+    expect(ptBRMessages.navigation.about).toBe('Sobre');
+  });
 });

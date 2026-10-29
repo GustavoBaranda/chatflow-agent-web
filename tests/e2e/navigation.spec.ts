@@ -1,13 +1,13 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Navigation and Localization Suite', () => {
+test.describe('Navigation, Home, and About Suite', () => {
   test('should redirect root path to an authoritative localized route with explicit prefix', async ({ page }) => {
     await page.goto('/');
     // Must redirect to /en, /es, or /pt-BR
     await expect(page).toHaveURL(/\/(en|es|pt-BR)/);
   });
 
-  test('should render English layout with header, brand, skip link, and About section', async ({ page }) => {
+  test('should render English Home page with aligned header controls, hero, code showcase, and features', async ({ page }) => {
     await page.goto('/en');
 
     // Skip to content link
@@ -19,26 +19,57 @@ test.describe('Navigation and Localization Suite', () => {
     await expect(brand).toBeVisible();
     await expect(brand).toContainText('chatflow-agent');
 
-    // Header nav links
+    // Header nav links (Home, Docs, Community, About)
     await expect(page.locator('header nav a[href="/en/docs"]')).toBeAttached();
     await expect(page.locator('header nav a[href="/en/community"]')).toBeAttached();
+    await expect(page.locator('header nav a[href="/en/about"]')).toBeVisible();
 
-    // Language selector
+    // Header control height and alignment check (h-9 class)
     const langBtn = page.locator('header button[aria-label="Change language"]');
-    await expect(langBtn).toBeAttached();
+    await expect(langBtn).toHaveClass(/h-9/);
+    await expect(langBtn).toHaveClass(/rounded-lg/);
 
-    // Theme toggle button
     const themeBtn = page.locator('header button[aria-pressed]').first();
-    await expect(themeBtn).toBeVisible();
+    await expect(themeBtn).toHaveClass(/h-9/);
+    await expect(themeBtn).toHaveClass(/rounded-lg/);
 
-    // Visible About section recognizing Gustavo Baranda as Creator & Lead Maintainer
-    const aboutSection = page.locator('section[aria-labelledby="about-heading"]');
-    await expect(aboutSection).toBeVisible();
-    await expect(aboutSection).toContainText('Gustavo Baranda');
-    await expect(aboutSection).toContainText('Creator & Lead Maintainer');
+    const ghLink = page.locator('header a[href="https://github.com/GustavoBaranda/chatflow-agent"]');
+    await expect(ghLink).toHaveClass(/h-9/);
+    await expect(ghLink).toHaveClass(/rounded-lg/);
 
-    const creatorLink = aboutSection.locator('a[href="https://github.com/GustavoBaranda"]');
-    await expect(creatorLink).toBeVisible();
+    // Hero Section
+    const heroHeading = page.locator('h1');
+    await expect(heroHeading).toContainText('Build Contextual Multi-Agent Systems in Python');
+
+    // Release badge with v0.3.4
+    const badge = page.locator('text=chatflow-agent v0.3.4').first();
+    await expect(badge).toBeVisible();
+
+    // Primary CTA buttons (no broken internal links)
+    const getStartedBtn = page.locator('a[href="#quickstart"]').first();
+    await expect(getStartedBtn).toBeVisible();
+
+    const docsBtn = page.locator('a[href="https://github.com/GustavoBaranda/chatflow-agent#readme"]');
+    await expect(docsBtn).toBeVisible();
+
+    // Installation command block
+    await expect(page.locator('code:has-text("pip install chatflow-agent")')).toBeVisible();
+
+    // Python Code Showcase
+    const codeShowcase = page.locator('#quickstart');
+    await expect(codeShowcase).toBeVisible();
+    await expect(codeShowcase).toContainText('from chatflow_agent import Agent, Runner, SQLiteSessionStore');
+    await expect(codeShowcase).toContainText('chatflow-agent v0.3.4');
+
+    // Features Section (6 verified capabilities)
+    const featuresSection = page.locator('section[aria-labelledby="features-title"]');
+    await expect(featuresSection).toBeVisible();
+    await expect(featuresSection.locator('article')).toHaveCount(6);
+
+    // Community Teaser linking to About page
+    const communityTeaser = page.locator('section[aria-labelledby="community-teaser-title"]');
+    await expect(communityTeaser).toBeVisible();
+    await expect(communityTeaser.locator('a[href="/en/about"]')).toBeVisible();
 
     // Footer
     const footer = page.locator('footer');
@@ -47,11 +78,68 @@ test.describe('Navigation and Localization Suite', () => {
     await expect(footer).toContainText('MIT License');
   });
 
-  test('should switch language from English to Spanish', async ({ page }) => {
+  test('should navigate to dedicated multilingual About page and verify Creator attribution in English', async ({ page }) => {
+    await page.goto('/en/about');
+
+    // Heading
+    await expect(page.locator('h1')).toContainText('About chatflow-agent');
+
+    // Creator & Lead Maintainer card with Gustavo Baranda and GitHub profile link
+    const creatorSection = page.locator('article', { hasText: 'Gustavo Baranda' });
+    await expect(creatorSection).toBeVisible();
+    await expect(creatorSection).toContainText('Creator & Lead Maintainer');
+
+    const creatorLink = creatorSection.locator('a[href="https://github.com/GustavoBaranda"]');
+    await expect(creatorLink).toBeVisible();
+    await expect(creatorLink).toHaveAttribute('target', '_blank');
+
+    // 4 Architectural Principles
+    const principlesSection = page.locator('section[aria-labelledby="principles-heading"]');
+    await expect(principlesSection).toBeVisible();
+    await expect(principlesSection.locator('article')).toHaveCount(4);
+
+    // Leadership and Community Section
+    const leadershipSection = page.locator('section[aria-labelledby="leadership-heading"]');
+    await expect(leadershipSection).toBeVisible();
+  });
+
+  test('should render About page in Spanish with proper translations', async ({ page }) => {
+    await page.goto('/es/about');
+
+    await expect(page.locator('h1')).toContainText('Acerca de chatflow-agent');
+
+    const creatorSection = page.locator('article', { hasText: 'Gustavo Baranda' });
+    await expect(creatorSection).toBeVisible();
+    await expect(creatorSection).toContainText('Creador y Mantenedor Principal');
+
+    const creatorLink = creatorSection.locator('a[href="https://github.com/GustavoBaranda"]');
+    await expect(creatorLink).toBeVisible();
+
+    const htmlLang = await page.locator('html').getAttribute('lang');
+    expect(htmlLang).toBe('es');
+  });
+
+  test('should render About page in Brazilian Portuguese with proper translations', async ({ page }) => {
+    await page.goto('/pt-BR/about');
+
+    await expect(page.locator('h1')).toContainText('Sobre o chatflow-agent');
+
+    const creatorSection = page.locator('article', { hasText: 'Gustavo Baranda' });
+    await expect(creatorSection).toBeVisible();
+    await expect(creatorSection).toContainText('Criador e Mantenedor Principal');
+
+    const creatorLink = creatorSection.locator('a[href="https://github.com/GustavoBaranda"]');
+    await expect(creatorLink).toBeVisible();
+
+    const htmlLang = await page.locator('html').getAttribute('lang');
+    expect(htmlLang).toBe('pt-BR');
+  });
+
+  test('should switch language from English to Spanish via LanguageSelector', async ({ page }) => {
     await page.goto('/en');
 
     // Check English heading
-    await expect(page.locator('h1')).toHaveText('chatflow-agent');
+    await expect(page.locator('h1')).toContainText('Build Contextual Multi-Agent Systems in Python');
 
     // Open language selector
     const langBtn = page.locator('header button[aria-label="Change language"]').first();
@@ -69,12 +157,11 @@ test.describe('Navigation and Localization Suite', () => {
     const htmlLang = await page.locator('html').getAttribute('lang');
     expect(htmlLang).toBe('es');
 
-    // About section should be translated in Spanish
-    const aboutSection = page.locator('section[aria-labelledby="about-heading"]');
-    await expect(aboutSection).toContainText('Creador y Mantenedor Principal');
+    // Spanish Hero heading
+    await expect(page.locator('h1')).toContainText('Construí Sistemas Multiagente Contextuales en Python');
   });
 
-  test('should switch language from English to Brazilian Portuguese and render localized metadata and About section', async ({ page }) => {
+  test('should switch language from English to Brazilian Portuguese via LanguageSelector', async ({ page }) => {
     await page.goto('/en');
 
     // Open language selector
@@ -93,18 +180,8 @@ test.describe('Navigation and Localization Suite', () => {
     const htmlLang = await page.locator('html').getAttribute('lang');
     expect(htmlLang).toBe('pt-BR');
 
-    // Portuguese description
-    await expect(page.locator('main p').first()).toContainText('Agentes de IA conversacional');
-
-    // About section translated in Portuguese with Gustavo Baranda attribution
-    const aboutSection = page.locator('section[aria-labelledby="about-heading"]');
-    await expect(aboutSection).toBeVisible();
-    await expect(aboutSection).toContainText('Sobre o chatflow-agent');
-    await expect(aboutSection).toContainText('Criador e Mantenedor Principal');
-    await expect(aboutSection).toContainText('Gustavo Baranda');
-
-    const creatorLink = aboutSection.locator('a[href="https://github.com/GustavoBaranda"]');
-    await expect(creatorLink).toBeVisible();
+    // Portuguese Hero heading
+    await expect(page.locator('h1')).toContainText('Construa Sistemas Multiagentes Contextuais em Python');
   });
 
   test('should include canonical and hreflang alternate links for all three launch locales', async ({ page }) => {
@@ -132,16 +209,17 @@ test.describe('Navigation and Localization Suite', () => {
     const themeBtn = page.locator('header button[aria-pressed]').first();
     await expect(themeBtn).toBeVisible();
 
-    const initialTheme = await page.locator('html').getAttribute('class');
+    const isInitiallyDark = (await page.locator('html').getAttribute('class'))?.includes('dark');
     await themeBtn.click();
 
-    // The theme class should have been toggled
-    const updatedTheme = await page.locator('html').getAttribute('class');
-    expect(updatedTheme).not.toBe(initialTheme);
+    if (isInitiallyDark) {
+      await expect(page.locator('html')).toHaveClass(/light/);
+    } else {
+      await expect(page.locator('html')).toHaveClass(/dark/);
+    }
   });
 
   test('should support keyboard navigation in mobile drawer on small screens', async ({ page }) => {
-    // Set viewport to mobile size
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/en');
 
@@ -158,6 +236,9 @@ test.describe('Navigation and Localization Suite', () => {
 
     // Body scroll should be locked via html.menu-open
     await expect(page.locator('html')).toHaveClass(/menu-open/);
+
+    // Verify About link in drawer
+    await expect(drawer.locator('a[href="/en/about"]')).toBeVisible();
 
     // Press Escape to close
     await page.keyboard.press('Escape');
@@ -185,7 +266,7 @@ test.describe('Navigation and Localization Suite', () => {
     await expect(hamburger).toBeVisible();
   });
 
-  test('should render localized drawer navigation in Brazilian Portuguese', async ({ page }) => {
+  test('should render localized drawer navigation with About in Brazilian Portuguese', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/pt-BR');
 
@@ -199,6 +280,7 @@ test.describe('Navigation and Localization Suite', () => {
     await expect(drawer.locator('a[href="/pt-BR"]')).toContainText('Início');
     await expect(drawer.locator('a[href="/pt-BR/docs"]')).toContainText('Documentação');
     await expect(drawer.locator('a[href="/pt-BR/community"]')).toContainText('Comunidade');
+    await expect(drawer.locator('a[href="/pt-BR/about"]')).toContainText('Sobre');
   });
 
   test('should include official favicon, SVG icon, and Apple Touch Icon across localized routes (/en, /es, /pt-BR)', async ({ page }) => {

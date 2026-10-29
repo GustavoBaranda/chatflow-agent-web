@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>503 Service Unavailable — chatflow-agent</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(17, 24, 39, 0.85);
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --amber: #f59e0b;
+      --amber-bg: rgba(245, 158, 11, 0.1);
+      --amber-border: rgba(245, 158, 11, 0.25);
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f9fafb;
+        --card-bg: rgba(255, 255, 255, 0.9);
+        --border: rgba(0, 0, 0, 0.1);
+        --text: #111827;
+        --text-muted: #4b5563;
+        --primary: #2563eb;
+        --primary-hover: #1d4ed8;
+        --amber: #d97706;
+        --amber-bg: rgba(217, 119, 6, 0.1);
+        --amber-border: rgba(217, 119, 6, 0.25);
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      text-align: center;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 38rem;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .logo-badge {
+      width: 4.5rem;
+      height: 4.5rem;
+      border-radius: 1.25rem;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+    }
+    .logo-badge svg {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-radius: 9999px;
+      border: 1px solid var(--amber-border);
+      background: var(--amber-bg);
+      color: var(--amber);
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.35rem 0.85rem;
+      margin-bottom: 1rem;
+    }
+    .pulse-dot {
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 9999px;
+      background: var(--amber);
+    }
+    h1 {
+      font-size: 1.875rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      margin-bottom: 0.75rem;
+      color: var(--text);
+    }
+    @media (min-width: 640px) {
+      h1 { font-size: 2.25rem; }
+    }
+    p.desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      max-width: 32rem;
+      margin-bottom: 1.5rem;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: center;
+      margin-bottom: 2rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      height: 2.75rem;
+      padding: 0 1.5rem;
+      border-radius: 0.75rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+    .btn-secondary {
+      background: var(--card-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover {
+      background: rgba(128, 128, 128, 0.1);
+    }
+    .fallback-card {
+      width: 100%;
+      border-radius: 1rem;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      padding: 1.25rem;
+      text-align: left;
+      margin-top: 1rem;
+    }
+    .fallback-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    .tag {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 0.375rem;
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--primary);
+      font-weight: 600;
+    }
+    .code-block {
+      margin-top: 0.75rem;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 0.65rem 0.85rem;
+      border-radius: 0.5rem;
+      font-family: monospace;
+      font-size: 0.825rem;
+      border: 1px solid var(--border);
+    }
+    .lang-tabs {
+      display: inline-flex;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 0.25rem;
+      gap: 0.25rem;
+      margin-top: 1.5rem;
+    }
+    .lang-tab {
+      background: none;
+      border: none;
+      padding: 0.25rem 0.75rem;
+      border-radius: 0.375rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .lang-tab.active {
+      background: var(--primary);
+      color: #ffffff;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Official Isotype SVG -->
+    <div class="logo-badge" aria-hidden="true">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="45" stroke="#3b82f6" stroke-width="8" stroke-dasharray="180 50" stroke-linecap="round" />
+        <circle cx="50" cy="50" r="28" stroke="#8b5cf6" stroke-width="6" stroke-dasharray="100 35" stroke-linecap="round" />
+        <circle cx="50" cy="50" r="12" fill="#3b82f6" />
+      </svg>
+    </div>
+
+    <!-- Status Badge -->
+    <div class="status-badge" role="status">
+      <span class="pulse-dot" aria-hidden="true"></span>
+      <span id="txt-badge">HTTP 503 • Scheduled Maintenance</span>
+    </div>
+
+    <!-- Title and Description -->
+    <h1 id="txt-title">System maintenance in progress</h1>
+    <p class="desc" id="txt-desc">
+      We are performing scheduled infrastructure updates and platform improvements. The chatflow-agent documentation platform will be back online shortly.
+    </p>
+
+    <!-- Actions -->
+    <div class="actions">
+      <button type="button" class="btn btn-primary" onclick="window.location.reload();" id="btn-refresh">
+        Check Again
+      </button>
+      <a href="https://github.com/GustavoBaranda/chatflow-agent" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="btn-github">
+        GitHub Repository →
+      </a>
+    </div>
+
+    <!-- Python SDK Autonomous Card -->
+    <div class="fallback-card">
+      <div class="fallback-header">
+        <span id="txt-sdk-title">Python SDK remains fully operational</span>
+        <span class="tag">v0.3.4</span>
+      </div>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;" id="txt-sdk-desc">
+        Install and run chatflow-agent directly from PyPI while web maintenance is underway:
+      </p>
+      <div class="code-block">pip install chatflow-agent</div>
+    </div>
+
+    <!-- Language Selector Tabs (Flagless per Rule 2.4) -->
+    <div class="lang-tabs" role="group" aria-label="Language selection">
+      <button type="button" class="lang-tab active" onclick="switchLang('en')">English</button>
+      <button type="button" class="lang-tab" onclick="switchLang('es')">Español</button>
+      <button type="button" class="lang-tab" onclick="switchLang('pt-BR')">Português (Brasil)</button>
+    </div>
+  </div>
+
+  <script>
+    var TRANSLATIONS = {
+      en: {
+        badge: "HTTP 503 • Scheduled Maintenance",
+        title: "System maintenance in progress",
+        desc: "We are performing scheduled infrastructure updates and platform improvements. The chatflow-agent documentation platform will be back online shortly.",
+        refresh: "Check Again",
+        github: "GitHub Repository →",
+        sdkTitle: "Python SDK remains fully operational",
+        sdkDesc: "Install and run chatflow-agent directly from PyPI while web maintenance is underway:"
+      },
+      es: {
+        badge: "HTTP 503 • Mantenimiento Programado",
+        title: "Mantenimiento del sistema en progreso",
+        desc: "Estamos realizando actualizaciones programadas de infraestructura y mejoras en la plataforma. chatflow-agent volverá a estar en línea en breve.",
+        refresh: "Comprobar de nuevo",
+        github: "Repositorio en GitHub →",
+        sdkTitle: "El SDK de Python permanece totalmente operativo",
+        sdkDesc: "Instalá y ejecutá chatflow-agent directamente desde PyPI mientras concluye el mantenimiento web:"
+      },
+      "pt-BR": {
+        badge: "HTTP 503 • Manutenção Programada",
+        title: "Manutenção do sistema em andamento",
+        desc: "Estamos realizando atualizações programadas de infraestrutura e melhorias na plataforma. O chatflow-agent estará online novamente em breve.",
+        refresh: "Verificar novamente",
+        github: "Repositório no GitHub →",
+        sdkTitle: "O SDK do Python permanece totalmente operacional",
+        sdkDesc: "Instale e execute o chatflow-agent diretamente do PyPI durante a janela de manutenção:"
+      }
+    };
+
+    function switchLang(lang) {
+      var data = TRANSLATIONS[lang] || TRANSLATIONS.en;
+      document.getElementById('txt-badge').innerText = data.badge;
+      document.getElementById('txt-title').innerText = data.title;
+      document.getElementById('txt-desc').innerText = data.desc;
+      document.getElementById('btn-refresh').innerText = data.refresh;
+      document.getElementById('btn-github').innerText = data.github;
+      document.getElementById('txt-sdk-title').innerText = data.sdkTitle;
+      document.getElementById('txt-sdk-desc').innerText = data.sdkDesc;
+      document.documentElement.lang = lang;
+
+      var tabs = document.querySelectorAll('.lang-tab');
+      tabs.forEach(function(t) {
+        if (t.innerText.includes(lang === 'pt-BR' ? 'Português' : lang === 'es' ? 'Español' : 'English')) {
+          t.classList.add('active');
+        } else {
+          t.classList.remove('active');
+        }
+      });
+    }
+
+    // Auto-detect browser preferred language on initial load
+    var navLang = (navigator.language || 'en').toLowerCase();
+    if (navLang.startsWith('es')) switchLang('es');
+    else if (navLang.startsWith('pt')) switchLang('pt-BR');
+  </script>
+</body>
+</html>

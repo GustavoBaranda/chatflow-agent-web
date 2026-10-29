@@ -1,7 +1,57 @@
 import createMiddleware from 'next-intl/middleware';
+import { NextResponse, type NextRequest } from 'next/server';
 import { routing } from './i18n/routing';
+import {
+  isMaintenanceModeEnabled,
+  getMaintenanceRetryAfter,
+  isStaticAsset,
+} from './lib/maintenance';
 
-export default createMiddleware(routing);
+const intlMiddleware = createMiddleware(routing);
+
+export default function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Handle scheduled maintenance mode when active
+  if (isMaintenanceModeEnabled()) {
+    // Immediately allow static assets, images, brand assets, and internal bundles
+    if (isStaticAsset(pathname)) {
+      return NextResponse.next();
+    }
+
+    const retryAfter = getMaintenanceRetryAfter();
+    const segments = pathname.split('/').filter(Boolean);
+    const firstSegment = segments[0] as (typeof routing.locales)[number] | undefined;
+    const isSupportedLocale = firstSegment && routing.locales.includes(firstSegment);
+    const targetLocale = isSupportedLocale ? firstSegment : routing.defaultLocale;
+    const isMaintenanceRoute = segments[isSupportedLocale ? 1 : 0] === 'maintenance';
+
+    // If already accessing the localized maintenance page directly, render it with HTTP 503
+    if (isSupportedLocale && isMaintenanceRoute) {
+      const response = intlMiddleware(request);
+      response.headers.set('Retry-After', String(retryAfter));
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+      return new NextResponse(response.body, {
+        status: 503,
+        statusText: 'Service Unavailable',
+        headers: response.headers,
+      });
+    }
+
+    // Rewrite any other incoming route to the localized maintenance page with HTTP 503
+    const maintenanceUrl = new URL(`/${targetLocale}/maintenance`, request.url);
+    return NextResponse.rewrite(maintenanceUrl, {
+      status: 503,
+      statusText: 'Service Unavailable',
+      headers: {
+        'Retry-After': String(retryAfter),
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      },
+    });
+  }
+
+  return intlMiddleware(request);
+}
 
 export const config = {
   // Match all pathnames except for

@@ -10,7 +10,7 @@ export default function GlobalNotFound() {
         className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center overflow-hidden"
         aria-hidden="true"
       >
-        <div className="h-[360px] w-[360px] rounded-full bg-primary/10 blur-3xl sm:h-[480px] sm:w-[480px]" />
+        <div className="h-90 w-90 rounded-full bg-primary/10 blur-3xl sm:h-120 sm:w-120" />
       </div>
 
       <main id="main-content" className="mx-auto flex max-w-2xl flex-col items-center py-16">

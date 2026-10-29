@@ -70,10 +70,9 @@ function resolveLocale(): SupportedLocale {
 }
 
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
-  const [locale, setLocale] = useState<SupportedLocale>('en');
+  const [locale, setLocale] = useState<SupportedLocale>(() => resolveLocale());
 
   useEffect(() => {
-    setLocale(resolveLocale());
     console.error('[GlobalErrorBoundary]', error);
   }, [error]);
 
@@ -162,7 +161,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
               type="button"
               onClick={() => {
                 if (typeof window !== 'undefined') {
-                  window.location.href = `/${locale}`;
+                  window.location.assign(new URL(`/${locale}`, window.location.origin).href);
                 }
               }}
               className="inline-flex h-11 items-center justify-center rounded-xl border border-border/80 bg-background/80 px-6 text-sm font-semibold text-foreground backdrop-blur-xs transition-all hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-98 cursor-pointer"

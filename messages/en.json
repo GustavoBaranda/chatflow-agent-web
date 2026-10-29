@@ -98,8 +98,13 @@
     "joinCommunity": "Explore community discussions"
   },
   "notFound": {
-    "title": "Page Not Found",
-    "description": "The page you are looking for does not exist or has been moved.",
-    "returnHome": "Return Home"
+    "badge": "HTTP 404 • Unmapped Route",
+    "title": "Conversation flow reached an unmapped route",
+    "description": "The agent attempted a context handoff, but this path does not exist in the session graph. It may have been moved, renamed, or is currently under active development.",
+    "returnHome": "Return to Home",
+    "viewDocs": "Read Official Documentation",
+    "quickLinksTitle": "Or explore these sections:",
+    "aboutLink": "About the Project",
+    "communityLink": "Community & Discussions"
   }
 }

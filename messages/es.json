@@ -98,8 +98,13 @@
     "joinCommunity": "Explorá las discusiones de la comunidad"
   },
   "notFound": {
-    "title": "Página no encontrada",
-    "description": "La página que estás buscando no existe o ha sido movida.",
-    "returnHome": "Volver al inicio"
+    "badge": "HTTP 404 • Ruta no mapeada",
+    "title": "El flujo conversacional llegó a una ruta no mapeada",
+    "description": "El agente intentó una delegación de contexto, pero este destino no existe en el grafo de la sesión actual. Es posible que haya sido movido, renombrado o aún esté en desarrollo.",
+    "returnHome": "Volver al inicio",
+    "viewDocs": "Consultar documentación oficial",
+    "quickLinksTitle": "O explorá estas secciones:",
+    "aboutLink": "Acerca del proyecto",
+    "communityLink": "Comunidad y debates"
   }
 }

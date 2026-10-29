@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "fumadocs-ui/style.css";
 
 @custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
 
@@ -26,6 +27,22 @@
   --card-foreground: #090e1a;
   --accent-cyan: #00d2f0;
   --accent-violet: #7c3aed;
+
+  /* Fumadocs Theme Token Harmonization */
+  --color-fd-background: var(--background);
+  --color-fd-foreground: var(--foreground);
+  --color-fd-primary: var(--primary);
+  --color-fd-primary-foreground: var(--primary-foreground);
+  --color-fd-muted: var(--muted);
+  --color-fd-muted-foreground: var(--muted-foreground);
+  --color-fd-border: var(--border);
+  --color-fd-card: var(--card);
+  --color-fd-card-foreground: var(--card-foreground);
+  --color-fd-popover: var(--card);
+  --color-fd-popover-foreground: var(--card-foreground);
+  --color-fd-accent: rgba(37, 99, 235, 0.08);
+  --color-fd-accent-foreground: var(--primary);
+  --color-fd-ring: var(--primary);
 }
 
 .dark {
@@ -40,6 +57,22 @@
   --card-foreground: #f8fafc;
   --accent-cyan: #00e5ff;
   --accent-violet: #8b5cf6;
+
+  /* Fumadocs Theme Token Harmonization */
+  --color-fd-background: var(--background);
+  --color-fd-foreground: var(--foreground);
+  --color-fd-primary: var(--primary);
+  --color-fd-primary-foreground: var(--primary-foreground);
+  --color-fd-muted: var(--muted);
+  --color-fd-muted-foreground: var(--muted-foreground);
+  --color-fd-border: var(--border);
+  --color-fd-card: var(--card);
+  --color-fd-card-foreground: var(--card-foreground);
+  --color-fd-popover: var(--card);
+  --color-fd-popover-foreground: var(--card-foreground);
+  --color-fd-accent: rgba(59, 130, 246, 0.12);
+  --color-fd-accent-foreground: var(--primary);
+  --color-fd-ring: var(--primary);
 }
 
 body {

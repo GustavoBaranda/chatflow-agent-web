@@ -194,5 +194,105 @@ test.describe('Comprehensive Visual and Accessibility Validation', () => {
     const htmlLang = await page.locator('html').getAttribute('lang');
     expect(htmlLang).toBe('es');
   });
+
+  test('Audit 6: Phase 2 Deliverables - Home and About Visuals across Themes and Devices', async ({ page }) => {
+    // 1. Desktop captures (1280 x 800)
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    // Home - Desktop Light
+    await page.goto('/en');
+    await page.locator('html').evaluate((el) => {
+      el.classList.remove('dark');
+      el.classList.add('light');
+    });
+    await page.waitForTimeout(300);
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, 'home-desktop-light.png'),
+      fullPage: true,
+    });
+
+    // Home - Desktop Dark
+    await page.locator('html').evaluate((el) => {
+      el.classList.remove('light');
+      el.classList.add('dark');
+    });
+    await page.waitForTimeout(300);
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, 'home-desktop-dark.png'),
+      fullPage: true,
+    });
+
+    // About - Desktop Dark
+    await page.goto('/en/about');
+    await page.locator('html').evaluate((el) => {
+      el.classList.remove('light');
+      el.classList.add('dark');
+    });
+    await page.waitForTimeout(300);
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, 'about-desktop-dark.png'),
+      fullPage: true,
+    });
+
+    // About - Desktop Light
+    await page.locator('html').evaluate((el) => {
+      el.classList.remove('dark');
+      el.classList.add('light');
+    });
+    await page.waitForTimeout(300);
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, 'about-desktop-light.png'),
+      fullPage: true,
+    });
+
+    // 2. Mobile captures (390 x 844)
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    // Home - Mobile Light
+    await page.goto('/en');
+    await page.locator('html').evaluate((el) => {
+      el.classList.remove('dark');
+      el.classList.add('light');
+    });
+    await page.waitForTimeout(300);
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, 'home-mobile-light.png'),
+      fullPage: false,
+    });
+
+    // Home - Mobile Dark
+    await page.locator('html').evaluate((el) => {
+      el.classList.remove('light');
+      el.classList.add('dark');
+    });
+    await page.waitForTimeout(300);
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, 'home-mobile-dark.png'),
+      fullPage: false,
+    });
+
+    // About - Mobile Dark
+    await page.goto('/en/about');
+    await page.locator('html').evaluate((el) => {
+      el.classList.remove('light');
+      el.classList.add('dark');
+    });
+    await page.waitForTimeout(300);
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, 'about-mobile-dark.png'),
+      fullPage: false,
+    });
+
+    // About - Mobile Light
+    await page.locator('html').evaluate((el) => {
+      el.classList.remove('dark');
+      el.classList.add('light');
+    });
+    await page.waitForTimeout(300);
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, 'about-mobile-light.png'),
+      fullPage: false,
+    });
+  });
 });
 

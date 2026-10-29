@@ -316,7 +316,7 @@ test.describe('Navigation, Home, and About Suite', () => {
 
   test('should render localized 404 Not Found page for nonexistent routes within a locale without hydration errors', async ({ page }) => {
     await page.goto('/pt-BR/non-existent-page');
-    await expect(page.locator('h1')).toContainText('Página não encontrada');
+    await expect(page.locator('h1')).toContainText('O fluxo conversacional atingiu uma rota não mapeada');
     await expect(page.locator('a:has-text("Voltar ao início")')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
   });

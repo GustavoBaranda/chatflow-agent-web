@@ -27,6 +27,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@/.source": [
+        "./.source/server"
       ]
     }
   },

@@ -12,7 +12,7 @@ export function AppProviders({ children, direction = 'ltr' }: AppProvidersProps)
   return (
     <RootProvider
       dir={direction}
-      search={{ enabled: false }}
+      search={{ enabled: true }}
       theme={{
         attribute: 'class',
         defaultTheme: 'system',

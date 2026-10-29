@@ -11,7 +11,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build --webpack",
+    "build": "fumadocs-mdx && next build --webpack",
     "start": "next start -p 3100",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
@@ -19,7 +19,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check:i18n": "node scripts/check-i18n.mjs",
-    "verify": "pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm test"
+    "verify": "pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm test",
+    "postinstall": "fumadocs-mdx"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.3",

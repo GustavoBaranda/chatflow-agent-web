@@ -52,4 +52,18 @@ describe('Documentation Engine & Source Loader', () => {
     expect(locales).toContain('es');
     expect(locales).toContain('pt-BR');
   });
+
+  it('should load getting-started pages in English', () => {
+    const installPage = source.getPage(['getting-started', 'installation'], 'en');
+    expect(installPage).toBeDefined();
+    expect(installPage?.data.title).toBe('Installation');
+
+    const quickstartPage = source.getPage(['getting-started', 'quickstart'], 'en');
+    expect(quickstartPage).toBeDefined();
+    expect(quickstartPage?.data.title).toBe('Quickstart');
+
+    const conceptsPage = source.getPage(['getting-started', 'core-concepts'], 'en');
+    expect(conceptsPage).toBeDefined();
+    expect(conceptsPage?.data.title).toBe('Core Concepts');
+  });
 });

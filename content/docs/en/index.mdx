@@ -1,23 +1,74 @@
 ---
 title: "Documentation Overview"
-description: "Official documentation for chatflow-agent: a reactive conversational AI framework in Python."
+description: "Official documentation for chatflow-agent: a lightweight, async multi-agent framework with native handoffs for Python."
 ---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
 
 # chatflow-agent Documentation
 
-Welcome to the official documentation for **chatflow-agent**, a lightweight and reactive Python framework designed for building robust, stateful conversational AI agents.
+Welcome to the official documentation for **chatflow-agent**, a lightweight, async-first Python framework engineered for building modular conversational agents and multi-agent swarms with native, type-safe handoffs.
 
-## Key Capabilities
+Created and led by **Gustavo Baranda** alongside an international open-source community, `chatflow-agent` is designed to eliminate framework bloat and vendor lock-in while providing enterprise-grade concurrency, resilient memory, and multi-channel connectivity.
 
-- **Reactive State Machine**: Manage complex multi-turn dialogs with clean state transitions.
-- **Schema Validation**: Strongly-typed payload and action handling powered by standard typing.
-- **Pluggable Architecture**: Seamlessly integrate custom tools, LLM providers, and memory stores.
-- **Production-Ready**: Engineered for low-latency cloud and edge deployments.
+---
 
-## Quick Installation
+## Architecture Highlights
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+  <div className="p-4 rounded-xl border border-border bg-card">
+    <h3 className="text-base font-semibold text-foreground mb-1">Zero-SDK Lock-In</h3>
+    <p className="text-sm text-muted-foreground leading-relaxed">
+      Connects to LLMs over pure, asynchronous HTTP REST using <code>httpx</code>. No monolithic vendor SDKs or heavy runtime dependencies required.
+    </p>
+  </div>
+  <div className="p-4 rounded-xl border border-border bg-card">
+    <h3 className="text-base font-semibold text-foreground mb-1">Native Multi-Agent Handoffs</h3>
+    <p className="text-sm text-muted-foreground leading-relaxed">
+      Declare collaborative swarms. Agents delegate tasks dynamically using synthesized <code>transfer_to_*</code> tools with automatic cycle prevention.
+    </p>
+  </div>
+  <div className="p-4 rounded-xl border border-border bg-card">
+    <h3 className="text-base font-semibold text-foreground mb-1">Transactional Resilient Memory</h3>
+    <p className="text-sm text-muted-foreground leading-relaxed">
+      Every turn takes an atomic snapshot. If an error or timeout occurs, state automatically rolls back. SQLite operations run in dedicated thread pools.
+    </p>
+  </div>
+  <div className="p-4 rounded-xl border border-border bg-card">
+    <h3 className="text-base font-semibold text-foreground mb-1">Multi-Channel Readiness</h3>
+    <p className="text-sm text-muted-foreground leading-relaxed">
+      Deploy your agents seamlessly to terminal REPLs, Telegram bots, or WhatsApp Business Cloud API with HMAC SHA-256 signature verification.
+    </p>
+  </div>
+</div>
+
+---
+
+## Release & Versioning Strategy
+
+`chatflow-agent` strictly adheres to Semantic Versioning (SemVer). The documentation is version-aware:
+
+* <VersionBadge version="0.3.4" status="stable" /> **Current Stable Release (Default):** Recommended for all production deployments. Published on PyPI on October 23, 2026.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Prerelease Candidate 1:** Available on PyPI for testing upcoming architecture enhancements, including REST-native Gemini execution and swarm duplicate validation.
 
 ```bash
+# Install stable release (default)
 pip install chatflow-agent
+
+# Install prerelease candidate
+pip install "chatflow-agent==0.4.0rc1"
 ```
 
-> **Note**: Current stable release is `v0.3.4`. Prerelease candidate `v0.4.0rc1` is available for testing upcoming features.
+<Callout type="info" title="Stable-First Documentation">
+All code snippets and API signatures in this documentation default to the stable <code>v0.3.4</code> release. Enhancements or breaking changes introduced in <code>v0.4.0rc1</code> are explicitly highlighted with the <VersionBadge version="0.4.0rc1" status="prerelease" /> badge.
+</Callout>
+
+---
+
+## Getting Started Path
+
+Follow our structured onboarding guide to go from installation to a running production agent in minutes:
+
+1. **[Installation](/en/docs/getting-started/installation):** Verify your Python environment (`>=3.10`), install core packages, and configure optional channel extras.
+2. **[Quickstart](/en/docs/getting-started/quickstart):** Build your first agent in under 5 minutes, invoke custom tools with `@tool`, and explore asynchronous execution.
+3. **[Core Concepts](/en/docs/getting-started/core-concepts):** Learn the foundational architecture: `Agent`, `Runner`, `Engines`, `Tools`, `Memory`, and `Handoffs`.

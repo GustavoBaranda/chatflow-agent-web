@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getMessages, setRequestLocale } from 'next-intl/server';
 import { NextIntlClientProvider } from 'next-intl';
-import { RootProvider } from 'fumadocs-ui/provider/next';
+import { AppProviders } from '@/components/providers/AppProviders';
 import { routing } from '@/i18n/routing';
 import { getLanguage } from '@/config/languages';
 import { Navbar } from '@/components/navigation/Navbar';
@@ -87,19 +87,11 @@ export default async function LocaleLayout({
         suppressHydrationWarning
       >
         <NextIntlClientProvider messages={messages}>
-          <RootProvider
-            dir={lang.direction}
-            search={{ enabled: false }}
-            theme={{
-              attribute: 'class',
-              defaultTheme: 'system',
-              enableSystem: true,
-            }}
-          >
+          <AppProviders direction={lang.direction}>
             <Navbar />
             {children}
             <Footer />
-          </RootProvider>
+          </AppProviders>
         </NextIntlClientProvider>
       </body>
     </html>

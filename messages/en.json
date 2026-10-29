@@ -106,5 +106,28 @@
     "quickLinksTitle": "Or explore these sections:",
     "aboutLink": "About the Project",
     "communityLink": "Community & Discussions"
+  },
+  "error": {
+    "badge": "HTTP 500 • Unexpected Error",
+    "title": "Conversation flow encountered an unexpected error",
+    "description": "An unexpected exception halted processing in this route segment. The error boundary contained the failure and no sensitive information was exposed.",
+    "retry": "Try Again",
+    "returnHome": "Return to Home",
+    "referenceCode": "Reference code",
+    "reportIssue": "Report an issue on GitHub",
+    "quickLinksTitle": "Or explore safe routes:",
+    "docsLink": "Official Documentation",
+    "aboutLink": "About chatflow-agent"
+  },
+  "maintenance": {
+    "badge": "HTTP 503 • Scheduled Maintenance",
+    "title": "System maintenance in progress",
+    "description": "We are currently performing scheduled infrastructure updates and platform improvements. The chatflow-agent platform will be back online shortly.",
+    "retryAfterNotice": "Estimated availability in approximately {minutes} minutes.",
+    "refreshPage": "Check Again",
+    "githubFallbackTitle": "Python SDK remains fully operational",
+    "githubFallbackDesc": "You can continue installing, running, and inspecting chatflow-agent directly from PyPI and GitHub during the maintenance window.",
+    "visitGithub": "Visit GitHub Repository",
+    "pypiCommand": "pip install chatflow-agent"
   }
 }

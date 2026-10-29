@@ -9,7 +9,7 @@ import {
 
 const intlMiddleware = createMiddleware(routing);
 
-export default function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Handle scheduled maintenance mode when active
@@ -59,3 +59,4 @@ export const config = {
   // - … the ones containing a dot (e.g. `favicon.ico`)
   matcher: ['/((?!api|_next|_vercel|.*\\..*).*)'],
 };
+

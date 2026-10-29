@@ -7,6 +7,10 @@ const withMDX = createMDX();
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  agentRules: false,
+  experimental: {
+    turbopackPluginRuntimeStrategy: 'workerThreads',
+  },
   webpack: (config) => {
     // Disable Webpack filesystem cache to prevent Windows EPERM mkdir file-lock races in sandbox
     config.cache = false;

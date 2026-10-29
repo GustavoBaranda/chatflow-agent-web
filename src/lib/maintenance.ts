@@ -6,10 +6,7 @@
  */
 
 export function isMaintenanceModeEnabled(): boolean {
-  return (
-    process.env.MAINTENANCE_MODE === 'true' ||
-    process.env.NEXT_PUBLIC_MAINTENANCE_MODE === 'true'
-  );
+  return process.env.MAINTENANCE_MODE === 'true';
 }
 
 export function getMaintenanceRetryAfter(): number {

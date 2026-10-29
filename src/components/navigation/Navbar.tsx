@@ -61,6 +61,12 @@ export function Navbar() {
             >
               {t('community')}
             </Link>
+            <Link
+              href="/about"
+              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              {t('about')}
+            </Link>
           </nav>
 
           {/* Right actions: LanguageSelector, ThemeToggle, GitHub link, MenuToggle */}

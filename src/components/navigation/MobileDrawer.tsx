@@ -5,7 +5,7 @@ import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
-import { BookOpen, Users, Home } from 'lucide-react';
+import { BookOpen, Users, Home, Info } from 'lucide-react';
 import { GitHubIcon } from '@/components/ui/icons';
 import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
@@ -124,6 +124,7 @@ export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps)
     { href: '/', label: t('home'), icon: Home },
     { href: '/docs', label: t('docs'), icon: BookOpen },
     { href: '/community', label: t('community'), icon: Users },
+    { href: '/about', label: t('about'), icon: Info },
   ];
 
   return (

@@ -2,10 +2,24 @@ import { notFound } from 'next/navigation';
 import { setRequestLocale } from 'next-intl/server';
 import { DocsPage, DocsBody, DocsTitle, DocsDescription } from 'fumadocs-ui/page';
 import defaultMdxComponents from 'fumadocs-ui/mdx';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { source } from '@/lib/source';
 import { TranslationNotice } from '@/components/docs/TranslationNotice';
 import { OutdatedNotice } from '@/components/docs/OutdatedNotice';
+import { VersionBadge } from '@/components/docs/VersionBadge';
 import type { Metadata } from 'next';
+
+const customMdxComponents = {
+  ...defaultMdxComponents,
+  Callout,
+  Tab,
+  Tabs,
+  Step,
+  Steps,
+  VersionBadge,
+};
 
 interface PageProps {
   params: Promise<{
@@ -94,7 +108,7 @@ export default async function Page({ params }: PageProps) {
       )}
 
       <DocsBody>
-        <MDX components={defaultMdxComponents} />
+        <MDX components={customMdxComponents} />
       </DocsBody>
     </DocsPage>
   );

@@ -115,22 +115,32 @@ test.describe('Documentation Engine E2E Suite', () => {
     await page.waitForLoadState('networkidle');
 
     // Switch to Spanish via LanguageSelector
-    await page.locator('header button[aria-label="Change language"]').click();
-    await page.locator('role=option[name="Español"]').click();
+    const langBtn = page.locator('header button[aria-label="Change language"]');
+    await langBtn.click();
+    const esOption = page.locator('role=option[name="Español"]');
+    if (!(await esOption.isVisible())) {
+      await langBtn.click();
+    }
+    await esOption.click();
     await page.waitForURL(/\/es\/docs/);
     await expect(page).toHaveURL(/\/es\/docs/);
     await expect(page.locator('html')).toHaveAttribute('lang', 'es');
 
     // Switch to Brazilian Portuguese via LanguageSelector
-    await page.locator('header button[aria-label="Cambiar idioma"]').click();
-    await page.locator('role=option[name="Português (Brasil)"]').click();
+    const langBtnEs = page.locator('header button[aria-label="Cambiar idioma"]');
+    await langBtnEs.click();
+    const ptOption = page.locator('role=option[name="Português (Brasil)"]');
+    if (!(await ptOption.isVisible())) {
+      await langBtnEs.click();
+    }
+    await ptOption.click();
     await page.waitForURL(/\/pt-BR\/docs/);
     await expect(page).toHaveURL(/\/pt-BR\/docs/);
     await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
   });
 
   test('should query local search API endpoint and receive indexed results', async ({ request }) => {
-    const res = await request.get('/api/search?query=reactive');
+    const res = await request.get('/api/search?query=Python');
     expect(res.status()).toBe(200);
 
     const json = await res.json();

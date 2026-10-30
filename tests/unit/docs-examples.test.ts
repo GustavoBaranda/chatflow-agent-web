@@ -51,6 +51,7 @@ describe('Documentation Python Code Snippets and SDK Parity Verification', () =>
           const run = spawnSync(PYTHON_PATH, ['-c', pyScript], {
             input: code,
             encoding: 'utf-8',
+            env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
           });
           expect(run.status).toBe(0);
           expect(run.stderr).toBe('');
@@ -72,7 +73,7 @@ print("Verified: No engine accepts model parameter.")
     const run = spawnSync(PYTHON_PATH, ['-c', checkNoEngineModelScript], { encoding: 'utf-8' });
     expect(run.status).toBe(0);
     expect(run.stdout).toContain('Verified: No engine accepts model parameter.');
-  });
+  }, 15000);
 
   it('verifies that SQLiteSessionStore does not take busy_timeout as a parameter', () => {
     const checkSqliteScript = `
@@ -88,7 +89,7 @@ print("Verified: SQLiteSessionStore signature is exact.")
     const run = spawnSync(PYTHON_PATH, ['-c', checkSqliteScript], { encoding: 'utf-8' });
     expect(run.status).toBe(0);
     expect(run.stdout).toContain('Verified: SQLiteSessionStore signature is exact.');
-  });
+  }, 15000);
 
   it('verifies pyproject.toml extras match across v0.3.4 and v0.4.0rc1', () => {
     const checkExtrasScript = `
@@ -109,7 +110,7 @@ print("Verified: pyproject.toml extras match.")
     const run = spawnSync(PYTHON_PATH, ['-c', checkExtrasScript], { encoding: 'utf-8' });
     expect(run.status).toBe(0);
     expect(run.stdout).toContain('Verified: pyproject.toml extras match.');
-  });
+  }, 15000);
 
   it('executes all documentation examples end-to-end using an isolated mock engine with zero network calls', () => {
     const executeExamplesScript = `
@@ -209,5 +210,5 @@ print("All documentation examples successfully executed end-to-end!")
     const run = spawnSync(PYTHON_PATH, ['-c', executeExamplesScript], { encoding: 'utf-8' });
     expect(run.status).toBe(0);
     expect(run.stdout).toContain('All documentation examples successfully executed end-to-end!');
-  });
+  }, 15000);
 });

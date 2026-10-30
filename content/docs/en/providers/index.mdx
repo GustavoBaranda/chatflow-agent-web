@@ -1,0 +1,193 @@
+---
+title: LLM Providers Overview
+description: Engine architecture, dynamic provider resolution, security policies, and multi-model execution in chatflow-agent.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+`chatflow-agent` decouples agent reasoning and swarm orchestration from underlying language models through an engine abstraction layer. Every agent can communicate with a different foundation model—ranging from Google Gemini and Anthropic Claude to OpenAI, Groq, DeepSeek, and local Ollama instances—within a single shared conversation session.
+
+## Architecture and Core Components
+
+Every model interaction in the framework executes through a concrete implementation of `BaseEngine`. The engine translates normalized conversation messages and tool schemas into provider-specific API payloads, executes the request via asynchronous HTTP, and maps responses back into an `EngineTurnResult`.
+
+```
++-------------------------------------------------------------------+
+|                           Runner                                  |
++---------------------------------+---------------------------------+
+                                  |
+                   resolve_engine(agent, default_engine)
+                                  |
+                                  v
++---------------------------------+---------------------------------+
+|                         BaseEngine                                |
+|  - generate_turn_async(agent, history) -> EngineTurnResult        |
++----------+----------------------+--------------------+------------+
+           |                      |                    |
+           v                      v                    v
++----------+----------+  +--------+---------+  +-------+------------+
+|    GeminiEngine     |  | AnthropicEngine  |  |   OpenAIEngine     |
+| Direct REST v1beta  |  | Messages API v1  |  | OpenAI, Groq,      |
+| Connection Pooling  |  | Retry & Backoff  |  | DeepSeek, Ollama   |
++---------------------+  +------------------+  +--------------------+
+```
+
+### The BaseEngine Interface
+
+All engines implement the abstract method `generate_turn_async`, which receives the active `Agent` and the entire conversation `history`:
+
+```python
+from chatflow_agent.core.engines.base import BaseEngine, EngineTurnResult
+from chatflow_agent.types import Message, ToolCall
+
+class CustomEchoEngine(BaseEngine):
+    """Minimal custom engine demonstrating BaseEngine implementation."""
+
+    async def generate_turn_async(
+        self,
+        agent,
+        history: list[Message],
+    ) -> EngineTurnResult:
+        last_message = history[-1].content if history else "Empty"
+        return EngineTurnResult(
+            text=f"Echo: {last_message}",
+            tool_calls=[],
+        )
+```
+
+### Normalized Turn Results
+
+The engine returns an `EngineTurnResult` containing:
+
+| Attribute | Type | Description |
+| :--- | :--- | :--- |
+| `text` | `str \| None` | Generated assistant textual response. |
+| `tool_calls` | `list[ToolCall]` | Structured tool execution requests requested by the model. |
+| `raw_response` | `Any \| None` | Native provider response payload for debugging or token inspection. |
+
+### Universal Tool Call ID Normalization
+
+When multi-agent handoffs occur between different model families (for instance, handing off from Anthropic Claude to OpenAI GPT-4o), historical messages retain tool call IDs issued by the previous model. Because different providers impose conflicting ID validation constraints (for example, OpenAI rejects tool call IDs exceeding 40 characters), `chatflow-agent` uses deterministic replacement:
+
+```python
+from chatflow_agent.core.engines.base import replacement_tool_call_id
+
+original_id = "toolu_01A098bC45dEf67gHiJkLmNoPqRsTuVwXyZ"
+safe_id = replacement_tool_call_id(original_id)
+# Returns: "call_" followed by 24 deterministic hex characters
+# History preserves original_id while provider requests use safe_id
+```
+
+## Dynamic Engine Resolution
+
+When an agent executes a turn, `chatflow_agent.core.engines.factory.resolve_engine` inspects agent properties and applies a strict 7-level precedence hierarchy:
+
+```mermaid
+flowchart TD
+    Start["resolve_engine(agent, default_engine)"] --> C1{"1. agent.engine set?"}
+    C1 -- Yes --> R1["Return agent.engine"]
+    C1 -- No --> C2{"2. agent.provider set?"}
+    C2 -- Yes --> R2["Instantiate Provider Engine"]
+    C2 -- No --> C3{"3. agent.base_url or api_key set?"}
+    C3 -- Yes --> R3["Resolve via OpenAIEngine"]
+    C3 -- No --> C4{"4. prefer_default_engine and default_engine?"}
+    C4 -- Yes --> R4["Return default_engine"]
+    C4 -- No --> C5{"5. Model Prefix Heuristic Match?"}
+    C5 -- claude-* --> R5A["AnthropicEngine"]
+    C5 -- gpt-*, o1, o3 --> R5B["OpenAIEngine (openai)"]
+    C5 -- grok* --> R5C["OpenAIEngine (grok)"]
+    C5 -- deepseek-* --> R5D["OpenAIEngine (deepseek)"]
+    C5 -- gemma, llama, mistral, qwen, phi --> R5E["OpenAIEngine (ollama)"]
+    C5 -- None of above --> C6{"6. default_engine set?"}
+    C6 -- Yes --> R6["Return default_engine"]
+    C6 -- No --> R7["Fallback: GeminiEngine()"]
+```
+
+### Resolution Order Details
+
+1. **Explicit Engine:** `agent.engine` takes precedence if directly assigned on the agent instance.
+2. **Explicit Provider:** `agent.provider` matches recognized strings (`"gemini"`, `"google"`, `"anthropic"`, `"claude"`, `"openai"`, `"grok"`, `"xai"`, `"ollama"`, `"gemma"`, `"deepseek"`, `"groq"`).
+3. **Custom Connection:** `agent.base_url` or `agent.api_key` without provider. Official endpoints automatically map to their respective provider configuration; otherwise, defaults to `"openai"`.
+4. **Caller Override:** `default_engine` supplied with `prefer_default_engine=True` (used when callers deliberately enforce a test mock or specific runner default).
+5. **Model Name Prefix Heuristics:** Matches recognizable prefixes (`claude-`, `gpt-`, `o1`, `o3`, `grok`, `deepseek-`, `gemma`, `llama`, `mistral`, `qwen`, `phi`). This prevents a Claude model from accidentally falling back to a Gemini default.
+6. **Default Runner Engine:** The engine built by `Runner` (e.g., from `Runner(api_key=...)`).
+7. **Ultimate Fallback:** Standard `GeminiEngine(api_key=...)`.
+
+## Security Rules and Credential Isolation
+
+A common vulnerability in multi-provider frameworks is credential leakage: sending cloud API keys (such as `OPENAI_API_KEY`) to untrusted proxy endpoints or third-party gateways. `chatflow-agent` enforces strict credential isolation:
+
+<Callout type="warn" title="Credential Isolation Policy">
+Environment keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`) are **strictly transmitted only to their official provider HTTPS endpoints**. Passing a custom `base_url` without providing an explicit `api_key` raises a `ValueError` rather than leaking global cloud credentials.
+</Callout>
+
+```python
+from chatflow_agent import Agent
+from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
+
+# [CORRECT] Official endpoints read OPENAI_API_KEY automatically
+official_engine = OpenAIEngine(provider="openai")
+
+# [CORRECT] Custom proxies require explicit credentials
+proxy_engine = OpenAIEngine(
+    base_url="https://proxy.internal.corp/v1",
+    api_key="internal-proxy-token",
+)
+
+# [CORRECT] Local development hosts are exempted from credential requirements
+local_engine = OpenAIEngine(
+    base_url="http://localhost:11434/v1",
+    provider="ollama",
+)
+```
+
+## Version Evolution: v0.3.4 vs v0.4.0rc1
+
+Understanding architectural differences between releases helps choose the right configuration:
+
+| Architectural Area | Baseline `v0.3.4` (Stable) | Prerelease `v0.4.0rc1` |
+| :--- | :--- | :--- |
+| **Gemini Engine Runtime** | Powered by the Google `google-genai` SDK (`from google import genai`). | **Zero-SDK Lock-in**: Re-engineered with native asynchronous `httpx` directly against `https://generativelanguage.googleapis.com/v1beta`. |
+| **Connection Pooling** | Separate connection handles per request. | **Runner Lifespan Client Pool**: `_ClientPool` manages shared keepalive connections across turns via `async with runner:`. |
+| **Provider Presets** | OpenAI, Grok, Ollama. | Expanded presets: `deepseek`, `groq`, `xai`, `gemma`, with strict base URL verification. |
+| **Credential Guard** | Basic environment key fallback. | `_resolve_api_key` fail-closed verification preventing cloud key leakage to custom endpoints. |
+
+<Callout type="info" title="Runner Connection Pooling in v0.4.0rc1">
+In `v0.4.0rc1`, wrap runner executions inside `async with runner:` to enable HTTP connection keepalive pooling across turns:
+
+```python
+import asyncio
+from chatflow_agent import Agent, Runner
+
+agent = Agent(name="Assistant", instructions="Be helpful.")
+runner = Runner(agent=agent)
+
+async def main():
+    async with runner:
+        res1 = await runner.run_async("session-1", "Hello")
+        res2 = await runner.run_async("session-1", "How are you?")
+        print(res1.text, res2.text)
+
+asyncio.run(main())
+```
+</Callout>
+
+## Next Steps
+
+Explore detailed setup guides for each provider:
+
+<Cards>
+  <Card title="OpenAI & Compatible Endpoints" href="/en/docs/providers/openai">
+    Configure GPT-4o, Groq, DeepSeek, and custom proxy gateways.
+  </Card>
+  <Card title="Google Gemini & Anthropic Claude" href="/en/docs/providers/gemini-anthropic">
+    Direct REST Gemini v1beta and Anthropic Messages API integrations.
+  </Card>
+  <Card title="Local Models with Ollama" href="/en/docs/providers/ollama">
+    Run Gemma 2, Llama 3, and Mistral on local hardware with zero cloud fees.
+  </Card>
+</Cards>

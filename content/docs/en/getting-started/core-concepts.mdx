@@ -13,16 +13,16 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 ## 1. The Agent (`Agent`)
 
-An `Agent` represents an autonomous actor with an explicit persona, system prompt instructions, a designated LLM engine, and access to tools or handoff peers.
+An `Agent` represents an autonomous actor with an explicit persona, system prompt instructions, a designated LLM model and engine, and access to tools or handoff peers.
 
 ```python
-from chatflow_agent import Agent, OpenAIEngine
+from chatflow_agent import Agent
 
-# Static prompt instructions
+# Static prompt instructions with target model
 agent = Agent(
     name="TriageBot",
     instructions="You are the front desk concierge. Route questions to specialists.",
-    engine=OpenAIEngine(model="gpt-4o"),
+    model="gpt-4o",
 )
 ```
 
@@ -41,6 +41,7 @@ def get_live_instructions() -> str:
 agent = Agent(
     name="ScheduleBot",
     instructions=get_live_instructions,
+    model="gemini-2.5-flash",
 )
 ```
 
@@ -61,7 +62,15 @@ The `Runner` orchestrates the conversation lifecycle. It handles:
 5. Committing state changes, or rolling back automatically if an unhandled exception or timeout occurs.
 
 ```python
-from chatflow_agent import Runner
+from chatflow_agent import Agent, Runner, SessionStore
+
+agent = Agent(
+    name="Assistant",
+    instructions="Concise scheduling assistant.",
+    model="gpt-4o",
+)
+
+store = SessionStore()
 
 runner = Runner(
     starting_agent=agent,
@@ -74,13 +83,16 @@ response = runner.run(
     user_message="Book a meeting tomorrow at 3 PM",
 )
 
-# Asynchronous invocation with turn timeout
+# Asynchronous invocation
 response = await runner.run_async(
     session_id="user_123",
     user_message="Book a meeting tomorrow at 3 PM",
-    turn_timeout=30.0,
 )
 ```
+
+<Callout type="info" title="turn_timeout in v0.4.0rc1">
+In <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>Runner.run_async</code> introduces an optional <code>turn_timeout: float | None = None</code> keyword parameter (e.g. <code>turn_timeout=30.0</code>). If a turn exceeds the deadline, it is cancelled and rolls back state atomically.
+</Callout>
 
 ---
 
@@ -93,13 +105,20 @@ All model communication in `chatflow-agent` is decoupled behind the `BaseEngine`
 * **`GeminiEngine`**: Google Gemini integration. In <VersionBadge version="0.4.0rc1" status="prerelease" />, completely rewritten with native REST calls.
 
 ```python
-from chatflow_agent import OpenAIEngine
+from chatflow_agent import Agent, OpenAIEngine
 
-# Universal OpenAI-compatible engine (e.g. local Ollama)
+# Universal OpenAI-compatible engine for custom or local endpoints
 local_engine = OpenAIEngine(
-    model="llama3.2:latest",
     base_url="http://localhost:11434/v1",
+    provider="ollama",
     api_key="ollama",
+)
+
+local_agent = Agent(
+    name="LocalBot",
+    instructions="You run locally via Ollama.",
+    model="llama3.2:latest",
+    engine=local_engine,
 )
 ```
 
@@ -133,10 +152,10 @@ Both synchronous (`def`) and asynchronous (`async def`) tool functions are nativ
 ```python
 from chatflow_agent import SQLiteSessionStore
 
-# Persistent SQLite session store
+# Persistent SQLite session store with configurable turn limit
 store = SQLiteSessionStore(
     db_path="./chat_sessions.db",
-    busy_timeout=5.0,
+    default_max_turns=40,
 )
 ```
 
@@ -156,22 +175,20 @@ Prior to processing a turn, `Runner` snapshots the active session. If a network 
 Multi-agent swarms delegate tasks dynamically using declarative handoffs. When an agent defines `handoffs=[agent_b]`, `chatflow-agent` automatically synthesizes a tool named `transfer_to_agent_b`:
 
 ```python
-from chatflow_agent import Agent, OpenAIEngine, Runner
-
-engine = OpenAIEngine(model="gpt-4o")
+from chatflow_agent import Agent, Runner
 
 # Specialist Agent
 billing_agent = Agent(
     name="BillingAgent",
     instructions="You specialize in invoices, receipts, and refund requests.",
-    engine=engine,
+    model="gpt-4o",
 )
 
 # Frontline Triage Agent
 triage_agent = Agent(
     name="TriageAgent",
     instructions="Greet users. Transfer billing issues to BillingAgent.",
-    engine=engine,
+    model="gpt-4o",
     handoffs=[billing_agent],
 )
 

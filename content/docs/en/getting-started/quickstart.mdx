@@ -19,31 +19,26 @@ Create a new file named `quickstart.py`:
 
 ```python
 import os
-from chatflow_agent import Agent, OpenAIEngine, Runner
+from chatflow_agent import Agent, Runner
 
-# 1. Initialize the LLM provider engine
-engine = OpenAIEngine(
-    model="gpt-4o",
-    api_key=os.getenv("OPENAI_API_KEY"),
-)
-
-# 2. Define the agent persona and instructions
+# 1. Define the agent persona, instructions, and target model
+# chatflow-agent automatically routes "gpt-4o" to the OpenAI engine using OPENAI_API_KEY
 agent = Agent(
     name="Assistant",
     instructions="You are a concise and helpful AI technical assistant.",
-    engine=engine,
+    model="gpt-4o",
 )
 
-# 3. Initialize the Runner with your starting agent
+# 2. Initialize the Runner with your starting agent
 runner = Runner(starting_agent=agent)
 
-# 4. Execute a conversational turn
+# 3. Execute a conversational turn
 response = runner.run(
     session_id="quickstart_session",
-    user_message="Explain reactive programming in two concise sentences.",
+    user_message="Explain async Python in two concise sentences.",
 )
 
-# 5. Display the output
+# 4. Display the output
 print("Agent Response:")
 print(response.content)
 ```
@@ -66,7 +61,7 @@ Agents become exponentially more powerful when given access to deterministic fun
 
 ```python
 import os
-from chatflow_agent import Agent, OpenAIEngine, Runner, tool
+from chatflow_agent import Agent, Runner, tool
 
 # 1. Define a tool with typed parameters and docstrings
 @tool(name="calculate_discount", description="Calculate discounted price from original amount and percentage.")
@@ -82,12 +77,10 @@ def calculate_discount(price: float, discount_percent: float) -> str:
     return f"Original: ${price:.2f}, Savings: ${savings:.2f}, Final Price: ${final_price:.2f}"
 
 # 2. Attach the tool to the Agent
-engine = OpenAIEngine(model="gpt-4o", api_key=os.getenv("OPENAI_API_KEY"))
-
 agent = Agent(
     name="SalesBot",
     instructions="You help customers with purchase calculations. Always use calculate_discount for math.",
-    engine=engine,
+    model="gpt-4o",
     tools=[calculate_discount],
 )
 
@@ -106,9 +99,9 @@ print(response.content)
 The returned `AgentResponse` object retains full transparency into the conversational turn:
 
 ```python
-# Inspect executed tool calls
-for call in response.tool_calls_executed:
-    print(f"Tool executed: {call.name} with arguments: {call.arguments}")
+# Inspect executed tool names
+for tool_name in response.tool_calls_executed:
+    print(f"Tool executed: {tool_name}")
 ```
 
 ---
@@ -120,18 +113,13 @@ For high-concurrency web services, chatbots, and event loops, use the native asy
 ```python
 import asyncio
 import os
-from chatflow_agent import Agent, OpenAIEngine, Runner
+from chatflow_agent import Agent, Runner
 
 async def main() -> None:
-    engine = OpenAIEngine(
-        model="gpt-4o",
-        api_key=os.getenv("OPENAI_API_KEY"),
-    )
-
     agent = Agent(
         name="AsyncBot",
         instructions="Provide concise answers.",
-        engine=engine,
+        model="gpt-4o",
     )
 
     runner = Runner(starting_agent=agent)
@@ -156,22 +144,39 @@ Because `chatflow-agent` uses direct REST engines, switching between providers i
 
 ```python
 import os
-from chatflow_agent import Agent, AnthropicEngine, GeminiEngine, OpenAIEngine
+from chatflow_agent import Agent, OpenAIEngine
 
-# OpenAI
-openai_engine = OpenAIEngine(model="gpt-4o")
+# Option 1: Direct model configuration (engines are resolved automatically)
+openai_agent = Agent(
+    name="OpenAIBot",
+    instructions="You are powered by GPT-4o.",
+    model="gpt-4o",
+)
 
-# Anthropic Claude
-anthropic_engine = AnthropicEngine(model="claude-3-5-sonnet-20241022")
+claude_agent = Agent(
+    name="ClaudeBot",
+    instructions="You are powered by Claude 3.5 Sonnet.",
+    model="claude-3-5-sonnet-20241022",
+)
 
-# Google Gemini
-gemini_engine = GeminiEngine(model="gemini-2.0-flash")
+gemini_agent = Agent(
+    name="GeminiBot",
+    instructions="You are powered by Google Gemini.",
+    model="gemini-2.5-flash",
+)
 
-# Groq / Ollama / DeepSeek via OpenAI-compatible REST endpoint
+# Option 2: Custom endpoints via OpenAIEngine (Groq, Ollama, DeepSeek)
 groq_engine = OpenAIEngine(
-    model="llama-3.3-70b-versatile",
     base_url="https://api.groq.com/openai/v1",
     api_key=os.getenv("GROQ_API_KEY"),
+    provider="groq",
+)
+
+groq_agent = Agent(
+    name="GroqBot",
+    instructions="You are powered by LLaMA 3.3 on Groq.",
+    model="llama-3.3-70b-versatile",
+    engine=groq_engine,
 )
 ```
 

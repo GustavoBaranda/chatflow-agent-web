@@ -38,47 +38,49 @@ python --version
 # Install current stable release (v0.3.4 - recommended for production)
 pip install chatflow-agent
 
-# Or install the prerelease candidate
-pip install "chatflow-agent==0.4.0rc1"
+# Or install the prerelease candidate (v0.4.0rc1+)
+pip install --pre chatflow-agent
+# or: pip install "chatflow-agent==0.4.0rc1"
 ```
   </Tab>
   <Tab value="uv">
 ```bash
-# Install with uv
+# Install current stable release with uv
 uv add chatflow-agent
 
-# Or prerelease candidate
-uv add "chatflow-agent==0.4.0rc1"
+# Or install the prerelease candidate
+uv add --prerelease=allow chatflow-agent
+# or: uv add "chatflow-agent==0.4.0rc1"
 ```
   </Tab>
   <Tab value="poetry">
 ```bash
-# Install with poetry
+# Install current stable release with poetry
 poetry add chatflow-agent
 
-# Or prerelease candidate
+# Or install the prerelease candidate
 poetry add chatflow-agent@0.4.0rc1
 ```
   </Tab>
 </Tabs>
 
-<Callout type="info" title="Zero-SDK Lock-In">
-Unlike traditional agent libraries that bundle heavy SDKs like <code>openai</code> or <code>google-genai</code>, <code>chatflow-agent</code> connects to model endpoints directly over asynchronous REST via <code>httpx</code>. This keeps installations fast, minimizes dependency conflicts, and prevents runtime bloat.
+<Callout type="info" title="Zero-SDK Lock-In & Core Dependencies">
+In **v0.3.4**, core dependencies are strictly limited to `google-genai>=0.1.1`, `pydantic>=2.6.0`, and `httpx>=0.27.0`. In **v0.4.0rc1+**, `google-genai` is no longer required: all Gemini and OpenAI-compatible communication executes directly over asynchronous REST via `httpx`. SQLite persistence uses Python's built-in `sqlite3` library without requiring third-party database drivers.
 </Callout>
 
 ---
 
 ## Optional Channel Extras
 
-`chatflow-agent` uses package extras to keep the core footprint tiny. Install only the features your deployment requires:
+`chatflow-agent` declares optional dependencies in `pyproject.toml` to keep the core footprint tiny. Install only the features your deployment requires:
 
 | Extra Name | Description | Key Dependencies Added | Command |
 | :--- | :--- | :--- | :--- |
 | `[telegram]` | Telegram Bot integration via polling or webhooks | `python-telegram-bot>=21.0` | `pip install "chatflow-agent[telegram]"` |
 | `[whatsapp]` | Meta WhatsApp Cloud API webhooks & webhook listener | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[whatsapp]"` |
 | `[webhook]` | Generic HTTP webhook server for external integrations | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[webhook]"` |
-| `[all]` | Installs all channel dependencies simultaneously | All of the above | `pip install "chatflow-agent[all]"` |
-| `[dev]` | Tools for running unit and integration test suites | `pytest>=8.0`, `pytest-asyncio`, `ruff`, `mypy` | `pip install "chatflow-agent[dev]"` |
+| `[all]` | Installs all channel dependencies simultaneously | `telegram`, `whatsapp`, `webhook` | `pip install "chatflow-agent[all]"` |
+| `[dev]` | Tools for running unit and integration test suites | `pytest>=8.0.0`, `pytest-asyncio`, `ruff`, `mypy` | `pip install "chatflow-agent[dev]"` |
 
 ---
 

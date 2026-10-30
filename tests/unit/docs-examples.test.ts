@@ -205,6 +205,35 @@ runner_swarm = Runner(starting_agent=triage)
 res_swarm = runner_swarm.run(session_id="sess_swarm", user_message="Billing query")
 assert res_swarm.content == "Billed"
 
+# Example 9: Guide 1 - @agent.tool decorator registration
+agent_with_tool = Agent(name="AnalyticsBot", instructions="Process metrics", model="gpt-4o")
+@agent_with_tool.tool(name="query_active_users", description="Count active sessions")
+def query_active_users(minutes: int = 15) -> int:
+    return 142
+assert any(t.name == "query_active_users" for t in agent_with_tool.tools)
+
+# Example 10: Guide 2 - Tool async and sync execution
+@tool(name="calc_vat", description="Calculate VAT")
+def calc_vat(amount: float, rate: float = 0.20) -> float:
+    return amount * rate
+assert calc_vat.execute(amount=100.0) == 20.0
+
+# Example 11: Guide 4 - Runner custom limits and agent registry
+custom_runner = Runner(
+    starting_agent=triage,
+    max_handoffs_per_turn=3,
+    max_tool_iterations=6,
+)
+assert custom_runner.max_handoffs_per_turn == 3
+assert custom_runner.max_tool_iterations == 6
+assert "BillingAgent" in custom_runner._agents_registry
+
+# Example 12: Guide 5 - Webhook deduplication TTL and SessionContext
+from chatflow_agent.core.memory import DEFAULT_DEDUP_TTL_HOURS
+assert DEFAULT_DEDUP_TTL_HOURS == 192
+sess_ctx = mem_store.get_or_create(session_id="dedup_test", default_agent=triage)
+assert sess_ctx.active_agent.name == "TriageAgent"
+
 print("All documentation examples successfully executed end-to-end!")
 `;
     const run = spawnSync(PYTHON_PATH, ['-c', executeExamplesScript], { encoding: 'utf-8' });

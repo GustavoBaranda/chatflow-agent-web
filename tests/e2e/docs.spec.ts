@@ -248,6 +248,11 @@ test.describe('Documentation Engine E2E Suite', () => {
     '/en/docs/getting-started/installation',
     '/en/docs/getting-started/quickstart',
     '/en/docs/getting-started/core-concepts',
+    '/en/docs/guides/agents',
+    '/en/docs/guides/tools',
+    '/en/docs/guides/multi-agent-handoffs',
+    '/en/docs/guides/runner-lifecycle',
+    '/en/docs/guides/sessions-state',
   ];
 
   for (const route of docRoutesToTest) {

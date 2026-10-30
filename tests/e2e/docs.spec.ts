@@ -253,6 +253,13 @@ test.describe('Documentation Engine E2E Suite', () => {
     '/en/docs/guides/multi-agent-handoffs',
     '/en/docs/guides/runner-lifecycle',
     '/en/docs/guides/sessions-state',
+    '/en/docs/providers',
+    '/en/docs/providers/openai',
+    '/en/docs/providers/gemini-anthropic',
+    '/en/docs/providers/ollama',
+    '/en/docs/integrations/telegram',
+    '/en/docs/integrations/whatsapp',
+    '/en/docs/integrations/webhook',
   ];
 
   for (const route of docRoutesToTest) {

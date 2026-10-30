@@ -234,9 +234,41 @@ assert DEFAULT_DEDUP_TTL_HOURS == 192
 sess_ctx = mem_store.get_or_create(session_id="dedup_test", default_agent=triage)
 assert sess_ctx.active_agent.name == "TriageAgent"
 
+# Example 13: Etapa 4C.2 - BaseChannel and split_message
+from chatflow_agent.channels.base import BaseChannel, split_message
+chunks = split_message("Paragraph 1\\n\\nParagraph 2\\n\\nParagraph 3", max_len=15)
+assert len(chunks) >= 3
+
+class MockWebhookChannel(BaseChannel):
+    def run(self, **kwargs):
+        pass
+
+mock_channel = MockWebhookChannel()
+mock_channel.attach(runner1)
+assert mock_channel.runner is runner1
+
+# Example 14: Etapa 4C.2 - OpenAIEngine presets & security
+from chatflow_agent.core.engines.openai_compatible import PROVIDER_PRESETS, OpenAIEngine, _resolve_api_key
+assert "deepseek" in PROVIDER_PRESETS
+assert "groq" in PROVIDER_PRESETS
+assert "grok" in PROVIDER_PRESETS
+
+# Confirm security guard on custom base_url
+try:
+    _resolve_api_key(None, "https://untrusted-proxy.com/v1", official_base_url="https://api.openai.com/v1", env_key="OPENAI_API_KEY")
+    assert False, "Should have raised ValueError"
+except ValueError as e:
+    assert "custom or unofficial base_url was provided" in str(e)
+
 print("All documentation examples successfully executed end-to-end!")
 `;
-    const run = spawnSync(PYTHON_PATH, ['-c', executeExamplesScript], { encoding: 'utf-8' });
+    const run = spawnSync(PYTHON_PATH, ['-c', executeExamplesScript], {
+      encoding: 'utf-8',
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+    });
+    if (run.status !== 0) {
+      console.error('executeExamplesScript STDERR:', run.stderr);
+    }
     expect(run.status).toBe(0);
     expect(run.stdout).toContain('All documentation examples successfully executed end-to-end!');
   }, 15000);

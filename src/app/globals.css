@@ -29,6 +29,10 @@
   --accent-cyan: #00d2f0;
   --accent-violet: #7c3aed;
 
+  /* Fumadocs Navbar Offset & Layout Harmonization (Navbar h-14 = 3.5rem = 56px) */
+  --fd-banner-height: 3.5rem;
+  --fd-header-height: 3.5rem;
+
   /* Fumadocs Theme Token Harmonization */
   --color-fd-background: var(--background);
   --color-fd-foreground: var(--foreground);
@@ -83,6 +87,12 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* Ensure collapsed sidebar restore button panel remains accessible below sticky header */
+[data-sidebar-panel] {
+  top: calc(3.5rem + 1rem) !important;
+  z-index: 40 !important;
 }
 
 /* Soft scroll lock when mobile drawer is open */

@@ -19,6 +19,12 @@ export default async function Layout({
         collapsible: true,
         defaultOpenLevel: 2,
       }}
+      containerProps={{
+        style: {
+          '--fd-banner-height': '3.5rem',
+          '--fd-header-height': '3.5rem',
+        } as React.CSSProperties,
+      }}
     >
       {children}
     </DocsLayout>

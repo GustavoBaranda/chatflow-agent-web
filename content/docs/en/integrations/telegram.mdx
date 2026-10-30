@@ -1,0 +1,131 @@
+---
+title: Telegram Bot Integration
+description: Deploy multi-agent AI assistants to Telegram with python-telegram-bot, session memory, message chunking, and group admin controls.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+`TelegramChannel` connects `chatflow-agent` swarms to Telegram bots. Powered by the asynchronous `python-telegram-bot` library, it handles polling, session isolation per chat ID, automatic message chunking, and security policies for group chats.
+
+## Installation
+
+Install `chatflow-agent` with the `telegram` extra to include required dependencies (`python-telegram-bot>=21.0`):
+
+```bash
+pip install "chatflow-agent[telegram]"
+```
+
+## Quickstart Bot Setup
+
+<Steps>
+  <Step>
+    ### Create a Bot via BotFather
+
+    1. Open Telegram and search for [@BotFather](https://t.me/BotFather).
+    2. Send `/newbot` and follow the prompts to choose a display name and username.
+    3. Copy the generated HTTP API Bot Token.
+  </Step>
+
+  <Step>
+    ### Implement the Channel Script
+
+    Create a script attaching a `Runner` to `TelegramChannel`:
+
+    ```python
+    import os
+    from chatflow_agent import Agent, Runner
+    from chatflow_agent.channels import TelegramChannel
+    from chatflow_agent.core.memory import SQLiteSessionStore
+
+    # Define your agent
+    support_agent = Agent(
+        name="SupportBot",
+        instructions="You are a helpful customer support representative.",
+    )
+
+    # Configure persistent session storage
+    store = SQLiteSessionStore("telegram_sessions.db")
+    runner = Runner(agent=support_agent, session_store=store)
+
+    # Initialize Telegram Channel
+    telegram = TelegramChannel(
+        token=os.environ.get("TELEGRAM_BOT_TOKEN", "your-bot-token"),
+        start_message="Welcome! How can I assist you today?",
+    )
+
+    # Attach runner and run polling loop
+    telegram.attach(runner)
+
+    if __name__ == "__main__":
+        print("Starting Telegram bot polling...")
+        telegram.run()
+    ```
+  </Step>
+</Steps>
+
+## Channel Configuration Parameters
+
+The `TelegramChannel` constructor accepts the following options:
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `token` | `str` | *Required* | Telegram Bot API token issued by @BotFather. |
+| `start_message` | `str` | `"Hello! I am your AI..."` | Greeting message sent when a user triggers `/start`. |
+| `fallback_message` | `str` | `"Disculpa, ocurrió un..."` | User-facing message sent when model execution fails. |
+| `allowed_updates` | `list[str] \| None` | `None` | Restrict update types (e.g. `["message"]`). Defaults to all. |
+
+## Built-In Commands & Group Chat Security
+
+`TelegramChannel` includes preconfigured command handlers:
+
+### `/start` Command
+Responds with `start_message` to onboard new users.
+
+### `/reset` Command
+Clears the session history in `runner.session_store` for the active chat ID, allowing users to restart their conversation cleanly.
+
+<Callout type="warn" title="Group and Supergroup Chat Security">
+In group and supergroup chats, allowing any participant to clear the conversation could disrupt other users. `TelegramChannel` enforces role verification:
+* **Creators and Administrators:** Allowed to run `/reset`.
+* **Standard Members:** Denied execution with the response: `"Only group admins can reset the conversation."`.
+</Callout>
+
+```python
+# Security logic enforced internally by TelegramChannel._handle_reset:
+# member = await context.bot.get_chat_member(chat_id=chat.id, user_id=user.id)
+# if member.status not in ("creator", "administrator"):
+#     await update.message.reply_text("Only group admins can reset the conversation.")
+#     return
+```
+
+## Outbound Message Chunking (`split_message`)
+
+Telegram enforces a strict maximum length of **4096 characters per text message**. When an agent generates long formatted analyses, code blocks, or tables, sending the full text directly causes the Telegram API to return HTTP 400.
+
+`TelegramChannel` automatically pipes responses through `split_message`:
+
+```python
+from chatflow_agent.channels import split_message
+
+long_text = "Detailed agent analysis..." * 200
+chunks = split_message(long_text, max_len=4096)
+# Splits progressively at \n\n, \n, . , or spaces to preserve readability
+```
+
+The channel delivers chunks sequentially, ensuring that paragraphs, sentences, and lists are never broken abruptly mid-word.
+
+## Typing Indicators & User Experience
+
+While the model turn executes (including tool invocations and handoffs), `TelegramChannel` sends periodic `ChatAction.TYPING` indicators every 4 seconds. Users see the native *"Bot is typing..."* status in their Telegram client until the complete response is delivered.
+
+## Running in Existing Event Loops
+
+If you are integrating the bot inside an existing `asyncio` service or FastAPI application, pass `close_loop=False` to `run()`:
+
+```python
+telegram.run(drop_pending_updates=True, close_loop=False)
+```

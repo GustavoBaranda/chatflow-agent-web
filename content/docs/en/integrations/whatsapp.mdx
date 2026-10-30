@@ -70,36 +70,36 @@ Meta WhatsApp Cloud API
   <Step>
     ### Initialize and Attach the Channel
 
-    ```python
-    import os
-    from chatflow_agent import Agent, Runner
-    from chatflow_agent.channels import WhatsAppChannel
-    from chatflow_agent.core.memory import SQLiteSessionStore
+```python
+import os
+from chatflow_agent import Agent, Runner
+from chatflow_agent.channels import WhatsAppChannel
+from chatflow_agent.core.memory import SQLiteSessionStore
 
-    # Define your agent
-    customer_service = Agent(
-        name="CustomerService",
-        instructions="Provide courteous, professional customer support.",
-    )
+# Define your agent
+customer_service = Agent(
+    name="CustomerService",
+    instructions="Provide courteous, professional customer support.",
+)
 
-    store = SQLiteSessionStore("whatsapp_sessions.db", dedup_ttl_hours=192)
-    runner = Runner(agent=customer_service, session_store=store)
+store = SQLiteSessionStore("whatsapp_sessions.db", dedup_ttl_hours=192)
+runner = Runner(agent=customer_service, session_store=store)
 
-    # Initialize WhatsApp Channel
-    whatsapp = WhatsAppChannel(
-        verify_token=os.environ.get("WHATSAPP_VERIFY_TOKEN", "my-verify-token"),
-        access_token=os.environ.get("WHATSAPP_ACCESS_TOKEN", "EAAB..."),
-        phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "1029384756"),
-        app_secret=os.environ.get("META_APP_SECRET", "secret-key"),
-        verify_signature=True,
-    )
+# Initialize WhatsApp Channel
+whatsapp = WhatsAppChannel(
+    verify_token=os.environ.get("WHATSAPP_VERIFY_TOKEN", "my-verify-token"),
+    access_token=os.environ.get("WHATSAPP_ACCESS_TOKEN", "EAAB..."),
+    phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "1029384756"),
+    app_secret=os.environ.get("META_APP_SECRET", "secret-key"),
+    verify_signature=True,
+)
 
-    whatsapp.attach(runner)
+whatsapp.attach(runner)
 
-    if __name__ == "__main__":
-        # Runs FastAPI ASGI server on port 8000
-        whatsapp.run(host="0.0.0.0", port=8000)
-    ```
+if __name__ == "__main__":
+    # Runs FastAPI ASGI server on port 8000
+    whatsapp.run(host="0.0.0.0", port=8000)
+```
   </Step>
 
   <Step>

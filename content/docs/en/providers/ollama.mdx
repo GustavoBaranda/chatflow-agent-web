@@ -32,18 +32,18 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
     `chatflow-agent` automatically routes model names starting with `gemma`, `llama`, `mistral`, `qwen`, or `phi` to the Ollama engine preset:
 
-    ```python
-    from chatflow_agent import Agent, Runner
+```python
+from chatflow_agent import Agent, Runner
 
-    # Automatically routed to http://localhost:11434/v1
-    local_agent = Agent(
-        name="LocalAssistant",
-        model="gemma2:9b",
-        instructions="You are a helpful offline assistant.",
-    )
+# Automatically routed to http://localhost:11434/v1
+local_agent = Agent(
+    name="LocalAssistant",
+    model="gemma2:9b",
+    instructions="You are a helpful offline assistant.",
+)
 
-    runner = Runner(agent=local_agent)
-    ```
+runner = Runner(agent=local_agent)
+```
   </Step>
 </Steps>
 

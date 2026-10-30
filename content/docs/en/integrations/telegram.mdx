@@ -35,35 +35,35 @@ pip install "chatflow-agent[telegram]"
 
     Create a script attaching a `Runner` to `TelegramChannel`:
 
-    ```python
-    import os
-    from chatflow_agent import Agent, Runner
-    from chatflow_agent.channels import TelegramChannel
-    from chatflow_agent.core.memory import SQLiteSessionStore
+```python
+import os
+from chatflow_agent import Agent, Runner
+from chatflow_agent.channels import TelegramChannel
+from chatflow_agent.core.memory import SQLiteSessionStore
 
-    # Define your agent
-    support_agent = Agent(
-        name="SupportBot",
-        instructions="You are a helpful customer support representative.",
-    )
+# Define your agent
+support_agent = Agent(
+    name="SupportBot",
+    instructions="You are a helpful customer support representative.",
+)
 
-    # Configure persistent session storage
-    store = SQLiteSessionStore("telegram_sessions.db")
-    runner = Runner(agent=support_agent, session_store=store)
+# Configure persistent session storage
+store = SQLiteSessionStore("telegram_sessions.db")
+runner = Runner(agent=support_agent, session_store=store)
 
-    # Initialize Telegram Channel
-    telegram = TelegramChannel(
-        token=os.environ.get("TELEGRAM_BOT_TOKEN", "your-bot-token"),
-        start_message="Welcome! How can I assist you today?",
-    )
+# Initialize Telegram Channel
+telegram = TelegramChannel(
+    token=os.environ.get("TELEGRAM_BOT_TOKEN", "your-bot-token"),
+    start_message="Welcome! How can I assist you today?",
+)
 
-    # Attach runner and run polling loop
-    telegram.attach(runner)
+# Attach runner and run polling loop
+telegram.attach(runner)
 
-    if __name__ == "__main__":
-        print("Starting Telegram bot polling...")
-        telegram.run()
-    ```
+if __name__ == "__main__":
+    print("Starting Telegram bot polling...")
+    telegram.run()
+```
   </Step>
 </Steps>
 

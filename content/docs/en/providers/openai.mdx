@@ -67,59 +67,59 @@ Connecting to ultra-fast inference providers or specialized reasoning models req
 
 <Tabs items={["Groq Cloud", "DeepSeek API", "xAI Grok"]}>
   <Tab value="Groq Cloud">
-    ```python
-    import os
-    from chatflow_agent import Agent
-    from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
+```python
+import os
+from chatflow_agent import Agent
+from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
 
-    # Requires GROQ_API_KEY environment variable
-    groq_engine = OpenAIEngine(
-        provider="groq",
-        api_key=os.environ.get("GROQ_API_KEY"),
-    )
+# Requires GROQ_API_KEY environment variable
+groq_engine = OpenAIEngine(
+    provider="groq",
+    api_key=os.environ.get("GROQ_API_KEY"),
+)
 
-    speed_agent = Agent(
-        name="SpeedAgent",
-        model="llama-3.3-70b-versatile",
-        engine=groq_engine,
-        instructions="Provide real-time triage responses.",
-    )
-    ```
+speed_agent = Agent(
+    name="SpeedAgent",
+    model="llama-3.3-70b-versatile",
+    engine=groq_engine,
+    instructions="Provide real-time triage responses.",
+)
+```
   </Tab>
   <Tab value="DeepSeek API">
-    ```python
-    import os
-    from chatflow_agent import Agent
-    from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
+```python
+import os
+from chatflow_agent import Agent
+from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
 
-    # Requires DEEPSEEK_API_KEY environment variable
-    deepseek_engine = OpenAIEngine(
-        provider="deepseek",
-        api_key=os.environ.get("DEEPSEEK_API_KEY"),
-    )
+# Requires DEEPSEEK_API_KEY environment variable
+deepseek_engine = OpenAIEngine(
+    provider="deepseek",
+    api_key=os.environ.get("DEEPSEEK_API_KEY"),
+)
 
-    reasoning_agent = Agent(
-        name="ReasoningAgent",
-        model="deepseek-chat",
-        engine=deepseek_engine,
-        instructions="Perform deep technical root cause analysis.",
-    )
-    ```
+reasoning_agent = Agent(
+    name="ReasoningAgent",
+    model="deepseek-chat",
+    engine=deepseek_engine,
+    instructions="Perform deep technical root cause analysis.",
+)
+```
   </Tab>
   <Tab value="xAI Grok">
-    ```python
-    import os
-    from chatflow_agent import Agent
+```python
+import os
+from chatflow_agent import Agent
 
-    # Implicitly maps to xAI preset via 'grok' model prefix
-    # Requires XAI_API_KEY environment variable
-    grok_agent = Agent(
-        name="GrokAgent",
-        provider="grok",
-        model="grok-2",
-        instructions="Provide witty and technically precise answers.",
-    )
-    ```
+# Implicitly maps to xAI preset via 'grok' model prefix
+# Requires XAI_API_KEY environment variable
+grok_agent = Agent(
+    name="GrokAgent",
+    provider="grok",
+    model="grok-2",
+    instructions="Provide witty and technically precise answers.",
+)
+```
   </Tab>
 </Tabs>
 

@@ -4,8 +4,7 @@ description: "Official documentation for chatflow-agent: a lightweight, async mu
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
-
-# chatflow-agent Documentation
+import { Card, Cards } from 'fumadocs-ui/components/card';
 
 Welcome to the official documentation for **chatflow-agent**, a lightweight, async-first Python framework engineered for building modular conversational agents and multi-agent swarms with native, type-safe handoffs.
 
@@ -15,32 +14,20 @@ Created and led by **Gustavo Baranda** alongside an international open-source co
 
 ## Architecture Highlights
 
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-  <div className="p-4 rounded-xl border border-border bg-card">
-    <h3 className="text-base font-semibold text-foreground mb-1">Zero-SDK Lock-In</h3>
-    <p className="text-sm text-muted-foreground leading-relaxed">
-      Connects to LLMs over pure, asynchronous HTTP REST using <code>httpx</code>. No monolithic vendor SDKs or heavy runtime dependencies required.
-    </p>
-  </div>
-  <div className="p-4 rounded-xl border border-border bg-card">
-    <h3 className="text-base font-semibold text-foreground mb-1">Native Multi-Agent Handoffs</h3>
-    <p className="text-sm text-muted-foreground leading-relaxed">
-      Declare collaborative swarms. Agents delegate tasks dynamically using synthesized <code>transfer_to_*</code> tools with automatic cycle prevention.
-    </p>
-  </div>
-  <div className="p-4 rounded-xl border border-border bg-card">
-    <h3 className="text-base font-semibold text-foreground mb-1">Transactional Resilient Memory</h3>
-    <p className="text-sm text-muted-foreground leading-relaxed">
-      Every turn takes an atomic snapshot. If an error or timeout occurs, state automatically rolls back. SQLite operations run in dedicated thread pools.
-    </p>
-  </div>
-  <div className="p-4 rounded-xl border border-border bg-card">
-    <h3 className="text-base font-semibold text-foreground mb-1">Multi-Channel Readiness</h3>
-    <p className="text-sm text-muted-foreground leading-relaxed">
-      Deploy your agents seamlessly to terminal REPLs, Telegram bots, or WhatsApp Business Cloud API with HMAC SHA-256 signature verification.
-    </p>
-  </div>
-</div>
+<Cards>
+  <Card title="Zero-SDK Lock-In">
+    Connects to LLMs over pure, asynchronous HTTP REST using `httpx`. No monolithic vendor SDKs or heavy runtime dependencies required.
+  </Card>
+  <Card title="Native Multi-Agent Handoffs">
+    Declare collaborative swarms. Agents delegate tasks dynamically using synthesized `transfer_to_*` tools with automatic cycle prevention.
+  </Card>
+  <Card title="Transactional Resilient Memory">
+    Every turn takes an atomic snapshot. If an error or timeout occurs, state automatically rolls back. SQLite operations run in dedicated thread pools.
+  </Card>
+  <Card title="Multi-Channel Readiness">
+    Deploy your agents seamlessly to terminal REPLs, Telegram bots, or WhatsApp Business Cloud API with HMAC SHA-256 signature verification.
+  </Card>
+</Cards>
 
 ---
 

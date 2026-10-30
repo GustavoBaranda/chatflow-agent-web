@@ -5,6 +5,7 @@ import defaultMdxComponents from 'fumadocs-ui/mdx';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
 import { source } from '@/lib/source';
 import { TranslationNotice } from '@/components/docs/TranslationNotice';
 import { OutdatedNotice } from '@/components/docs/OutdatedNotice';
@@ -13,6 +14,8 @@ import type { Metadata } from 'next';
 
 const customMdxComponents = {
   ...defaultMdxComponents,
+  Card,
+  Cards,
   Callout,
   Tab,
   Tabs,

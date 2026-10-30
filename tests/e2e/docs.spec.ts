@@ -241,17 +241,17 @@ test.describe('Documentation Engine E2E Suite', () => {
     await page.screenshot({ path: path.join(artifactDir, 'docs-pt-BR-desktop-dark.png'), fullPage: false });
   });
 
-  test('should render docs and getting started pages without React hydration or HTML nesting errors', async ({ page }) => {
-    const pagesToTest = [
-      '/en/docs',
-      '/es/docs',
-      '/pt-BR/docs',
-      '/en/docs/getting-started/installation',
-      '/en/docs/getting-started/quickstart',
-      '/en/docs/getting-started/core-concepts',
-    ];
+  const docRoutesToTest = [
+    '/en/docs',
+    '/es/docs',
+    '/pt-BR/docs',
+    '/en/docs/getting-started/installation',
+    '/en/docs/getting-started/quickstart',
+    '/en/docs/getting-started/core-concepts',
+  ];
 
-    for (const route of pagesToTest) {
+  for (const route of docRoutesToTest) {
+    test(`should render ${route} without React hydration or HTML nesting errors`, async ({ page }) => {
       const consoleErrors: string[] = [];
       const hydrationErrors: string[] = [];
 
@@ -296,6 +296,6 @@ test.describe('Documentation Engine E2E Suite', () => {
       // Crucial assertion: exactly zero hydration or DOM nesting errors
       expect(hydrationErrors, `Hydration errors detected on ${route}`).toEqual([]);
       expect(consoleErrors, `Console errors detected on ${route}`).toEqual([]);
-    }
-  });
+    });
+  }
 });

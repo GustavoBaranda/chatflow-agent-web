@@ -15,6 +15,9 @@ export default async function Layout({
   return (
     <DocsLayout
       tree={tree}
+      themeSwitch={{
+        enabled: false,
+      }}
       sidebar={{
         collapsible: true,
         defaultOpenLevel: 2,

@@ -27,13 +27,10 @@ test.describe('Documentation Engine E2E Suite', () => {
     await expect(langBtn).toBeVisible();
     await expect(page.locator('header a[aria-label="GitHub"]')).toBeVisible();
 
-    // Main document headings
-    const h1 = page.locator('main h1, article h1').first();
-    await expect(h1).toBeVisible();
-    await expect(h1).toContainText('Documentation Overview');
-
-    const mdxH1 = page.locator('main h1, article h1').filter({ hasText: 'chatflow-agent Documentation' });
-    await expect(mdxH1).toBeVisible();
+    // Main document heading: exactly one visible, semantic H1 per page (DocsTitle)
+    const h1Elements = page.locator('article h1, main h1');
+    await expect(h1Elements).toHaveCount(1);
+    await expect(h1Elements.first()).toContainText('Documentation Overview');
 
     // Sidebar navigation check
     const sidebar = page.locator('#nd-sidebar, [data-sidebar="true"], nav[aria-label="Sidebar"]').first();
@@ -65,9 +62,9 @@ test.describe('Documentation Engine E2E Suite', () => {
     const langBtn = page.locator('header button[aria-label="Cambiar idioma"]');
     await expect(langBtn).toBeVisible();
 
-    const h1 = page.locator('main h1, article h1').first();
-    await expect(h1).toBeVisible();
-    await expect(h1).toContainText('Visión General de la Documentación');
+    const h1Elements = page.locator('article h1, main h1');
+    await expect(h1Elements).toHaveCount(1);
+    await expect(h1Elements.first()).toContainText('Visión General de la Documentación');
     await expect(page.locator('html')).toHaveAttribute('lang', 'es');
   });
 
@@ -87,9 +84,9 @@ test.describe('Documentation Engine E2E Suite', () => {
     const langBtn = page.locator('header button[aria-label="Alterar idioma"]');
     await expect(langBtn).toBeVisible();
 
-    const h1 = page.locator('main h1, article h1').first();
-    await expect(h1).toBeVisible();
-    await expect(h1).toContainText('Visão Geral da Documentação');
+    const ptH1Elements = page.locator('article h1, main h1');
+    await expect(ptH1Elements).toHaveCount(1);
+    await expect(ptH1Elements.first()).toContainText('Visão Geral da Documentação');
     await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
   });
 
@@ -242,5 +239,63 @@ test.describe('Documentation Engine E2E Suite', () => {
     });
     await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(artifactDir, 'docs-pt-BR-desktop-dark.png'), fullPage: false });
+  });
+
+  test('should render docs and getting started pages without React hydration or HTML nesting errors', async ({ page }) => {
+    const pagesToTest = [
+      '/en/docs',
+      '/es/docs',
+      '/pt-BR/docs',
+      '/en/docs/getting-started/installation',
+      '/en/docs/getting-started/quickstart',
+      '/en/docs/getting-started/core-concepts',
+    ];
+
+    for (const route of pagesToTest) {
+      const consoleErrors: string[] = [];
+      const hydrationErrors: string[] = [];
+
+      page.on('console', (msg) => {
+        const text = msg.text();
+        if (
+          text.includes('Hydration failed') ||
+          text.includes('did not match') ||
+          text.includes('cannot be a descendant of') ||
+          text.includes('validateDOMNesting')
+        ) {
+          hydrationErrors.push(`[${route}] ${text}`);
+        } else if (
+          msg.type() === 'error' &&
+          !text.includes('net::ERR_') &&
+          !text.includes('access control checks')
+        ) {
+          consoleErrors.push(`[${route}] ${text}`);
+        }
+      });
+
+      page.on('pageerror', (err) => {
+        if (
+          err.message.includes('Hydration') ||
+          err.message.includes('descendant') ||
+          err.message.includes('validateDOMNesting')
+        ) {
+          hydrationErrors.push(`[${route}] ${err.message}`);
+        } else if (!err.message.includes('access control checks')) {
+          consoleErrors.push(`[${route}] ${err.message}`);
+        }
+      });
+
+      const response = await page.goto(route);
+      expect(response?.status()).toBe(200);
+      await page.waitForLoadState('networkidle');
+
+      // Verify exactly ONE semantic H1 heading per documentation page
+      const h1Count = page.locator('article h1, main h1');
+      await expect(h1Count).toHaveCount(1);
+
+      // Crucial assertion: exactly zero hydration or DOM nesting errors
+      expect(hydrationErrors, `Hydration errors detected on ${route}`).toEqual([]);
+      expect(consoleErrors, `Console errors detected on ${route}`).toEqual([]);
+    }
   });
 });

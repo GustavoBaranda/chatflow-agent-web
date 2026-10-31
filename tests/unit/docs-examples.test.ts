@@ -4,8 +4,41 @@ import { spawnSync } from 'node:child_process';
 import { describe, it, expect } from 'vitest';
 
 const DOCS_DIR = path.resolve(process.cwd(), 'content/docs/en');
-const PYTHON_PATH = 'C:\\Users\\Gustavo\\Desktop\\chatflow-agent\\.venv\\Scripts\\python.exe';
-const SDK_DIR = 'C:\\Users\\Gustavo\\Desktop\\chatflow-agent';
+
+// Resolve SDK directory with environment variable priority and relative fallback
+const SDK_DIR =
+  process.env.CHATFLOW_SDK_PATH ||
+  (fs.existsSync(path.resolve(process.cwd(), '../chatflow-agent'))
+    ? path.resolve(process.cwd(), '../chatflow-agent')
+    : 'C:\\Users\\Gustavo\\Desktop\\chatflow-agent');
+
+// Resolve Python interpreter portably across OS platforms and virtual environments
+function resolvePythonPath(sdkDir: string): string {
+  if (process.env.PYTHON_PATH && fs.existsSync(process.env.PYTHON_PATH)) {
+    return process.env.PYTHON_PATH;
+  }
+  const venvWin = path.join(sdkDir, '.venv', 'Scripts', 'python.exe');
+  if (fs.existsSync(venvWin)) return venvWin;
+  const venvPosix = path.join(sdkDir, '.venv', 'bin', 'python');
+  if (fs.existsSync(venvPosix)) return venvPosix;
+  return process.platform === 'win32' ? 'python' : 'python3';
+}
+
+const PYTHON_PATH = resolvePythonPath(SDK_DIR);
+
+function getPythonEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    PYTHONIOENCODING: 'utf-8',
+  };
+  const srcDir = path.join(SDK_DIR, 'src');
+  if (fs.existsSync(srcDir)) {
+    env.PYTHONPATH = process.env.PYTHONPATH
+      ? `${srcDir}${path.delimiter}${process.env.PYTHONPATH}`
+      : srcDir;
+  }
+  return env;
+}
 
 function getMdxFiles(dir: string): string[] {
   let results: string[] = [];
@@ -45,20 +78,97 @@ describe('Documentation Python Code Snippets and SDK Parity Verification', () =>
     const pythonBlocks = extractPythonBlocks(content);
 
     describe(`File: ${relativePath}`, () => {
-      it(`has valid Python syntax for all ${pythonBlocks.length} code block(s)`, () => {
+      it(`has valid Python syntax and call signatures for all ${pythonBlocks.length} code block(s)`, () => {
         pythonBlocks.forEach((code) => {
-          const pyScript = `import sys, ast\nast.parse(sys.stdin.read())\n`;
+          const pyScript = `
+import sys, ast
+
+code = sys.stdin.read()
+try:
+    tree = ast.parse(code)
+except SyntaxError as e:
+    sys.stderr.write(f"SyntaxError: {e}\\n")
+    sys.exit(1)
+
+KNOWN_SIGNATURES = {
+    "Runner": {
+        "valid_kwargs": {"starting_agent", "session_store", "engine", "api_key", "max_handoffs_per_turn", "max_tool_iterations"},
+        "disallowed_kwargs": {"agent", "max_turns", "busy_timeout"}
+    },
+    "OpenAIEngine": {
+        "disallowed_kwargs": {"model"}
+    },
+    "GeminiEngine": {
+        "disallowed_kwargs": {"model"}
+    },
+    "AnthropicEngine": {
+        "disallowed_kwargs": {"model"}
+    },
+    "SQLiteSessionStore": {
+        "disallowed_kwargs": {"busy_timeout"}
+    }
+}
+
+for node in ast.walk(tree):
+    if isinstance(node, ast.Call):
+        func_name = None
+        if isinstance(node.func, ast.Name):
+            func_name = node.func.id
+        elif isinstance(node.func, ast.Attribute):
+            func_name = node.func.attr
+        if func_name in KNOWN_SIGNATURES:
+            spec = KNOWN_SIGNATURES[func_name]
+            disallowed = spec.get("disallowed_kwargs", set())
+            valid = spec.get("valid_kwargs")
+            for kw in node.keywords:
+                if kw.arg in disallowed:
+                    sys.stderr.write(f"ERROR: Disallowed kwarg '{kw.arg}' in call to {func_name}() on line {node.lineno}\\n")
+                    sys.exit(1)
+                if valid and kw.arg not in valid:
+                    sys.stderr.write(f"ERROR: Unrecognized kwarg '{kw.arg}' in call to {func_name}() on line {node.lineno}\\n")
+                    sys.exit(1)
+`;
           const run = spawnSync(PYTHON_PATH, ['-c', pyScript], {
             input: code,
             encoding: 'utf-8',
-            env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+            env: getPythonEnv(),
           });
+          if (run.status !== 0) {
+            console.error(`Error in ${relativePath}:\n`, run.stderr);
+          }
           expect(run.status).toBe(0);
           expect(run.stderr).toBe('');
         });
       });
     });
   });
+
+  it('verifies that Runner rejects "agent" parameter and strictly requires "starting_agent"', () => {
+    const checkRunnerAgentScript = `
+import inspect
+from chatflow_agent import Runner, Agent
+
+sig = inspect.signature(Runner.__init__)
+assert "starting_agent" in sig.parameters, "Runner.__init__ missing 'starting_agent' parameter!"
+assert "agent" not in sig.parameters, "Runner.__init__ must not accept 'agent' keyword!"
+
+# Verify runtime rejection
+agent = Agent(name="TestAgent", instructions="Test instructions")
+try:
+    Runner(agent=agent)
+    assert False, "Runner(agent=...) should have raised TypeError!"
+except TypeError as e:
+    assert "unexpected keyword argument 'agent'" in str(e)
+
+print("Verified: Runner rejects 'agent' and enforces 'starting_agent'.")
+`;
+    const run = spawnSync(PYTHON_PATH, ['-c', checkRunnerAgentScript], {
+      encoding: 'utf-8',
+      env: getPythonEnv(),
+    });
+    expect(run.status).toBe(0);
+    expect(run.stdout).toContain("Verified: Runner rejects 'agent' and enforces 'starting_agent'.");
+  }, 15000);
 
   it('verifies that no engine constructors in documentation accept a "model" argument', () => {
     const checkNoEngineModelScript = `
@@ -70,7 +180,10 @@ for engine_cls in [OpenAIEngine, GeminiEngine, AnthropicEngine]:
     assert "model" not in sig.parameters, f"Engine {engine_cls.__name__} must not accept 'model' parameter!"
 print("Verified: No engine accepts model parameter.")
 `;
-    const run = spawnSync(PYTHON_PATH, ['-c', checkNoEngineModelScript], { encoding: 'utf-8' });
+    const run = spawnSync(PYTHON_PATH, ['-c', checkNoEngineModelScript], {
+      encoding: 'utf-8',
+      env: getPythonEnv(),
+    });
     expect(run.status).toBe(0);
     expect(run.stdout).toContain('Verified: No engine accepts model parameter.');
   }, 15000);
@@ -86,7 +199,10 @@ assert "db_path" in sig.parameters, "SQLiteSessionStore missing db_path"
 assert "default_max_turns" in sig.parameters, "SQLiteSessionStore missing default_max_turns"
 print("Verified: SQLiteSessionStore signature is exact.")
 `;
-    const run = spawnSync(PYTHON_PATH, ['-c', checkSqliteScript], { encoding: 'utf-8' });
+    const run = spawnSync(PYTHON_PATH, ['-c', checkSqliteScript], {
+      encoding: 'utf-8',
+      env: getPythonEnv(),
+    });
     expect(run.status).toBe(0);
     expect(run.stdout).toContain('Verified: SQLiteSessionStore signature is exact.');
   }, 15000);
@@ -107,7 +223,10 @@ for tag in ["v0.3.4", "v0.4.0rc1"]:
 
 print("Verified: pyproject.toml extras match.")
 `;
-    const run = spawnSync(PYTHON_PATH, ['-c', checkExtrasScript], { encoding: 'utf-8' });
+    const run = spawnSync(PYTHON_PATH, ['-c', checkExtrasScript], {
+      encoding: 'utf-8',
+      env: getPythonEnv(),
+    });
     expect(run.status).toBe(0);
     expect(run.stdout).toContain('Verified: pyproject.toml extras match.');
   }, 15000);
@@ -234,7 +353,7 @@ assert DEFAULT_DEDUP_TTL_HOURS == 192
 sess_ctx = mem_store.get_or_create(session_id="dedup_test", default_agent=triage)
 assert sess_ctx.active_agent.name == "TriageAgent"
 
-# Example 13: Etapa 4C.2 - BaseChannel and split_message
+# Example 13: Channels - BaseChannel and split_message
 from chatflow_agent.channels.base import BaseChannel, split_message
 chunks = split_message("Paragraph 1\\n\\nParagraph 2\\n\\nParagraph 3", max_len=15)
 assert len(chunks) >= 3
@@ -247,7 +366,7 @@ mock_channel = MockWebhookChannel()
 mock_channel.attach(runner1)
 assert mock_channel.runner is runner1
 
-# Example 14: Etapa 4C.2 - OpenAIEngine presets & security
+# Example 14: Providers - OpenAIEngine presets & security
 from chatflow_agent.core.engines.openai_compatible import PROVIDER_PRESETS, OpenAIEngine, _resolve_api_key
 assert "deepseek" in PROVIDER_PRESETS
 assert "groq" in PROVIDER_PRESETS
@@ -260,7 +379,7 @@ try:
 except ValueError as e:
     assert "custom or unofficial base_url was provided" in str(e)
 
-# Example 15: Etapa 4C.3 - Exceptions hierarchy & AgentResponse model
+# Example 15: Production - Exceptions hierarchy & AgentResponse model
 from chatflow_agent.exceptions import (
     ChatFlowError,
     DependencyError,
@@ -280,16 +399,54 @@ assert "active_agent_name" in resp_fields
 assert "tool_calls_executed" in resp_fields
 assert "handoff" in resp_fields
 
-# Example 16: Etapa 4C.3 - Runner bounded limits
+# Example 16: Production - Runner bounded limits
 r_test = Runner(starting_agent=agent1, max_tool_iterations=7, max_handoffs_per_turn=4)
 assert r_test.max_tool_iterations == 7
 assert r_test.max_handoffs_per_turn == 4
+
+# Example 17: Corrected Telegram integration snippet
+tg_agent = Agent(name="SupportBot", instructions="Support", model="gpt-4o", engine=MockEngine("Help message"))
+tg_store = SQLiteSessionStore(db_path=":memory:")
+tg_runner = Runner(starting_agent=tg_agent, session_store=tg_store)
+assert tg_runner.starting_agent.name == "SupportBot"
+
+# Example 18: Corrected Webhook integration snippet
+wh_agent = Agent(name="APIAssistant", instructions="API Assistant", model="gpt-4o", engine=MockEngine("Processed ticket"))
+wh_store = SQLiteSessionStore(db_path=":memory:")
+wh_runner = Runner(starting_agent=wh_agent, session_store=wh_store)
+assert wh_runner.starting_agent.name == "APIAssistant"
+
+router_wh = Agent(name="RouterAgent", instructions="Triage", model="gpt-4o", engine=MockEngine("Resolved issue"))
+router_runner = Runner(starting_agent=router_wh)
+res_router = router_runner.run(session_id="cust_123", user_message="issue description", metadata={"priority": "high"})
+assert res_router.content == "Resolved issue"
+
+# Example 19: Corrected WhatsApp integration snippet
+wa_agent = Agent(name="CustomerService", instructions="WhatsApp Support", model="gpt-4o", engine=MockEngine("WA reply"))
+wa_store = SQLiteSessionStore(db_path=":memory:", dedup_ttl_hours=192)
+wa_runner = Runner(starting_agent=wa_agent, session_store=wa_store)
+assert wa_runner.starting_agent.name == "CustomerService"
+
+# Example 20: Corrected Gemini-Anthropic multi-engine swarm snippet
+researcher = Agent(name="Researcher", instructions="Search", model="gemini-2.5-flash", engine=MockEngine("Found findings"))
+synthesizer = Agent(name="Synthesizer", instructions="Prose", model="claude-3-5-sonnet-20241022", engine=MockEngine("Synthesized"))
+researcher.handoffs.append(synthesizer)
+synthesizer.handoffs.append(researcher)
+swarm_runner = Runner(starting_agent=researcher)
+assert swarm_runner.starting_agent.name == "Researcher"
+assert "Synthesizer" in swarm_runner._agents_registry
+
+# Example 21: Corrected Ollama local provider snippets
+local_bot = Agent(name="LocalBot", instructions="Offline", model="llama3.2:latest", engine=MockEngine("Offline response"))
+runner_local = Runner(starting_agent=local_bot)
+res_local = runner_local.run(session_id="local_sess", user_message="Analyze data")
+assert res_local.content == "Offline response"
 
 print("All documentation examples successfully executed end-to-end!")
 `;
     const run = spawnSync(PYTHON_PATH, ['-c', executeExamplesScript], {
       encoding: 'utf-8',
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      env: getPythonEnv(),
     });
     if (run.status !== 0) {
       console.error('executeExamplesScript STDERR:', run.stderr);

@@ -19,8 +19,11 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:smoke": "node scripts/test-dev-smoke.mjs",
+    "test:sdk:stable": "node scripts/run-sdk-parity.mjs --version 0.3.4",
+    "test:sdk:prerelease": "node scripts/run-sdk-parity.mjs --version 0.4.0rc1",
+    "test:sdk:parity": "node scripts/run-sdk-parity.mjs --all",
     "check:i18n": "node scripts/check-i18n.mjs",
-    "verify": "pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm test",
+    "verify": "pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm test && pnpm test:sdk:parity",
     "postinstall": "fumadocs-mdx"
   },
   "dependencies": {

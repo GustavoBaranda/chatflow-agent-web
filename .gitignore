@@ -16,6 +16,8 @@ test-results/
 playwright-report/
 blob-report/
 .nyc_output/
+.cache/
+.sdk-cache/
 
 # Environment files (Strict security: never commit secrets)
 .env

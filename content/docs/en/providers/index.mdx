@@ -74,6 +74,8 @@ The engine returns an `EngineTurnResult` containing:
 When multi-agent handoffs occur between different model families (for instance, handing off from Anthropic Claude to OpenAI GPT-4o), historical messages retain tool call IDs issued by the previous model. Because different providers impose conflicting ID validation constraints (for example, OpenAI rejects tool call IDs exceeding 40 characters), `chatflow-agent` uses deterministic replacement:
 
 ```python
+# [min-version: 0.4.0rc1]
+# [executable]
 from chatflow_agent.core.engines.base import replacement_tool_call_id
 
 original_id = "toolu_01A098bC45dEf67gHiJkLmNoPqRsTuVwXyZ"
@@ -160,6 +162,8 @@ Understanding architectural differences between releases helps choose the right 
 In `v0.4.0rc1`, wrap runner executions inside `async with runner:` to enable HTTP connection keepalive pooling across turns:
 
 ```python
+# [min-version: 0.4.0rc1]
+# [no-exec: requires real provider engine for turn execution]
 import asyncio
 from chatflow_agent import Agent, Runner
 

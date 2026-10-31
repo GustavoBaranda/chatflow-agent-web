@@ -177,6 +177,8 @@ Session management introduces high-concurrency optimizations in newer versions:
 ## Complete Example: Persistent Webhook Session
 
 ```python
+# [min-version: 0.4.0rc1]
+# [no-exec: illustrative async webhook handler]
 import asyncio
 from chatflow_agent import Agent, Runner, SQLiteSessionStore, tool
 

@@ -50,6 +50,8 @@ runner = Runner(
 When initialized, the `Runner` recursively traverses `starting_agent` and every peer in its `handoffs` list, building an internal registry (`_agents_registry`). This ensures any destination agent can be resolved instantly during handoffs:
 
 ```python
+# [min-version: 0.3.0]
+# [executable]
 from chatflow_agent import Agent, Runner
 
 billing = Agent(name="Billing", instructions="Billing", model="gpt-4o")
@@ -152,6 +154,8 @@ asyncio.run(main())
 A convenience helper for scripts, interactive REPLs, and unit tests:
 
 ```python
+# [min-version: 0.3.0]
+# [no-exec: requires LLM engine for turn response]
 from chatflow_agent import Agent, Runner
 
 agent = Agent(name="Bot", instructions="Concise assistant", model="gpt-4o")
@@ -180,6 +184,8 @@ The `Runner` execution engine includes major concurrency and performance upgrade
 ### Prerelease Enhancements (`v0.4.0rc1`)
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Connection Pooling (`async with runner:`):** Open an HTTP client pool across turns to reuse underlying TCP connections:
 ```python
+# [min-version: 0.4.0rc1]
+# [no-exec: illustrative async connection pool pattern]
 from chatflow_agent import Agent, Runner
 
 agent = Agent(name="Bot", instructions="Helper", model="gemini-2.5-flash")

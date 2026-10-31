@@ -14,6 +14,8 @@ In `chatflow-agent`, an **`Agent`** represents a persona with dedicated instruct
 Create a new file named `quickstart.py`:
 
 ```python
+# [min-version: 0.3.0]
+# [no-exec: requires real openai api key for live response]
 import os
 from chatflow_agent import Agent, Runner
 
@@ -56,6 +58,8 @@ python quickstart.py
 Agents become exponentially more powerful when given access to deterministic functions. Use the `@tool` decorator to turn any Python function into an introspectable tool:
 
 ```python
+# [min-version: 0.3.0]
+# [no-exec: requires real openai api key for live response]
 import os
 from chatflow_agent import Agent, Runner, tool
 

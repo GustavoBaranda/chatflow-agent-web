@@ -109,6 +109,8 @@ Telegram enforces a strict maximum length of **4096 characters per text message*
 `TelegramChannel` automatically pipes responses through `split_message`:
 
 ```python
+# [min-version: 0.3.2]
+# [executable]
 from chatflow_agent.channels import split_message
 
 long_text = "Detailed agent analysis..." * 200

@@ -63,6 +63,8 @@ The Gemini implementation underwent an architectural shift between releases:
 * **In `v0.4.0rc1` (Prerelease):** The engine was completely rewritten using native asynchronous `httpx` against `https://generativelanguage.googleapis.com/v1beta`. This eliminates heavy dependencies and enables **connection pooling** across agent turns:
 
 ```python
+# [min-version: 0.4.0rc1]
+# [no-exec: requires real gemini api key]
 import asyncio
 from chatflow_agent import Agent, Runner
 

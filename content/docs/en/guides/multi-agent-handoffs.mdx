@@ -31,6 +31,8 @@ Handoff relationships are declared either during instantiation or imperatively:
 Pass a list of target `Agent` instances in the `handoffs` parameter:
 
 ```python
+# [min-version: 0.3.0]
+# [executable]
 from chatflow_agent import Agent
 
 # Define specialized destination agents first
@@ -62,6 +64,8 @@ triage_agent = Agent(
 Specialists often need to transfer users back and forth. Use `agent.add_handoff()` to establish bidirectional links:
 
 ```python
+# [min-version: 0.3.0]
+# [executable]
 from chatflow_agent import Agent
 
 support = Agent(name="Support", instructions="General support", model="gpt-4o")

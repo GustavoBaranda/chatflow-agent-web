@@ -154,6 +154,8 @@ async def execute_turn_with_recovery(
 Starting in `v0.4.0rc1`, `run_async` supports an explicit `turn_timeout` parameter (in seconds). Unlike generic request timeouts, `turn_timeout` begins counting only **after** the call acquires the session lock, ensuring queued turns do not expire prematurely while waiting behind earlier turns:
 
 ```python
+# [min-version: 0.4.0rc1]
+# [no-exec: illustrative turn timeout call]
 # Limits the turn execution to 45 seconds once lock is acquired
 response = await runner.run_async(
     session_id="customer-1029",

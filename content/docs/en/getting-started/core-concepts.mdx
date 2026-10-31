@@ -14,6 +14,8 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 An `Agent` represents an autonomous actor with an explicit persona, system prompt instructions, a designated LLM model and engine, and access to tools or handoff peers.
 
 ```python
+# [min-version: 0.3.0]
+# [executable]
 from chatflow_agent import Agent
 
 # Static prompt instructions with target model
@@ -29,6 +31,8 @@ agent = Agent(
 Instructions can be a static string or a dynamic Python callable (`Callable[[], str]`). Dynamic instructions are evaluated at the beginning of each turn:
 
 ```python
+# [min-version: 0.3.0]
+# [executable]
 from datetime import datetime
 from chatflow_agent import Agent
 
@@ -127,6 +131,8 @@ local_agent = Agent(
 Tools give agents deterministic execution power. When decorated with `@tool`, `chatflow-agent` automatically parses Python type annotations and docstrings to generate standard JSON Schema specifications for the LLM:
 
 ```python
+# [min-version: 0.3.0]
+# [executable]
 from chatflow_agent import tool
 
 @tool(name="fetch_user_profile", description="Fetch user metadata from internal database.")

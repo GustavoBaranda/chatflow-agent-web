@@ -21,6 +21,8 @@ The standard way to author a tool is using the `@tool` decorator. You can apply 
 Infers the tool name from the function identifier and description from the function docstring:
 
 ```python
+# [min-version: 0.3.0]
+# [executable]
 from chatflow_agent import tool
 
 @tool
@@ -36,6 +38,8 @@ assert "Calculate Value-Added Tax" in calculate_vat.description
 Explicitly overrides the name and description exposed to the LLM:
 
 ```python
+# [min-version: 0.3.0]
+# [executable]
 from chatflow_agent import tool
 
 @tool(

@@ -114,7 +114,7 @@ flowchart TD
 3. **Custom Connection:** `agent.base_url` or `agent.api_key` without provider. Official endpoints automatically map to their respective provider configuration; otherwise, defaults to `"openai"`.
 4. **Caller Override:** `default_engine` supplied with `prefer_default_engine=True` (used when callers deliberately enforce a test mock or specific runner default).
 5. **Model Name Prefix Heuristics:** Matches recognizable prefixes (`claude-`, `gpt-`, `o1`, `o3`, `grok`, `deepseek-`, `gemma`, `llama`, `mistral`, `qwen`, `phi`). This prevents a Claude model from accidentally falling back to a Gemini default.
-6. **Default Runner Engine:** The engine built by `Runner` (e.g., from `Runner(api_key=...)`).
+6. **Default Runner Engine:** The engine built by `Runner` (e.g., from `Runner(starting_agent=..., api_key=...)`).
 7. **Ultimate Fallback:** Standard `GeminiEngine(api_key=...)`.
 
 ## Security Rules and Credential Isolation
@@ -164,13 +164,13 @@ import asyncio
 from chatflow_agent import Agent, Runner
 
 agent = Agent(name="Assistant", instructions="Be helpful.")
-runner = Runner(agent=agent)
+runner = Runner(starting_agent=agent)
 
 async def main():
     async with runner:
         res1 = await runner.run_async("session-1", "Hello")
         res2 = await runner.run_async("session-1", "How are you?")
-        print(res1.text, res2.text)
+        print(res1.content, res2.content)
 
 asyncio.run(main())
 ```

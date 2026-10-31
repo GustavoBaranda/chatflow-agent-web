@@ -83,7 +83,7 @@ customer_service = Agent(
 )
 
 store = SQLiteSessionStore("whatsapp_sessions.db", dedup_ttl_hours=192)
-runner = Runner(agent=customer_service, session_store=store)
+runner = Runner(starting_agent=customer_service, session_store=store)
 
 # Initialize WhatsApp Channel
 whatsapp = WhatsAppChannel(

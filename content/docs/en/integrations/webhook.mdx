@@ -141,7 +141,7 @@ assistant = Agent(
 
 # 2. Configure persistent memory
 store = SQLiteSessionStore("webhook_sessions.db")
-runner = Runner(agent=assistant, session_store=store)
+runner = Runner(starting_agent=assistant, session_store=store)
 
 # 3. Instantiate channel and attach runner
 channel = GenericWebhookChannel(secret="super-secret-key")
@@ -162,7 +162,7 @@ from chatflow_agent import Agent, Runner
 app = FastAPI()
 
 agent = Agent(name="RouterAgent", instructions="Triage support requests.")
-runner = Runner(agent=agent)
+runner = Runner(starting_agent=agent)
 
 @app.post("/crm/webhook")
 async def crm_webhook_endpoint(payload: dict):
@@ -172,11 +172,11 @@ async def crm_webhook_endpoint(payload: dict):
     # Execute agent directly
     response = await runner.run_async(
         session_id=session_id,
-        message=incoming_text,
+        user_message=incoming_text,
         metadata={"priority": payload.get("priority")},
     )
 
-    return {"status": "processed", "solution": response.text}
+    return {"status": "processed", "solution": response.content}
 ```
 
 ## Security Best Practices

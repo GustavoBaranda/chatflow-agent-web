@@ -42,7 +42,7 @@ local_agent = Agent(
     instructions="You are a helpful offline assistant.",
 )
 
-runner = Runner(agent=local_agent)
+runner = Runner(starting_agent=local_agent)
 ```
   </Step>
 </Steps>
@@ -70,7 +70,7 @@ gpu_agent = Agent(
     instructions="Analyze complex local datasets without cloud egress.",
 )
 
-runner = Runner(agent=gpu_agent)
+runner = Runner(starting_agent=gpu_agent)
 ```
 
 ## Security Rule: Localhost Loopback Exemption
@@ -124,7 +124,7 @@ finance_agent = Agent(
     instructions="Calculate tax obligations using the calculate_vat tool.",
 )
 
-runner = Runner(agent=finance_agent)
+runner = Runner(starting_agent=finance_agent)
 ```
 
 ## Best Practices for Local Inference
@@ -162,5 +162,5 @@ synthesis_agent = Agent(
 )
 
 triage_agent.handoffs.append(handoff(synthesis_agent))
-runner = Runner(agent=triage_agent)
+runner = Runner(starting_agent=triage_agent)
 ```

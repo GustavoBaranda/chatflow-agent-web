@@ -49,7 +49,7 @@ support_agent = Agent(
 
 # Configure persistent session storage
 store = SQLiteSessionStore("telegram_sessions.db")
-runner = Runner(agent=support_agent, session_store=store)
+runner = Runner(starting_agent=support_agent, session_store=store)
 
 # Initialize Telegram Channel
 telegram = TelegramChannel(

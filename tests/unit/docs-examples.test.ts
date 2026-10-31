@@ -5,10 +5,20 @@ import { describe, it, expect } from 'vitest';
 
 const DOCS_DIR = path.resolve(process.cwd(), 'content/docs/en');
 
-// Resolve SDK directory with environment variable priority and relative fallback
+// Resolve isolated published release path or fallback
+const DEFAULT_VERSION = process.env.CHATFLOW_SDK_VERSION || '0.3.4';
+const CACHED_RELEASE_PATH = path.resolve(process.cwd(), `.cache/sdk-releases/${DEFAULT_VERSION}`);
 const SDK_DIR =
   process.env.CHATFLOW_SDK_PATH ||
-  (fs.existsSync(path.resolve(process.cwd(), '../chatflow-agent'))
+  (fs.existsSync(CACHED_RELEASE_PATH)
+    ? CACHED_RELEASE_PATH
+    : fs.existsSync(path.resolve(process.cwd(), '../chatflow-agent'))
+      ? path.resolve(process.cwd(), '../chatflow-agent')
+      : 'C:\\Users\\Gustavo\\Desktop\\chatflow-agent');
+
+const SDK_REPO_DIR =
+  process.env.CHATFLOW_SDK_REPO ||
+  (fs.existsSync(path.resolve(process.cwd(), '../chatflow-agent/.git'))
     ? path.resolve(process.cwd(), '../chatflow-agent')
     : 'C:\\Users\\Gustavo\\Desktop\\chatflow-agent');
 
@@ -17,10 +27,24 @@ function resolvePythonPath(sdkDir: string): string {
   if (process.env.PYTHON_PATH && fs.existsSync(process.env.PYTHON_PATH)) {
     return process.env.PYTHON_PATH;
   }
+  // Check sibling SDK repository venv
+  const siblingWin = path.resolve(process.cwd(), '../chatflow-agent/.venv/Scripts/python.exe');
+  if (fs.existsSync(siblingWin)) return siblingWin;
+  const siblingPosix = path.resolve(process.cwd(), '../chatflow-agent/.venv/bin/python');
+  if (fs.existsSync(siblingPosix)) return siblingPosix;
+
+  // Check sdkDir venv
   const venvWin = path.join(sdkDir, '.venv', 'Scripts', 'python.exe');
   if (fs.existsSync(venvWin)) return venvWin;
   const venvPosix = path.join(sdkDir, '.venv', 'bin', 'python');
   if (fs.existsSync(venvPosix)) return venvPosix;
+
+  // Check local venv
+  const localWin = path.resolve(process.cwd(), '.venv/Scripts/python.exe');
+  if (fs.existsSync(localWin)) return localWin;
+  const localPosix = path.resolve(process.cwd(), '.venv/bin/python');
+  if (fs.existsSync(localPosix)) return localPosix;
+
   return process.platform === 'win32' ? 'python' : 'python3';
 }
 
@@ -32,11 +56,10 @@ function getPythonEnv(): NodeJS.ProcessEnv {
     PYTHONIOENCODING: 'utf-8',
   };
   const srcDir = path.join(SDK_DIR, 'src');
-  if (fs.existsSync(srcDir)) {
-    env.PYTHONPATH = process.env.PYTHONPATH
-      ? `${srcDir}${path.delimiter}${process.env.PYTHONPATH}`
-      : srcDir;
-  }
+  const targetDir = fs.existsSync(srcDir) ? srcDir : SDK_DIR;
+  env.PYTHONPATH = process.env.PYTHONPATH
+    ? `${targetDir}${path.delimiter}${process.env.PYTHONPATH}`
+    : targetDir;
   return env;
 }
 
@@ -79,67 +102,106 @@ describe('Documentation Python Code Snippets and SDK Parity Verification', () =>
 
     describe(`File: ${relativePath}`, () => {
       it(`has valid Python syntax and call signatures for all ${pythonBlocks.length} code block(s)`, () => {
-        pythonBlocks.forEach((code) => {
-          const pyScript = `
-import sys, ast
+        if (pythonBlocks.length === 0) return;
 
-code = sys.stdin.read()
-try:
-    tree = ast.parse(code)
-except SyntaxError as e:
-    sys.stderr.write(f"SyntaxError: {e}\\n")
-    sys.exit(1)
+        const batchPyScript = `
+import sys, json, ast, inspect
 
-KNOWN_SIGNATURES = {
-    "Runner": {
-        "valid_kwargs": {"starting_agent", "session_store", "engine", "api_key", "max_handoffs_per_turn", "max_tool_iterations"},
-        "disallowed_kwargs": {"agent", "max_turns", "busy_timeout"}
-    },
-    "OpenAIEngine": {
-        "disallowed_kwargs": {"model"}
-    },
-    "GeminiEngine": {
-        "disallowed_kwargs": {"model"}
-    },
-    "AnthropicEngine": {
-        "disallowed_kwargs": {"model"}
-    },
-    "SQLiteSessionStore": {
-        "disallowed_kwargs": {"busy_timeout"}
-    }
+blocks = json.loads(sys.stdin.read())
+
+import chatflow_agent
+from chatflow_agent import Agent, Runner, SessionStore, SQLiteSessionStore, tool
+from chatflow_agent.core.tools import Tool
+from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
+from chatflow_agent.core.engines.gemini import GeminiEngine
+from chatflow_agent.core.engines.anthropic import AnthropicEngine
+
+TARGETS = {
+    "Agent": Agent,
+    "Runner": Runner,
+    "Tool": Tool,
+    "SessionStore": SessionStore,
+    "SQLiteSessionStore": SQLiteSessionStore,
+    "OpenAIEngine": OpenAIEngine,
+    "GeminiEngine": GeminiEngine,
+    "AnthropicEngine": AnthropicEngine,
+    "tool": tool,
 }
 
-for node in ast.walk(tree):
-    if isinstance(node, ast.Call):
-        func_name = None
-        if isinstance(node.func, ast.Name):
-            func_name = node.func.id
-        elif isinstance(node.func, ast.Attribute):
-            func_name = node.func.attr
-        if func_name in KNOWN_SIGNATURES:
-            spec = KNOWN_SIGNATURES[func_name]
-            disallowed = spec.get("disallowed_kwargs", set())
-            valid = spec.get("valid_kwargs")
-            for kw in node.keywords:
-                if kw.arg in disallowed:
-                    sys.stderr.write(f"ERROR: Disallowed kwarg '{kw.arg}' in call to {func_name}() on line {node.lineno}\\n")
-                    sys.exit(1)
-                if valid and kw.arg not in valid:
-                    sys.stderr.write(f"ERROR: Unrecognized kwarg '{kw.arg}' in call to {func_name}() on line {node.lineno}\\n")
-                    sys.exit(1)
+try:
+    from chatflow_agent.channels.whatsapp import WhatsAppChannel
+    TARGETS["WhatsAppChannel"] = WhatsAppChannel
+except Exception:
+    pass
+
+try:
+    from chatflow_agent.channels.telegram import TelegramChannel
+    TARGETS["TelegramChannel"] = TelegramChannel
+except Exception:
+    pass
+
+DYNAMIC_SIGNATURES = {}
+for name, target in TARGETS.items():
+    fn = target.__init__ if isinstance(target, type) else target
+    sig = inspect.signature(fn)
+    allowed = {
+        p.name for p in sig.parameters.values()
+        if p.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+        and p.name not in ("self", "cls")
+    }
+    DYNAMIC_SIGNATURES[name] = allowed
+
+PROHIBITED_KWARGS = {
+    "Runner": {"agent", "max_turns", "busy_timeout"},
+    "OpenAIEngine": {"model"},
+    "GeminiEngine": {"model"},
+    "AnthropicEngine": {"model"},
+    "SQLiteSessionStore": {"busy_timeout"},
+}
+
+errors = []
+for idx, code in enumerate(blocks):
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        errors.append(f"Block #{idx+1} SyntaxError: {e}")
+        continue
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "chatflow_agent":
+            for alias in node.names:
+                if alias.name not in chatflow_agent.__all__:
+                    errors.append(f"Block #{idx+1}: Symbol '{alias.name}' is not in chatflow_agent.__all__")
+        elif isinstance(node, ast.Call):
+            func_name = None
+            if isinstance(node.func, ast.Name):
+                func_name = node.func.id
+            elif isinstance(node.func, ast.Attribute):
+                func_name = node.func.attr
+            if func_name in DYNAMIC_SIGNATURES:
+                allowed = DYNAMIC_SIGNATURES[func_name]
+                prohibited = PROHIBITED_KWARGS.get(func_name, set())
+                for kw in node.keywords:
+                    if kw.arg in prohibited:
+                        errors.append(f"Block #{idx+1} line {node.lineno}: Prohibited kwarg '{kw.arg}' in call to {func_name}()")
+                    elif kw.arg and kw.arg not in allowed:
+                        errors.append(f"Block #{idx+1} line {node.lineno}: Unsupported kwarg '{kw.arg}' in call to {func_name}()")
+
+if errors:
+    sys.stderr.write("\\n".join(errors))
+    sys.exit(1)
 `;
-          const run = spawnSync(PYTHON_PATH, ['-c', pyScript], {
-            input: code,
-            encoding: 'utf-8',
-            env: getPythonEnv(),
-          });
-          if (run.status !== 0) {
-            console.error(`Error in ${relativePath}:\n`, run.stderr);
-          }
-          expect(run.status).toBe(0);
-          expect(run.stderr).toBe('');
+        const run = spawnSync(PYTHON_PATH, ['-c', batchPyScript], {
+          input: JSON.stringify(pythonBlocks),
+          encoding: 'utf-8',
+          env: getPythonEnv(),
         });
-      });
+        if (run.status !== 0) {
+          console.error(`Error in ${relativePath}:\n`, run.stderr);
+        }
+        expect(run.status).toBe(0);
+        expect(run.stderr).toBe('');
+      }, 15000);
     });
   });
 
@@ -215,7 +277,7 @@ expected_extras = ["telegram", "whatsapp", "webhook", "all", "dev"]
 
 for tag in ["v0.3.4", "v0.4.0rc1"]:
     raw = subprocess.check_output(
-        ["git", "-C", r"${SDK_DIR}", "show", f"{tag}:pyproject.toml"],
+        ["git", "-C", r"${SDK_REPO_DIR}", "show", f"{tag}:pyproject.toml"],
         text=True
     )
     for extra in expected_extras:
@@ -430,14 +492,16 @@ assert wa_runner.starting_agent.name == "CustomerService"
 # Example 20: Corrected Gemini-Anthropic multi-engine swarm snippet
 researcher = Agent(name="Researcher", instructions="Search", model="gemini-2.5-flash", engine=MockEngine("Found findings"))
 synthesizer = Agent(name="Synthesizer", instructions="Prose", model="claude-3-5-sonnet-20241022", engine=MockEngine("Synthesized"))
-researcher.handoffs.append(synthesizer)
-synthesizer.handoffs.append(researcher)
+researcher.add_handoff(synthesizer)
+synthesizer.add_handoff(researcher)
 swarm_runner = Runner(starting_agent=researcher)
 assert swarm_runner.starting_agent.name == "Researcher"
 assert "Synthesizer" in swarm_runner._agents_registry
 
 # Example 21: Corrected Ollama local provider snippets
 local_bot = Agent(name="LocalBot", instructions="Offline", model="llama3.2:latest", engine=MockEngine("Offline response"))
+cloud_synth = Agent(name="CloudSynthesis", instructions="Cloud", model="gemini-2.5-flash", engine=MockEngine("Online response"))
+local_bot.add_handoff(cloud_synth)
 runner_local = Runner(starting_agent=local_bot)
 res_local = runner_local.run(session_id="local_sess", user_message="Analyze data")
 assert res_local.content == "Offline response"

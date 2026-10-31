@@ -35,11 +35,11 @@ ChatFlowError (Base)
 | `ChatFlowError` | `Exception` | Base class for all SDK exceptions. | Catch at top-level request boundaries. |
 | `DependencyError` | `ChatFlowError` | An optional channel extra (e.g. `[telegram]`, `[whatsapp]`) is not installed. | Install the required extra via `pip install "chatflow-agent[extra]"`. |
 | `ToolExecutionError` | `ChatFlowError` | A tool function raises an uncaught exception during execution. | Wrapped into `ToolResult(is_error=True)` so the agent can self-correct. |
-| `ToolSchemaError` <VersionBadge version="v0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Tool function arguments lack valid Python type annotations. | Fix function type signatures at development time. |
+| `ToolSchemaError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Tool function arguments lack valid Python type annotations. | Fix function type signatures at development time. |
 | `AgentHandoffError` | `ChatFlowError` | Target agent does not exist in the `Runner` registry, or turn exceeds `max_handoffs_per_turn`. | Verify handoff targets and check transfer loop conditions. |
 | `ProviderError` | `ChatFlowError` | Upstream model provider returns an HTTP error code (e.g. 429, 500, 503). | Implement exponential backoff or failover to a fallback engine. |
-| `ReentrantTurnError` <VersionBadge version="v0.4.0rc1" status="prerelease" /> | `ChatFlowError`, `RuntimeError` | Code executing inside a turn starts another turn for the same session. | Use background job queues or follow-up turn dispatchers. |
-| `SessionDeletedError` <VersionBadge version="v0.4.0rc1" status="prerelease" /> | `ChatFlowError` | A message is processed for a session that was purged during execution. | Re-create session or notify the user to restart the workflow. |
+| `ReentrantTurnError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError`, `RuntimeError` | Code executing inside a turn starts another turn for the same session. | Use background job queues or follow-up turn dispatchers. |
+| `SessionDeletedError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | A message is processed for a session that was purged during execution. | Re-create session or notify the user to restart the workflow. |
 
 ## Autonomous Tool Self-Correction
 
@@ -149,7 +149,7 @@ async def execute_turn_with_recovery(
 
 ## Turn Timeouts & Resource Boundaries
 
-<VersionBadge version="v0.4.0rc1" status="prerelease" />
+<VersionBadge version="0.4.0rc1" status="prerelease" />
 
 Starting in `v0.4.0rc1`, `run_async` supports an explicit `turn_timeout` parameter (in seconds). Unlike generic request timeouts, `turn_timeout` begins counting only **after** the call acquires the session lock, ensuring queued turns do not expire prematurely while waiting behind earlier turns:
 

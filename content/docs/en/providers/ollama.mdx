@@ -141,7 +141,7 @@ You can mix local and cloud agents in the same multi-agent swarm. For example, a
 
 ```python
 import os
-from chatflow_agent import Agent, Runner, handoff
+from chatflow_agent import Agent, Runner
 from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
 from chatflow_agent.core.engines.gemini import GeminiEngine
 
@@ -161,6 +161,6 @@ synthesis_agent = Agent(
     instructions="Synthesize public knowledge into structured reports.",
 )
 
-triage_agent.handoffs.append(handoff(synthesis_agent))
+triage_agent.add_handoff(synthesis_agent)
 runner = Runner(starting_agent=triage_agent)
 ```

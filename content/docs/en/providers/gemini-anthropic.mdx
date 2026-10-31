@@ -53,8 +53,8 @@ assistant = Agent(
 ### Connection Pooling & Zero-SDK Architecture
 
 <div className="flex gap-2 my-3">
-  <VersionBadge version="v0.4.0rc1" variant="prerelease" />
-  <VersionBadge version="v0.3.4" variant="stable" />
+  <VersionBadge version="0.4.0rc1" status="prerelease" />
+  <VersionBadge version="0.3.4" status="stable" />
 </div>
 
 The Gemini implementation underwent an architectural shift between releases:
@@ -140,7 +140,7 @@ If a `429` response includes a `Retry-After` header, the engine honors the provi
 A major advantage of `chatflow-agent` is composing swarms where different agents utilize different foundation models according to their strengths:
 
 ```python
-from chatflow_agent import Agent, Runner, handoff
+from chatflow_agent import Agent, Runner
 from chatflow_agent.core.engines.gemini import GeminiEngine
 from chatflow_agent.core.engines.anthropic import AnthropicEngine
 
@@ -162,8 +162,8 @@ synthesizer = Agent(
 )
 
 # Connect agents via handoffs
-researcher.handoffs.append(handoff(synthesizer))
-synthesizer.handoffs.append(handoff(researcher))
+researcher.add_handoff(synthesizer)
+synthesizer.add_handoff(researcher)
 
 runner = Runner(starting_agent=researcher)
 ```

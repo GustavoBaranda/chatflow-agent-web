@@ -123,7 +123,7 @@ def update_email(user_id: int, new_email: str) -> str:
 
 ## Reentrancy and Concurrency Security
 
-<VersionBadge version="v0.4.0rc1" status="prerelease" />
+<VersionBadge version="0.4.0rc1" status="prerelease" />
 
 Starting in `v0.4.0rc1`, `Runner` protects sessions against concurrent reentrant turns:
 - If a tool triggers code that calls `runner.run_async` on the same session while the lock is held, `Runner` raises `ReentrantTurnError`.

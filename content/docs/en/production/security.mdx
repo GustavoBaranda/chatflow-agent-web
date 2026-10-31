@@ -1,0 +1,131 @@
+---
+title: Security Best Practices
+description: Defense-in-depth security guidelines for chatflow-agent, credential isolation, prompt injection mitigations, webhook signatures, and data privacy.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+Autonomous AI agents capable of invoking tools, querying internal databases, and communicating over external messaging channels present unique security challenges. Defense-in-depth requires securing the LLM boundary, protecting credentials from exfiltration, and enforcing strict authorization on channel webhooks.
+
+`chatflow-agent` embeds defense mechanisms directly into its core engines, runners, and channel implementations.
+
+## Core Security Architecture
+
+```text
+Untrusted Input (Webhooks / Chat Channels)
+          │
+          ▼
+1. Transport Security & Authentication (HMAC SHA-256 / Bearer Tokens / Admin Check)
+          │
+          ▼
+2. Session Concurrency & Reentrancy Guards (ReentrantTurnError / Session Lock)
+          │
+          ▼
+3. Agent Boundaries & Tool Sandboxing (Validation / Type Check / Iteration Limits)
+          │
+          ▼
+4. Credential Isolation & Egress Guards (ValueError on Custom Host / No API Key Leak)
+```
+
+## Credential Protection & Egress Guards
+
+When connecting to private inference gateways or proxies, developers often override `base_url`. If an engine were to send official cloud credentials (such as an `OPENAI_API_KEY`) to an arbitrary third-party endpoint, secret tokens could be leaked.
+
+`chatflow-agent` enforces an automatic credential guard in `OpenAIEngine`:
+
+```python
+from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
+
+# [SAFE] Official endpoint with environment variable
+official_engine = OpenAIEngine(provider="openai")
+
+# [SAFE] Custom endpoint with explicitly provided internal token
+internal_engine = OpenAIEngine(
+    base_url="https://gateway.internal.corp/v1",
+    api_key="internal-bearer-token",
+)
+
+# [SAFE] Local offline inference with dummy key
+local_engine = OpenAIEngine(
+    base_url="http://localhost:11434/v1",
+    provider="ollama",
+)
+assert local_engine.api_key == "ollama"
+```
+
+<Callout type="warn" title="Automatic ValueError Protection">
+If you supply a custom `base_url` without providing an explicit `api_key`, `OpenAIEngine` refuses to reuse `OPENAI_API_KEY` from the environment and raises `ValueError`. This prevents accidental credential exfiltration to untrusted proxies.
+</Callout>
+
+## Channel Security Protocols
+
+### WhatsApp HMAC SHA-256 Signatures
+
+Meta delivers WhatsApp webhook events with an `X-Hub-Signature-256` header calculated as `HMAC-SHA256(payload, app_secret)`.
+
+`WhatsAppChannel` validates every inbound payload before parsing JSON or dispatching turns:
+
+```python
+import os
+from chatflow_agent.channels import WhatsAppChannel
+
+# Always enable signature verification in production
+channel = WhatsAppChannel(
+    verify_token=os.environ.get("WHATSAPP_VERIFY_TOKEN", ""),
+    access_token=os.environ.get("WHATSAPP_ACCESS_TOKEN", ""),
+    phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID", ""),
+    app_secret=os.environ.get("META_APP_SECRET", ""),
+    verify_signature=True,  # Rejects unauthenticated forge attempts with HTTP 403
+)
+```
+
+### Automatic Phone Number Masking
+
+Customer phone numbers received through WhatsApp are classified as Personally Identifiable Information (PII). `WhatsAppChannel` automatically masks telephone numbers in log outputs (`+1415****71`) via its internal `_mask_phone` sanitizer, preventing PII leaks to log monitoring platforms.
+
+### Telegram Group Chat Administration
+
+In group chats, multiple users interact with the same bot. Allowing any arbitrary member to execute `/reset` could disrupt ongoing workflows for other participants.
+
+`TelegramChannel` enforces authorization checks on `/reset`: it queries `get_chat_member` and permits the reset only if the sender has `creator` or `administrator` status in the group chat.
+
+## Prompt Injection & Tool Boundaries
+
+Prompt injection occurs when untrusted user input tricks the LLM into overriding system instructions or invoking unauthorized tools.
+
+To mitigate prompt injection risks:
+
+1. **Principle of Least Privilege:** Grant each specialized agent only the tools it strictly needs. A `BillingAgent` should not have access to database deletion or server restart tools.
+2. **Deterministic Argument Validation:** Validate all tool inputs against explicit type hints and runtime validation:
+
+```python
+from chatflow_agent import tool
+
+@tool
+def update_email(user_id: int, new_email: str) -> str:
+    """Update a user's verified email address.
+
+    Args:
+        user_id: Numeric user identifier.
+        new_email: Valid email address.
+    """
+    if "@" not in new_email or "." not in new_email:
+        raise ValueError("Invalid email format.")
+    # Execute update
+    return f"Email updated for user {user_id}."
+```
+
+3. **Multi-Agent Triage:** Use an initial unprivileged triage agent to classify requests before routing to agents with write access to production databases.
+
+## Reentrancy and Concurrency Security
+
+<VersionBadge version="v0.4.0rc1" status="prerelease" />
+
+Starting in `v0.4.0rc1`, `Runner` protects sessions against concurrent reentrant turns:
+- If a tool triggers code that calls `runner.run_async` on the same session while the lock is held, `Runner` raises `ReentrantTurnError`.
+- This prevents race conditions, infinite recursion, and concurrent history mutations.
+

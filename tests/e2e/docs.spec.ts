@@ -260,6 +260,13 @@ test.describe('Documentation Engine E2E Suite', () => {
     '/en/docs/integrations/telegram',
     '/en/docs/integrations/whatsapp',
     '/en/docs/integrations/webhook',
+    '/en/docs/production/error-handling',
+    '/en/docs/production/configuration',
+    '/en/docs/production/observability',
+    '/en/docs/production/security',
+    '/en/docs/production/deployment',
+    '/es/docs/production/error-handling',
+    '/pt-BR/docs/production/error-handling',
   ];
 
   for (const route of docRoutesToTest) {

@@ -260,6 +260,31 @@ try:
 except ValueError as e:
     assert "custom or unofficial base_url was provided" in str(e)
 
+# Example 15: Etapa 4C.3 - Exceptions hierarchy & AgentResponse model
+from chatflow_agent.exceptions import (
+    ChatFlowError,
+    DependencyError,
+    ToolExecutionError,
+    AgentHandoffError,
+    ProviderError,
+)
+assert issubclass(DependencyError, ChatFlowError)
+assert issubclass(ToolExecutionError, ChatFlowError)
+assert issubclass(AgentHandoffError, ChatFlowError)
+assert issubclass(ProviderError, ChatFlowError)
+
+from chatflow_agent.types import AgentResponse
+resp_fields = list(AgentResponse.model_fields.keys())
+assert "content" in resp_fields
+assert "active_agent_name" in resp_fields
+assert "tool_calls_executed" in resp_fields
+assert "handoff" in resp_fields
+
+# Example 16: Etapa 4C.3 - Runner bounded limits
+r_test = Runner(starting_agent=agent1, max_tool_iterations=7, max_handoffs_per_turn=4)
+assert r_test.max_tool_iterations == 7
+assert r_test.max_handoffs_per_turn == 4
+
 print("All documentation examples successfully executed end-to-end!")
 `;
     const run = spawnSync(PYTHON_PATH, ['-c', executeExamplesScript], {

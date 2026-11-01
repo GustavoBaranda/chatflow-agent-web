@@ -1,0 +1,10 @@
+{
+  "title": "Arquitectura Central",
+  "pages": [
+    "agents",
+    "tools",
+    "multi-agent-handoffs",
+    "runner-lifecycle",
+    "sessions-state"
+  ]
+}

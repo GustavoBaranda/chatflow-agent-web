@@ -2,6 +2,7 @@
   "title": "chatflow-agent v0.3 (Estable)",
   "root": true,
   "pages": [
-    "index"
+    "index",
+    "getting-started"
   ]
 }

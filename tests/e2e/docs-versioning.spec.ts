@@ -236,5 +236,101 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
     await page.waitForURL('**/en/docs/v0.3/getting-started/installation');
     expect(page.url()).toContain('/en/docs/v0.3/getting-started/installation');
   });
+
+  test('generates accurate canonical and robots metadata for stable v0.3 pages', async ({ page }) => {
+    await page.goto('/en/docs/v0.3/guides/agents');
+    await page.waitForLoadState('networkidle');
+
+    // Canonical link points to versioned stable URL
+    const canonical = page.locator('link[rel="canonical"]');
+    await expect(canonical).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.3/guides/agents');
+
+    // Robots meta allows index on stable
+    const robots = page.locator('meta[name="robots"]');
+    await expect(robots).toHaveAttribute('content', 'index, follow');
+  });
+
+  test('canonicalizes legacy unversioned documentation URLs to stable v0.3 equivalent', async ({ page }) => {
+    await page.goto('/en/docs/guides/agents');
+    await page.waitForLoadState('networkidle');
+
+    // Canonical points to /en/docs/v0.3/guides/agents
+    const canonical = page.locator('link[rel="canonical"]');
+    await expect(canonical).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.3/guides/agents');
+  });
+
+  test('enforces self-consistent canonical and noindex, follow on prerelease v0.4 pages', async ({ page }) => {
+    await page.goto('/en/docs/v0.4/guides/agents');
+    await page.waitForLoadState('networkidle');
+
+    const canonical = page.locator('link[rel="canonical"]');
+    await expect(canonical).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.4/guides/agents');
+
+    const robots = page.locator('meta[name="robots"]');
+    await expect(robots).toHaveAttribute('content', 'noindex, follow');
+  });
+
+  test('restricts hreflang alternates strictly to genuinely translated documentation', async ({ page }) => {
+    // 1. Genuine translated page: /es/docs/v0.3 has translations in es, pt-BR and en
+    await page.goto('/es/docs/v0.3');
+    await page.waitForLoadState('networkidle');
+
+    const esAlternate = page.locator('link[rel="alternate"][hreflang="es"]');
+    await expect(esAlternate).toHaveAttribute('href', 'https://chatflowagent.org/es/docs/v0.3');
+
+    const ptAlternate = page.locator('link[rel="alternate"][hreflang="pt-BR"]');
+    await expect(ptAlternate).toHaveAttribute('href', 'https://chatflowagent.org/pt-BR/docs/v0.3');
+
+    const enAlternate = page.locator('link[rel="alternate"][hreflang="en"]');
+    await expect(enAlternate).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.3');
+
+    const xDefault = page.locator('link[rel="alternate"][hreflang="x-default"]');
+    await expect(xDefault).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.3');
+
+    // 2. Untranslated fallback page: /es/docs/v0.3/guides/agents must NOT advertise es or pt-BR alternates
+    await page.goto('/es/docs/v0.3/guides/agents');
+    await page.waitForLoadState('networkidle');
+
+    const ungenuineEs = page.locator('link[rel="alternate"][hreflang="es"]');
+    await expect(ungenuineEs).toHaveCount(0);
+
+    const ungenuinePt = page.locator('link[rel="alternate"][hreflang="pt-BR"]');
+    await expect(ungenuinePt).toHaveCount(0);
+
+    // But English and x-default are present
+    const fallbackEn = page.locator('link[rel="alternate"][hreflang="en"]');
+    await expect(fallbackEn).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.3/guides/agents');
+  });
+
+  test('sitemap.xml returns 200 OK, includes indexable stable docs, and excludes v0.4 and fallbacks', async ({ request }) => {
+    const res = await request.get('/sitemap.xml');
+    expect(res.status()).toBe(200);
+
+    const text = await res.text();
+    expect(text).toContain('https://chatflowagent.org/en/docs/v0.3');
+    expect(text).toContain('https://chatflowagent.org/es/docs/v0.3');
+    expect(text).toContain('https://chatflowagent.org/pt-BR/docs/v0.3');
+
+    // Strictly excludes v0.4
+    expect(text).not.toContain('/docs/v0.4');
+
+    // Strictly excludes unversioned doc aliases
+    expect(text).not.toContain('https://chatflowagent.org/en/docs/guides');
+
+    // Strictly excludes untranslated fallbacks
+    expect(text).not.toContain('https://chatflowagent.org/es/docs/v0.3/guides');
+  });
+
+  test('robots.txt returns 200 OK, allows crawling for noindex detection, and links sitemap', async ({ request }) => {
+    const res = await request.get('/robots.txt');
+    expect(res.status()).toBe(200);
+
+    const text = await res.text();
+    expect(text).toContain('User-Agent: *');
+    expect(text).toContain('Allow: /');
+    expect(text).toContain('Disallow: /api/');
+    expect(text).toContain('Disallow: /_next/');
+    expect(text).toContain('Sitemap: https://chatflowagent.org/sitemap.xml');
+  });
 });
 

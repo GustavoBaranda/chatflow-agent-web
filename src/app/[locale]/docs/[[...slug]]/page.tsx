@@ -10,6 +10,7 @@ import { source, resolveDocPage } from '@/lib/source';
 import { TranslationNotice } from '@/components/docs/TranslationNotice';
 import { OutdatedNotice } from '@/components/docs/OutdatedNotice';
 import { VersionBadge } from '@/components/docs/VersionBadge';
+import { PrereleaseBanner } from '@/components/docs/PrereleaseBanner';
 import { DEFAULT_STABLE_TRACK } from '@/config/docs-versions';
 import type { Metadata } from 'next';
 
@@ -94,7 +95,7 @@ export default async function Page({ params }: PageProps) {
   const { locale, slug = [] } = await params;
   setRequestLocale(locale);
 
-  const { page, targetSlug, isFallback } = resolveDocPage(slug, locale);
+  const { page, targetSlug, isFallback, track, cleanSlug } = resolveDocPage(slug, locale);
 
   if (!page) {
     notFound();
@@ -110,6 +111,10 @@ export default async function Page({ params }: PageProps) {
 
       {isFallback && (
         <TranslationNotice targetLocale={locale} slug={cleanNoticeSlug} />
+      )}
+
+      {track === 'v0.4' && (
+        <PrereleaseBanner locale={locale} currentSlug={cleanSlug} />
       )}
 
       <DocsBody>

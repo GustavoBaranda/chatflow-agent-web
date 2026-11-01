@@ -6,10 +6,11 @@ import { Callout } from 'fumadocs-ui/components/callout';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Card, Cards } from 'fumadocs-ui/components/card';
-import { source } from '@/lib/source';
+import { source, resolveDocPage } from '@/lib/source';
 import { TranslationNotice } from '@/components/docs/TranslationNotice';
 import { OutdatedNotice } from '@/components/docs/OutdatedNotice';
 import { VersionBadge } from '@/components/docs/VersionBadge';
+import { DEFAULT_STABLE_TRACK } from '@/config/docs-versions';
 import type { Metadata } from 'next';
 
 const customMdxComponents = {
@@ -32,7 +33,17 @@ interface PageProps {
 }
 
 export async function generateStaticParams() {
-  return source.generateParams('slug', 'locale');
+  const versionedParams = source.generateParams('slug', 'locale');
+
+  // For every stable track page ['v0.3', ...rest], also generate the unversioned alias [...rest]
+  const unversionedParams = versionedParams
+    .filter((p) => Array.isArray(p.slug) && p.slug[0] === DEFAULT_STABLE_TRACK)
+    .map((p) => ({
+      locale: p.locale,
+      slug: (p.slug as string[]).slice(1),
+    }));
+
+  return [...versionedParams, ...unversionedParams];
 }
 
 export async function generateMetadata({
@@ -41,13 +52,7 @@ export async function generateMetadata({
   const { locale, slug = [] } = await params;
   setRequestLocale(locale);
 
-  let page = source.getPage(slug, locale);
-  let isFallback = false;
-
-  if (!page && locale !== 'en') {
-    page = source.getPage(slug, 'en');
-    isFallback = true;
-  }
+  const { page, targetSlug, isFallback, isExplicitTrack, track } = resolveDocPage(slug, locale);
 
   if (!page) {
     return {
@@ -55,14 +60,17 @@ export async function generateMetadata({
     };
   }
 
-  const cleanSlug = slug.join('/');
-  const canonicalPath = `/${locale}/docs${cleanSlug ? `/${cleanSlug}` : ''}`;
+  // Canonical path reflects the accessed URL (preserving version or unversioned alias)
+  const currentPath = slug.length > 0 ? `/${slug.join('/')}` : '';
+  const canonicalPath = `/${locale}/docs${currentPath}`;
 
   const languages: Record<string, string> = {};
   for (const l of ['en', 'es', 'pt-BR']) {
-    const localizedPage = source.getPage(slug, l);
-    if (localizedPage) {
-      languages[l] = `/${l}/docs${cleanSlug ? `/${cleanSlug}` : ''}`;
+    const localized = source.getPage(targetSlug, l);
+    if (localized) {
+      languages[l] = isExplicitTrack
+        ? `/${l}/docs/${targetSlug.join('/')}`
+        : `/${l}/docs${slug.length > 0 ? `/${slug.join('/')}` : ''}`;
     }
   }
 
@@ -73,7 +81,7 @@ export async function generateMetadata({
       canonical: canonicalPath,
       languages,
     },
-    robots: isFallback
+    robots: isFallback || track === 'v0.4'
       ? {
           index: false,
           follow: true,
@@ -86,20 +94,14 @@ export default async function Page({ params }: PageProps) {
   const { locale, slug = [] } = await params;
   setRequestLocale(locale);
 
-  let page = source.getPage(slug, locale);
-  let isFallback = false;
-
-  if (!page && locale !== 'en') {
-    page = source.getPage(slug, 'en');
-    isFallback = true;
-  }
+  const { page, targetSlug, isFallback } = resolveDocPage(slug, locale);
 
   if (!page) {
     notFound();
   }
 
   const MDX = page.data.body;
-  const cleanSlug = slug.join('/');
+  const cleanNoticeSlug = targetSlug.join('/');
 
   return (
     <DocsPage toc={page.data.toc} full={page.data.full}>
@@ -107,7 +109,7 @@ export default async function Page({ params }: PageProps) {
       <DocsDescription>{page.data.description}</DocsDescription>
 
       {isFallback && (
-        <TranslationNotice targetLocale={locale} slug={cleanSlug} />
+        <TranslationNotice targetLocale={locale} slug={cleanNoticeSlug} />
       )}
 
       <DocsBody>

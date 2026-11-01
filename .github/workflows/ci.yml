@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-and-build:
+    name: Verify & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.18.0"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: "9.15.0"
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Check i18n
+        run: pnpm run check:i18n
+
+      - name: Provision strict isolated SDK releases from PyPI
+        run: python scripts/ensure-sdk-releases.py --version all
+
+      - name: Unit & regression tests
+        run: pnpm run test
+
+      - name: Strict SDK stable parity (v0.3.4)
+        run: python scripts/validate-release-parity.py --version 0.3.4
+
+      - name: Strict SDK prerelease parity (v0.4.0rc1)
+        run: python scripts/validate-release-parity.py --version 0.4.0rc1
+
+      - name: Build production bundle
+        run: pnpm run build

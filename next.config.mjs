@@ -8,6 +8,9 @@ const withMDX = createMDX();
 const nextConfig = {
   reactStrictMode: true,
   agentRules: false,
+  experimental: {
+    cpus: 2,
+  },
   webpack: (config) => {
     // Disable Webpack filesystem cache to prevent Windows EPERM mkdir file-lock races in sandbox
     config.cache = false;

@@ -132,8 +132,8 @@ describe('Centralized Documentation SEO Policy', () => {
   describe('Sitemap Generator', () => {
     const entries = sitemap();
 
-    it('generates exactly 29 indexable canonical entries', () => {
-      expect(entries.length).toBe(29);
+    it('generates exactly 32 indexable canonical entries', () => {
+      expect(entries.length).toBe(32);
     });
 
     it('ensures all entries use the absolute SITE_ORIGIN', () => {
@@ -152,6 +152,11 @@ describe('Centralized Documentation SEO Policy', () => {
         (e) => e.url === `${SITE_ORIGIN}/en/about` || e.url === `${SITE_ORIGIN}/es/about` || e.url === `${SITE_ORIGIN}/pt-BR/about`
       );
       expect(aboutUrls.length).toBe(3);
+
+      const communityUrls = entries.filter(
+        (e) => e.url === `${SITE_ORIGIN}/en/community` || e.url === `${SITE_ORIGIN}/es/community` || e.url === `${SITE_ORIGIN}/pt-BR/community`
+      );
+      expect(communityUrls.length).toBe(3);
     });
 
     it('includes all 21 stable v0.3 English documentation pages', () => {

@@ -23,9 +23,9 @@ test.describe('Resilience, Error Boundaries & Maintenance Suite', () => {
       '/en/docs/unmapped-page',
       '/es/docs/pagina-inexistente',
       '/pt-BR/docs/pagina-inexistente',
-      '/en/community',
-      '/es/community',
-      '/pt-BR/community',
+      '/en/community/unmapped-subpath',
+      '/es/community/ruta-inexistente',
+      '/pt-BR/community/caminho-inexistente',
       '/some-random-global-route-xyz',
     ];
 

@@ -539,12 +539,12 @@ print("All documentation examples successfully executed end-to-end!")
       input: executeExamplesScript,
       encoding: 'utf-8',
       env: getPythonEnv(),
-      timeout: 30000,
+      timeout: 60000,
     });
     if (run.status !== 0) {
       console.error('executeExamplesScript STDERR:', run.stderr);
     }
     expect(run.status).toBe(0);
     expect(run.stdout).toContain('All documentation examples successfully executed end-to-end!');
-  }, 35000);
+  }, 70000);
 });

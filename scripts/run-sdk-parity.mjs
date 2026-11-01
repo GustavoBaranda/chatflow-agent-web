@@ -2,7 +2,7 @@
 
 /**
  * Cross-platform runner for chatflow-agent release parity validation.
- * Portably resolves Python interpreter (checking venvs, python, python3).
+ * Resolves Python interpreter portably across platforms and isolated venvs.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -19,14 +19,14 @@ function resolvePython() {
     return process.env.PYTHON_PATH;
   }
 
-  // Check sibling SDK virtual environment
-  const siblingVenvWin = path.resolve(ROOT_DIR, '..', 'chatflow-agent', '.venv', 'Scripts', 'python.exe');
-  if (fs.existsSync(siblingVenvWin)) return siblingVenvWin;
+  // Check provisioned release venv
+  const cachedVenvWin = path.resolve(ROOT_DIR, '.cache', 'sdk-venvs', '0.3.4', 'Scripts', 'python.exe');
+  if (fs.existsSync(cachedVenvWin)) return cachedVenvWin;
 
-  const siblingVenvPosix = path.resolve(ROOT_DIR, '..', 'chatflow-agent', '.venv', 'bin', 'python');
-  if (fs.existsSync(siblingVenvPosix)) return siblingVenvPosix;
+  const cachedVenvPosix = path.resolve(ROOT_DIR, '.cache', 'sdk-venvs', '0.3.4', 'bin', 'python');
+  if (fs.existsSync(cachedVenvPosix)) return cachedVenvPosix;
 
-  // Local repo virtualenv if present
+  // Local workspace virtualenv if present
   const localVenvWin = path.resolve(ROOT_DIR, '.venv', 'Scripts', 'python.exe');
   if (fs.existsSync(localVenvWin)) return localVenvWin;
 

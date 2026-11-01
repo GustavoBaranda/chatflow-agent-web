@@ -66,7 +66,7 @@ export default async function LocaleLayout({
   const lang = getLanguage(locale);
 
   return (
-    <NextIntlClientProvider messages={messages}>
+    <NextIntlClientProvider messages={messages} locale={locale}>
       <LocaleHtmlUpdater locale={locale} direction={lang.direction} />
       <Navbar />
       {children}

@@ -39,7 +39,7 @@ export default async function RootLayout({
         className="flex min-h-screen flex-col bg-background text-foreground antialiased selection:bg-primary/20"
         suppressHydrationWarning
       >
-        <AppProviders direction={lang.direction}>
+        <AppProviders direction={lang.direction} locale={locale}>
           {children}
         </AppProviders>
       </body>

@@ -3,8 +3,9 @@
 import { useState, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
-import { Link } from '@/i18n/navigation';
+import { Link, usePathname } from '@/i18n/navigation';
 import { GitHubIcon } from '@/components/ui/icons';
+import { cn } from '@/lib/utils';
 import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
 import { MenuToggle } from './MenuToggle';
@@ -15,6 +16,12 @@ export function Navbar() {
   const tCommon = useTranslations('common');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
+  const pathname = usePathname();
+
+  const isHomeActive = pathname === '/';
+  const isDocsActive = pathname === '/docs' || pathname.startsWith('/docs/');
+  const isCommunityActive = pathname === '/community' || pathname.startsWith('/community/');
+  const isAboutActive = pathname === '/about' || pathname.startsWith('/about/');
 
   return (
     <>
@@ -50,20 +57,50 @@ export function Navbar() {
           {/* Desktop Navigation Links */}
           <nav className="hidden items-center gap-6 md:flex" aria-label="Main navigation">
             <Link
+              href="/"
+              aria-current={isHomeActive ? 'page' : undefined}
+              className={cn(
+                'text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                isHomeActive
+                  ? 'font-semibold text-foreground'
+                  : 'font-medium text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {t('home')}
+            </Link>
+            <Link
               href="/docs"
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+              aria-current={isDocsActive ? 'page' : undefined}
+              className={cn(
+                'text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                isDocsActive
+                  ? 'font-semibold text-foreground'
+                  : 'font-medium text-muted-foreground hover:text-foreground'
+              )}
             >
               {t('docs')}
             </Link>
             <Link
               href="/community"
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+              aria-current={isCommunityActive ? 'page' : undefined}
+              className={cn(
+                'text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                isCommunityActive
+                  ? 'font-semibold text-foreground'
+                  : 'font-medium text-muted-foreground hover:text-foreground'
+              )}
             >
               {t('community')}
             </Link>
             <Link
               href="/about"
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+              aria-current={isAboutActive ? 'page' : undefined}
+              className={cn(
+                'text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                isAboutActive
+                  ? 'font-semibold text-foreground'
+                  : 'font-medium text-muted-foreground hover:text-foreground'
+              )}
             >
               {t('about')}
             </Link>

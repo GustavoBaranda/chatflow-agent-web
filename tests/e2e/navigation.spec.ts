@@ -20,6 +20,7 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(brand).toContainText('chatflow-agent');
 
     // Header nav links (Home, Docs, Community, About)
+    await expect(page.locator('header nav a[href="/en"]')).toBeVisible();
     await expect(page.locator('header nav a[href="/en/docs"]')).toBeAttached();
     await expect(page.locator('header nav a[href="/en/community"]')).toBeAttached();
     await expect(page.locator('header nav a[href="/en/about"]')).toBeVisible();

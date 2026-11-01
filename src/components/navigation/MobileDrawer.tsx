@@ -4,9 +4,10 @@ import { useEffect, useRef } from 'react';
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
-import { Link } from '@/i18n/navigation';
+import { Link, usePathname } from '@/i18n/navigation';
 import { BookOpen, Users, Home, Info } from 'lucide-react';
 import { GitHubIcon } from '@/components/ui/icons';
+import { cn } from '@/lib/utils';
 import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
 import { menuSlide, slide } from './Animation';
@@ -20,6 +21,7 @@ interface MobileDrawerProps {
 export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps) {
   const t = useTranslations('navigation');
   const tFooter = useTranslations('footer');
+  const pathname = usePathname();
   const drawerRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
 
@@ -176,6 +178,10 @@ export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps)
               <nav className="mt-6 flex flex-1 flex-col space-y-2" aria-label="Mobile navigation">
                 {navItems.map((item, index) => {
                   const Icon = item.icon;
+                  const isActive =
+                    item.href === '/'
+                      ? pathname === '/'
+                      : pathname === item.href || pathname.startsWith(`${item.href}/`);
                   return (
                     <motion.div
                       key={item.href}
@@ -188,9 +194,18 @@ export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps)
                       <Link
                         href={item.href}
                         onClick={onClose}
-                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
+                        aria-current={isActive ? 'page' : undefined}
+                        className={cn(
+                          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                          isActive
+                            ? 'bg-muted font-semibold text-foreground'
+                            : 'font-medium text-foreground hover:bg-muted'
+                        )}
                       >
-                        <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                        <Icon
+                          className={cn('h-4 w-4', isActive ? 'text-primary' : 'text-muted-foreground')}
+                          aria-hidden="true"
+                        />
                         <span>{item.label}</span>
                       </Link>
                     </motion.div>

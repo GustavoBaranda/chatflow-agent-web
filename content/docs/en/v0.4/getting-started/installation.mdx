@@ -1,0 +1,125 @@
+---
+title: "Installation"
+description: "Install chatflow-agent and configure optional channel extras for Telegram, WhatsApp, and development."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+---
+
+## Prerequisites
+
+Before installing `chatflow-agent`, ensure your system meets the minimum Python requirements:
+
+* **Python Version:** Python `>=3.10` (tested on 3.10, 3.11, 3.12, and 3.13).
+* **Package Manager:** `pip`, `uv`, or `poetry`.
+* **Operating Systems:** Linux, macOS, and Windows (x86_64, arm64).
+
+Verify your local Python version in your terminal:
+
+```bash
+python --version
+# Output should be Python 3.10.x or higher
+```
+
+---
+
+## Installing the Core Package
+
+`chatflow-agent` provides a lightweight core with zero heavy provider dependencies. Choose between the stable production release or the prerelease candidate:
+
+<Tabs items={['pip', 'uv', 'poetry']}>
+  <Tab value="pip">
+```bash
+# Install current stable release (v0.3.4 - recommended for production)
+pip install chatflow-agent
+
+# Or install the prerelease candidate (v0.4.0rc1+)
+pip install --pre chatflow-agent
+# or: pip install "chatflow-agent==0.4.0rc1"
+```
+  </Tab>
+  <Tab value="uv">
+```bash
+# Install current stable release with uv
+uv add chatflow-agent
+
+# Or install the prerelease candidate
+uv add --prerelease=allow chatflow-agent
+# or: uv add "chatflow-agent==0.4.0rc1"
+```
+  </Tab>
+  <Tab value="poetry">
+```bash
+# Install current stable release with poetry
+poetry add chatflow-agent
+
+# Or install the prerelease candidate
+poetry add chatflow-agent@0.4.0rc1
+```
+  </Tab>
+</Tabs>
+
+<Callout type="info" title="Zero-SDK Lock-In & Core Dependencies">
+In **v0.3.4**, core dependencies are strictly limited to `google-genai>=0.1.1`, `pydantic>=2.6.0`, and `httpx>=0.27.0`. In **v0.4.0rc1+**, `google-genai` is no longer required: all Gemini and OpenAI-compatible communication executes directly over asynchronous REST via `httpx`. SQLite persistence uses Python's built-in `sqlite3` library without requiring third-party database drivers.
+</Callout>
+
+---
+
+## Optional Channel Extras
+
+`chatflow-agent` declares optional dependencies in `pyproject.toml` to keep the core footprint tiny. Install only the features your deployment requires:
+
+| Extra Name | Description | Key Dependencies Added | Command |
+| :--- | :--- | :--- | :--- |
+| `[telegram]` | Telegram Bot integration via polling or webhooks | `python-telegram-bot>=21.0` | `pip install "chatflow-agent[telegram]"` |
+| `[whatsapp]` | Meta WhatsApp Cloud API webhooks & webhook listener | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[whatsapp]"` |
+| `[webhook]` | Generic HTTP webhook server for external integrations | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[webhook]"` |
+| `[all]` | Installs all channel dependencies simultaneously | `telegram`, `whatsapp`, `webhook` | `pip install "chatflow-agent[all]"` |
+| `[dev]` | Tools for running unit and integration test suites | `pytest>=8.0.0`, `pytest-asyncio`, `ruff`, `mypy` | `pip install "chatflow-agent[dev]"` |
+
+---
+
+## Verification
+
+Confirm that `chatflow-agent` is properly installed by checking its version in Python:
+
+```bash
+python -c "import chatflow_agent; print(chatflow_agent.__version__)"
+```
+
+Expected output:
+```text
+0.3.4
+```
+*(or `0.4.0rc1` if installed with the prerelease flag)*.
+
+---
+
+## Provider API Keys Configuration
+
+To interact with LLMs, export the API key for your chosen provider as an environment variable in your shell or `.env` file:
+
+```bash
+# OpenAI or OpenAI-compatible providers (Groq, xAI, DeepSeek, Ollama)
+export OPENAI_API_KEY="sk-..."
+
+# Anthropic Claude models
+export ANTHROPIC_API_KEY="sk-ant-..."
+
+# Google Gemini models
+export GEMINI_API_KEY="AIzaSy..."
+```
+
+On Windows PowerShell:
+```powershell
+$env:OPENAI_API_KEY="sk-..."
+$env:ANTHROPIC_API_KEY="sk-ant-..."
+$env:GEMINI_API_KEY="AIzaSy..."
+```
+
+---
+
+## Next Steps
+
+Now that your environment is configured, proceed to the [Quickstart guide](/en/docs/getting-started/quickstart) to run your first conversational agent in less than 5 minutes.

@@ -1,0 +1,12 @@
+{
+  "title": "chatflow-agent v0.3 (Stable)",
+  "root": true,
+  "pages": [
+    "index",
+    "getting-started",
+    "guides",
+    "providers",
+    "integrations",
+    "production"
+  ]
+}

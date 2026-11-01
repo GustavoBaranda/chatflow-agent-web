@@ -1,0 +1,166 @@
+---
+title: Local Models with Ollama
+description: Run open weights models like Google Gemma 2, Llama 3, and Mistral on local hardware with zero cloud fees.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+`chatflow-agent` supports local language models through its universal OpenAI-compatible engine. By pairing the framework with [Ollama](https://ollama.com/), you can build autonomous agent workflows, tools, and multi-agent handoffs that run entirely on local GPUs or Apple Silicon, with zero API costs, zero data egress, and complete offline capability.
+
+## Quickstart Setup
+
+<Steps>
+  <Step>
+    ### Install and Launch Ollama
+
+    Download and install Ollama from [ollama.com](https://ollama.com). Pull a model that supports native structured tool calling (such as Google Gemma 2 or Meta Llama 3.2):
+
+    ```bash
+    ollama pull gemma2:9b
+    ollama pull llama3.2
+    ```
+
+    Ollama exposes an OpenAI-compatible API endpoint by default at `http://localhost:11434/v1`.
+  </Step>
+
+  <Step>
+    ### Define a Local Agent
+
+    `chatflow-agent` automatically routes model names starting with `gemma`, `llama`, `mistral`, `qwen`, or `phi` to the Ollama engine preset:
+
+```python
+from chatflow_agent import Agent, Runner
+
+# Automatically routed to http://localhost:11434/v1
+local_agent = Agent(
+    name="LocalAssistant",
+    model="gemma2:9b",
+    instructions="You are a helpful offline assistant.",
+)
+
+runner = Runner(starting_agent=local_agent)
+```
+  </Step>
+</Steps>
+
+## Explicit Engine Configuration
+
+If your Ollama server runs on a remote machine on your local network (e.g. a dedicated GPU workstation or homelab server), configure `OpenAIEngine` explicitly:
+
+```python
+from chatflow_agent import Agent, Runner
+from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
+
+# Connecting to a remote Ollama server on LAN
+remote_ollama = OpenAIEngine(
+    base_url="http://192.168.1.50:11434/v1",
+    provider="ollama",
+    api_key="ollama",  # Dummy key for unauthenticated local endpoints
+    timeout=120.0,    # Increased timeout for local GPU inference
+)
+
+gpu_agent = Agent(
+    name="GPUAssistant",
+    model="llama3.1:70b",
+    engine=remote_ollama,
+    instructions="Analyze complex local datasets without cloud egress.",
+)
+
+runner = Runner(starting_agent=gpu_agent)
+```
+
+## Security Rule: Localhost Loopback Exemption
+
+The framework protects your cloud credentials when developing locally:
+
+1. **Loopback Detection:** When `base_url` points to `localhost`, `127.0.0.1`, `::1`, or `0.0.0.0`, `OpenAIEngine` detects a local environment.
+2. **Credential Isolation:** It will **never send your `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`** to local endpoints.
+3. **Automatic Fallback Key:** Because local servers typically do not enforce authentication but the OpenAI HTTP client requires a non-empty `Authorization` header, the engine automatically supplies `"ollama"` as a dummy key if none is provided.
+
+```python
+from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
+
+# Safe: automatically uses "ollama" dummy key without touching cloud credentials
+engine = OpenAIEngine(
+    base_url="http://localhost:11434/v1",
+    provider="ollama",
+)
+assert engine.api_key == "ollama"
+```
+
+## Function Calling with Local Models
+
+Modern open-weight models (such as `llama3.1`, `llama3.2`, and `qwen2.5`) support structured tool calling out of the box:
+
+```python
+from chatflow_agent import Agent, Runner, tool
+from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
+
+@tool
+def calculate_vat(amount: float, rate_pct: float = 21.0) -> float:
+    """Calculate the VAT amount for a given base price.
+
+    Args:
+        amount: Base monetary amount before tax.
+        rate_pct: VAT rate percentage (defaults to 21.0).
+    """
+    return round(amount * (rate_pct / 100.0), 2)
+
+ollama_engine = OpenAIEngine(
+    base_url="http://localhost:11434/v1",
+    provider="ollama",
+    timeout=90.0,
+)
+
+finance_agent = Agent(
+    name="FinanceAgent",
+    model="llama3.2",
+    engine=ollama_engine,
+    tools=[calculate_vat],
+    instructions="Calculate tax obligations using the calculate_vat tool.",
+)
+
+runner = Runner(starting_agent=finance_agent)
+```
+
+## Best Practices for Local Inference
+
+<Callout type="tip" title="Tips for Reliable Local Agent Execution">
+* **Model Size & Quantization:** For agents with multiple tools, use models with at least 8B parameters (`qwen2.5:7b`, `llama3.1:8b`, `gemma2:9b`). Smaller 1B-3B models may occasionally struggle with complex JSON tool schemas.
+* **Timeout Settings:** Local inference speeds depend on hardware. Set `timeout=90.0` or `120.0` in `OpenAIEngine` to avoid timeouts during prompt evaluation on long conversation histories.
+* **Keep Descriptions Concise:** Ensure docstrings in `@tool` functions are descriptive yet concise to minimize prompt token count on local context windows.
+</Callout>
+
+## Hybrid Architecture: Local & Cloud Swarms
+
+You can mix local and cloud agents in the same multi-agent swarm. For example, a local model handles private data triage, handing off to a cloud frontier model only for complex synthesis:
+
+```python
+import os
+from chatflow_agent import Agent, Runner
+from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
+from chatflow_agent.core.engines.gemini import GeminiEngine
+
+# Local private triage agent
+triage_agent = Agent(
+    name="PrivateTriage",
+    model="gemma2:9b",
+    provider="ollama",
+    instructions="Filter PII and categorize queries locally.",
+)
+
+# Cloud synthesis agent
+synthesis_agent = Agent(
+    name="CloudSynthesis",
+    model="gemini-2.5-flash",
+    engine=GeminiEngine(api_key=os.environ.get("GEMINI_API_KEY")),
+    instructions="Synthesize public knowledge into structured reports.",
+)
+
+triage_agent.add_handoff(synthesis_agent)
+runner = Runner(starting_agent=triage_agent)
+```

@@ -1,11 +1,7 @@
 {
   "title": "Documentation",
   "pages": [
-    "index",
-    "getting-started",
-    "guides",
-    "providers",
-    "integrations",
-    "production"
+    "v0.3",
+    "v0.4"
   ]
 }

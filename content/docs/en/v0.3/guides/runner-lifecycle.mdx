@@ -1,0 +1,239 @@
+---
+title: "Runner & Execution Lifecycle"
+description: "In-depth guide to the multi-turn conversational loop, engine resolution, tool execution flow, timeouts, and transaction rollback in chatflow-agent."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+The `Runner` is the execution engine of **chatflow-agent**. It drives the multi-turn conversation loop, resolves LLM engines, coordinates tool executions, orchestrates autonomous handoffs, and enforces transactional state safety.
+
+Applications interact with `Runner` as the primary interface: your code passes a `session_id` and a user message, and `Runner` executes the dialogue turn to completion, returning a typed `AgentResponse`.
+
+---
+
+## Constructor & Parameters
+
+```python
+from chatflow_agent import Agent, OpenAIEngine, Runner
+from chatflow_agent.core.memory import SessionStore
+
+starting_agent = Agent(name="Greeter", instructions="Greet users warmly.", model="gpt-4o")
+memory_store = SessionStore()
+engine = OpenAIEngine()
+
+runner = Runner(
+    starting_agent=starting_agent,
+    session_store=memory_store,
+    engine=engine,
+    max_handoffs_per_turn=5,
+    max_tool_iterations=10,
+)
+```
+
+### Complete Parameter Reference
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `starting_agent` | `Agent` | *Required* | The root agent assigned to handle initial turns for newly created sessions. |
+| `session_store` | `BaseSessionStore \| SessionStore \| None` | `SessionStore()` | Storage backend for conversation history and active agent pointers. |
+| `engine` | `BaseEngine \| None` | `GeminiEngine(...)` | Default LLM generation engine used when an agent does not define its own. |
+| `api_key` | `str \| None` | `None` | Default API key passed to the fallback engine if `engine` is omitted. |
+| `max_handoffs_per_turn` | `int` | `5` | Maximum number of peer agent transfers permitted within a single turn. |
+| `max_tool_iterations` | `int` | `10` | Maximum number of model-tool reasoning loops allowed before forced termination. |
+
+---
+
+## Agent Tree Indexing
+
+When initialized, the `Runner` recursively traverses `starting_agent` and every peer in its `handoffs` list, building an internal registry (`_agents_registry`). This ensures any destination agent can be resolved instantly during handoffs:
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from chatflow_agent import Agent, Runner
+
+billing = Agent(name="Billing", instructions="Billing", model="gpt-4o")
+support = Agent(name="Support", instructions="Support", handoffs=[billing], model="gpt-4o")
+
+runner = Runner(starting_agent=support)
+# Both Support and Billing are automatically indexed
+assert "Billing" in runner._agents_registry
+```
+
+If an agent is instantiated outside the root handoff graph, register it explicitly using `runner.register_agent(agent)`.
+
+---
+
+## The Turn Execution Lifecycle
+
+Every call to `runner.run_async()` follows a deterministic, transactionally protected sequence:
+
+```
+1. Session Retrieval & Lock Acquisition
+   └── Fetch or create session; acquire session.lock to serialize concurrent turns.
+
+2. Checkpoint Creation
+   └── Record checkpoint_len = len(session.history) for rollback protection.
+
+3. Inbound Message Ingestion
+   └── Append Message(role=Role.USER, content=user_message) to history.
+
+4. Execution Loop (Up to max_tool_iterations)
+   ├── A. Resolve active agent (from session.active_agent)
+   ├── B. Resolve engine (agent.engine or runner.engine)
+   ├── C. Generate model turn via engine.generate_turn_async()
+   ├── D. If Model Requests Tools:
+   │      ├── Append Message(role=Role.MODEL, tool_calls=[...])
+   │      ├── Execute tools / evaluate synthetic handoffs
+   │      ├── If Handoff: swap active agent & check max_handoffs_per_turn
+   │      └── Append Message(role=Role.TOOL, tool_results=[...])
+   │      └── Continue loop for next agent evaluation
+   └── E. If Final Text Generated:
+          └── Append Message(role=Role.MODEL, content=final_text)
+          └── Return AgentResponse
+
+5. Exception / Timeout Handling
+   └── If an error occurs, session.rollback_to(checkpoint_len) restores state.
+```
+
+---
+
+## Transactional State Safety & Rollback
+
+In distributed systems and conversational AI, network dropouts, rate limits, and tool exceptions can leave conversational history in a corrupted state (such as an orphaned tool call without a corresponding tool result).
+
+`chatflow-agent` guarantees **turn-level atomicity**:
+
+* **Pre-turn Checkpoint:** Before appending the user message, `Runner` records `checkpoint_len = len(session.history)`.
+* **Automatic Rollback:** If the engine throws a `ProviderError`, a tool crashes with an unexpected exception, or an async cancellation happens:
+
+```python
+try:
+    # Turn execution logic
+    pass
+except Exception:
+    if hasattr(session, "rollback_to"):
+        session.rollback_to(checkpoint_len)
+    else:
+        session.history = session.history[:checkpoint_len]
+    raise
+```
+* **Integrity Guarantee:** The failed turn is completely discarded from the history, preventing orphaned tool calls from invalidating subsequent provider requests.
+
+---
+
+## Async First vs. Synchronous Wrapper
+
+`chatflow-agent` is natively built on `asyncio`.
+
+### Asynchronous Execution (`run_async`)
+The standard, non-blocking interface for web backends, background workers, and messaging webhooks:
+
+```python
+import asyncio
+from chatflow_agent import Agent, Runner
+
+async def main():
+    agent = Agent(name="Bot", instructions="Concise assistant", model="gpt-4o")
+    runner = Runner(starting_agent=agent)
+
+    # Process turn asynchronously
+    response = await runner.run_async(
+        session_id="user-session-1",
+        user_message="Hello!",
+        metadata={"channel": "web"},
+    )
+    print(response.content)
+
+asyncio.run(main())
+```
+
+### Synchronous Wrapper (`run`)
+A convenience helper for scripts, interactive REPLs, and unit tests:
+
+```python
+# [min-version: 0.3.0]
+# [no-exec: requires LLM engine for turn response]
+from chatflow_agent import Agent, Runner
+
+agent = Agent(name="Bot", instructions="Concise assistant", model="gpt-4o")
+runner = Runner(starting_agent=agent)
+
+# Runs event loop internally
+response = runner.run(session_id="repl-1", user_message="Tell me a joke")
+print(response.content)
+```
+
+<Callout type="warn" title="Synchronous run() in Active Event Loops">
+Do not call <code>runner.run()</code> from inside an active asyncio event loop (such as inside a FastAPI async route handler or an active async task). Python prohibits nested event loop execution. In asynchronous environments, always use <code>await runner.run_async()</code>.
+</Callout>
+
+---
+
+## Version Differences & Prerelease Features
+
+The `Runner` execution engine includes major concurrency and performance upgrades across releases:
+
+### Stable Release (`v0.3.4`)
+* <VersionBadge version="0.3.4" status="stable" /> Core multi-agent loop with `max_handoffs_per_turn` and `max_tool_iterations`.
+* Session locking via `session.lock` serializing messages per session.
+* Checkpoint-based rollback on turn exceptions.
+* Asynchronous execution directly via `await runner.run_async(...)`:
+
+```python
+# [no-exec: illustrative async request handler pattern]
+from chatflow_agent import Agent, Runner
+
+agent = Agent(name="Bot", instructions="Helper", model="gemini-2.5-flash")
+runner = Runner(starting_agent=agent)
+
+async def handle_requests():
+    # In v0.3.x, execute asynchronous turns directly on the shared runner instance
+    res1 = await runner.run_async("s1", "First query")
+    res2 = await runner.run_async("s1", "Second query")
+```
+
+<Callout type="info" title="Preview Note: v0.4.0rc1 Upgrades">
+Asynchronous connection pooling via <code>async with runner:</code>, reentrant turn prevention with <code>ReentrantTurnError</code>, and worker thread cancellation tracking are introduced in prerelease <strong>v0.4.0rc1</strong>. In stable v0.3.x, execute turns directly on the shared runner instance.
+</Callout>
+
+---
+
+## Common Pitfalls & Anti-Patterns
+
+### 1. Re-instantiating `Runner` on Every Request
+`Runner` indexes the agent tree and coordinates session caches. Create a singleton `Runner` per application lifecycle and share it across incoming request handlers:
+```python
+# [INCORRECT]: Recreating Runner per HTTP request re-indexes trees and resets connection pools
+# def handle_post(msg):
+#     runner = Runner(starting_agent=agent)
+#     return runner.run("session", msg)
+
+# [CORRECT]: Singleton Runner reused across requests
+runner = Runner(starting_agent=agent)
+async def handle_post(session_id: str, msg: str):
+    return await runner.run_async(session_id, msg)
+```
+
+### 2. Calling Synchronous `run()` Inside Async Handlers
+```python
+# [INCORRECT]: Blocks worker threads and fails in v0.4.0rc1
+# async def api_endpoint(req):
+#     return runner.run(req.session_id, req.message)
+
+# [CORRECT]: Use await runner.run_async
+async def api_endpoint(req_session_id: str, req_message: str):
+    return await runner.run_async(req_session_id, req_message)
+```
+
+### 3. Ignoring the `AgentResponse` Metadata
+`AgentResponse` returns more than just text. Inspect `active_agent_name`, `tool_calls_executed`, and `handoff` to power analytics and UI status indicators:
+```python
+response = runner.run(session_id="s1", user_message="Check order 505")
+print(f"Handled by: {response.active_agent_name}")
+print(f"Tools used: {response.tool_calls_executed}")
+if response.handoff:
+    print(f"Handoff target: {response.handoff.target_agent_name} (Reason: {response.handoff.reason})")
+```

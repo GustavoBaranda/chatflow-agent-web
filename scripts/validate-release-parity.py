@@ -447,7 +447,7 @@ os.environ["GOOGLE_API_KEY"] = "mock-key-for-test"
         return False, str(e)
 
 
-def run_validation(target_version: str) -> dict[str, Any]:
+def run_validation(target_version: str, track: str | None = None) -> dict[str, Any]:
     py_exec = get_venv_python(target_version)
     if not os.path.isfile(py_exec):
         # Auto-provision
@@ -456,10 +456,18 @@ def run_validation(target_version: str) -> dict[str, Any]:
         py_exec = get_venv_python(target_version)
 
     inspector = ReleaseInspector(target_version, py_exec)
-    snippets = collect_snippets(DOCS_DIR)
+
+    # Resolve track directory
+    selected_track = track
+    if not selected_track or selected_track == "auto":
+        selected_track = "v0.3" if target_version == "0.3.4" else "v0.4"
+
+    target_docs_dir = DOCS_DIR if selected_track == "all" else os.path.join(DOCS_DIR, selected_track)
+    snippets = collect_snippets(target_docs_dir)
 
     stats: dict[str, Any] = {
         "version": target_version,
+        "track": selected_track,
         "python_bin": py_exec,
         "sdk_file": inspector.package_file,
         "total_snippets": len(snippets),
@@ -513,6 +521,7 @@ def run_validation(target_version: str) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate SDK documentation parity")
     parser.add_argument("--version", choices=["0.3.4", "0.4.0rc1"], help="Target SDK version")
+    parser.add_argument("--track", choices=["v0.3", "v0.4", "all", "auto"], default="auto", help="Documentation track (default: auto)")
     parser.add_argument("--all", action="store_true", help="Validate all versions")
     args = parser.parse_args()
 
@@ -524,10 +533,12 @@ def main() -> int:
     print("=" * 75)
 
     for v in versions:
-        print(f"\n[Validating against SDK {v}]")
-        res = run_validation(v)
+        track = args.track
+        print(f"\n[Validating against SDK {v} (Track: {track})]")
+        res = run_validation(v, track)
         print(f"  Venv Python:                 {res['python_bin']}")
         print(f"  SDK Loaded:                  {res['sdk_file']}")
+        print(f"  Track Evaluated:             {res['track']}")
         print(f"  Total MDX Snippets:          {res['total_snippets']}")
         print(f"  Statically Checked:          {res['statically_checked']}")
         print(f"  Version-Excluded (< {v}):     {res['version_excluded']}")

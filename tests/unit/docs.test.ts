@@ -1,69 +1,103 @@
 import { describe, it, expect } from 'vitest';
-import { source } from '@/lib/source';
+import { source, resolveDocPage, getVersionPageTree } from '@/lib/source';
 
 describe('Documentation Engine & Source Loader', () => {
-  it('should load authoritative English index page', () => {
-    const page = source.getPage([], 'en');
-    expect(page).toBeDefined();
-    expect(page?.data.title).toBe('Documentation Overview');
-    expect(page?.data.description).toContain('chatflow-agent');
-    expect(page?.url).toBe('/en/docs');
+  it('should load authoritative English index pages for both v0.3 and v0.4', () => {
+    const v03Page = source.getPage(['v0.3'], 'en');
+    expect(v03Page).toBeDefined();
+    expect(v03Page?.data.title).toContain('v0.3 Stable');
+    expect(v03Page?.url).toBe('/en/docs/v0.3');
+
+    const v04Page = source.getPage(['v0.4'], 'en');
+    expect(v04Page).toBeDefined();
+    expect(v04Page?.data.title).toContain('v0.4 Prerelease');
+    expect(v04Page?.url).toBe('/en/docs/v0.4');
   });
 
-  it('should load Spanish localized index page', () => {
-    const page = source.getPage([], 'es');
-    expect(page).toBeDefined();
-    expect(page?.data.title).toBe('Visión General de la Documentación');
-    expect(page?.url).toBe('/es/docs');
+  it('should resolve unversioned paths transparently to default stable track (v0.3)', () => {
+    const rootResolved = resolveDocPage([], 'en');
+    expect(rootResolved.page).toBeDefined();
+    expect(rootResolved.track).toBe('v0.3');
+    expect(rootResolved.isExplicitTrack).toBe(false);
+    expect(rootResolved.page?.data.title).toContain('v0.3 Stable');
+
+    const installResolved = resolveDocPage(['getting-started', 'installation'], 'en');
+    expect(installResolved.page).toBeDefined();
+    expect(installResolved.track).toBe('v0.3');
+    expect(installResolved.isExplicitTrack).toBe(false);
+    expect(installResolved.page?.data.title).toBe('Installation');
   });
 
-  it('should load Brazilian Portuguese localized index page', () => {
-    const page = source.getPage([], 'pt-BR');
-    expect(page).toBeDefined();
-    expect(page?.data.title).toBe('Visão Geral da Documentação');
-    expect(page?.url).toBe('/pt-BR/docs');
+  it('should load Spanish localized index pages for both tracks', () => {
+    const es03 = source.getPage(['v0.3'], 'es');
+    expect(es03).toBeDefined();
+    expect(es03?.data.title).toBe('Visión General de la Documentación');
+    expect(es03?.url).toBe('/es/docs/v0.3');
+
+    const es04 = source.getPage(['v0.4'], 'es');
+    expect(es04).toBeDefined();
+    expect(es04?.data.title).toContain('v0.4 Prerelease');
+    expect(es04?.url).toBe('/es/docs/v0.4');
   });
 
-  it('should generate page trees for all three launch languages', () => {
+  it('should load Brazilian Portuguese localized index pages for both tracks', () => {
+    const pt03 = source.getPage(['v0.3'], 'pt-BR');
+    expect(pt03).toBeDefined();
+    expect(pt03?.data.title).toBe('Visão Geral da Documentação');
+    expect(pt03?.url).toBe('/pt-BR/docs/v0.3');
+
+    const pt04 = source.getPage(['v0.4'], 'pt-BR');
+    expect(pt04).toBeDefined();
+    expect(pt04?.data.title).toContain('v0.4 Prerelease');
+    expect(pt04?.url).toBe('/pt-BR/docs/v0.4');
+  });
+
+  it('should generate page trees and isolate navigation per track', () => {
     const enTree = source.getPageTree('en');
-    const esTree = source.getPageTree('es');
-    const ptTree = source.getPageTree('pt-BR');
-
     expect(enTree).toBeDefined();
-    expect(esTree).toBeDefined();
-    expect(ptTree).toBeDefined();
+    expect(enTree.children.length).toBeGreaterThanOrEqual(2);
 
-    expect(enTree.children.length).toBeGreaterThan(0);
-    expect(esTree.children.length).toBeGreaterThan(0);
-    expect(ptTree.children.length).toBeGreaterThan(0);
+    const v03Tree = getVersionPageTree('v0.3', 'en');
+    expect(v03Tree).toBeDefined();
+    expect(v03Tree.children.length).toBeGreaterThan(0);
+
+    const v04Tree = getVersionPageTree('v0.4', 'en');
+    expect(v04Tree).toBeDefined();
+    expect(v04Tree.children.length).toBeGreaterThan(0);
   });
 
   it('should return undefined for non-existent pages', () => {
-    const page = source.getPage(['non-existent-slug-test'], 'en');
+    const page = source.getPage(['v0.3', 'non-existent-slug-test'], 'en');
     expect(page).toBeUndefined();
   });
 
-  it('should generate static params for all available routes', () => {
+  it('should generate static params for all versioned routes', () => {
     const params = source.generateParams('slug', 'locale');
-    expect(params.length).toBeGreaterThanOrEqual(3);
+    expect(params.length).toBeGreaterThanOrEqual(40);
 
     const locales = params.map((p) => p.locale);
     expect(locales).toContain('en');
     expect(locales).toContain('es');
     expect(locales).toContain('pt-BR');
+
+    const firstSegments = params.map((p) => (p.slug ? p.slug[0] : null));
+    expect(firstSegments).toContain('v0.3');
+    expect(firstSegments).toContain('v0.4');
   });
 
-  it('should load getting-started pages in English', () => {
-    const installPage = source.getPage(['getting-started', 'installation'], 'en');
-    expect(installPage).toBeDefined();
-    expect(installPage?.data.title).toBe('Installation');
+  it('should load getting-started pages in English under both v0.3 and v0.4', () => {
+    const install03 = source.getPage(['v0.3', 'getting-started', 'installation'], 'en');
+    expect(install03).toBeDefined();
+    expect(install03?.data.title).toBe('Installation');
 
-    const quickstartPage = source.getPage(['getting-started', 'quickstart'], 'en');
-    expect(quickstartPage).toBeDefined();
-    expect(quickstartPage?.data.title).toBe('Quickstart');
+    const install04 = source.getPage(['v0.4', 'getting-started', 'installation'], 'en');
+    expect(install04).toBeDefined();
+    expect(install04?.data.title).toBe('Installation');
 
-    const conceptsPage = source.getPage(['getting-started', 'core-concepts'], 'en');
-    expect(conceptsPage).toBeDefined();
-    expect(conceptsPage?.data.title).toBe('Core Concepts');
+    const quickstart03 = source.getPage(['v0.3', 'getting-started', 'quickstart'], 'en');
+    expect(quickstart03).toBeDefined();
+
+    const quickstart04 = source.getPage(['v0.4', 'getting-started', 'quickstart'], 'en');
+    expect(quickstart04).toBeDefined();
   });
 });

@@ -3,7 +3,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { describe, it, expect } from 'vitest';
 
-const DOCS_DIR = path.resolve(process.cwd(), 'content/docs/en');
+const DEFAULT_TRACK = process.env.CHATFLOW_DOCS_TRACK || 'v0.3';
+const DOCS_DIR = path.resolve(process.cwd(), 'content/docs/en', DEFAULT_TRACK);
 
 // Resolve isolated published release path or fallback
 const DEFAULT_VERSION = process.env.CHATFLOW_SDK_VERSION || '0.3.4';

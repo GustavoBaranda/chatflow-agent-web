@@ -12,6 +12,7 @@ import { OutdatedNotice } from '@/components/docs/OutdatedNotice';
 import { VersionBadge } from '@/components/docs/VersionBadge';
 import { PrereleaseBanner } from '@/components/docs/PrereleaseBanner';
 import { DEFAULT_STABLE_TRACK } from '@/config/docs-versions';
+import { resolveDocSeo } from '@/config/docs-seo';
 import type { Metadata } from 'next';
 
 const customMdxComponents = {
@@ -53,7 +54,7 @@ export async function generateMetadata({
   const { locale, slug = [] } = await params;
   setRequestLocale(locale);
 
-  const { page, targetSlug, isFallback, isExplicitTrack, track } = resolveDocPage(slug, locale);
+  const { page, isFallback, isExplicitTrack, track, cleanSlug } = resolveDocPage(slug, locale);
 
   if (!page) {
     return {
@@ -61,33 +62,22 @@ export async function generateMetadata({
     };
   }
 
-  // Canonical path reflects the accessed URL (preserving version or unversioned alias)
-  const currentPath = slug.length > 0 ? `/${slug.join('/')}` : '';
-  const canonicalPath = `/${locale}/docs${currentPath}`;
-
-  const languages: Record<string, string> = {};
-  for (const l of ['en', 'es', 'pt-BR']) {
-    const localized = source.getPage(targetSlug, l);
-    if (localized) {
-      languages[l] = isExplicitTrack
-        ? `/${l}/docs/${targetSlug.join('/')}`
-        : `/${l}/docs${slug.length > 0 ? `/${slug.join('/')}` : ''}`;
-    }
-  }
+  const seo = resolveDocSeo({
+    track,
+    cleanSlug,
+    locale,
+    isExplicitTrack,
+    isFallback,
+  });
 
   return {
     title: page.data.title,
     description: page.data.description,
     alternates: {
-      canonical: canonicalPath,
-      languages,
+      canonical: seo.canonicalUrl,
+      languages: seo.languages,
     },
-    robots: isFallback || track === 'v0.4'
-      ? {
-          index: false,
-          follow: true,
-        }
-      : undefined,
+    robots: seo.robots,
   };
 }
 

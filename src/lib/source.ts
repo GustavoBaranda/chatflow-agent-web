@@ -98,3 +98,20 @@ export function resolveDocPage(slug: string[] = [], locale: string) {
     isFallback,
   };
 }
+
+/**
+ * Extract all topic subpaths available in a specific track from the in-memory
+ * Fumadocs documentation source tree (authoritative English baseline).
+ * Completely avoids runtime filesystem calls.
+ */
+export function getAvailableTopicsForTrack(track: DocVersionTrack): string[] {
+  const pages = source.getPages('en');
+  const topics = new Set<string>();
+  for (const page of pages) {
+    if (page.slugs[0] === track) {
+      topics.add(page.slugs.slice(1).join('/'));
+    }
+  }
+  return Array.from(topics).sort();
+}
+

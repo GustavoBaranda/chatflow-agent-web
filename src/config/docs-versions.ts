@@ -64,57 +64,8 @@ export const DOC_VERSIONS: Record<DocVersionTrack, DocVersionConfig> = {
 
 export const ALL_DOC_TRACKS: readonly DocVersionTrack[] = ['v0.3', 'v0.4'] as const;
 
-/**
- * Known valid documentation topics per track (unversioned subpath strings).
- */
-export const TRACK_AVAILABLE_TOPICS: Record<DocVersionTrack, readonly string[]> = {
-  'v0.3': [
-    '',
-    'getting-started/installation',
-    'getting-started/quickstart',
-    'getting-started/core-concepts',
-    'guides/agents',
-    'guides/tools',
-    'guides/multi-agent-handoffs',
-    'guides/runner-lifecycle',
-    'guides/sessions-state',
-    'integrations/telegram',
-    'integrations/whatsapp',
-    'integrations/webhook',
-    'production/configuration',
-    'production/deployment',
-    'production/error-handling',
-    'production/observability',
-    'production/security',
-    'providers',
-    'providers/openai',
-    'providers/gemini-anthropic',
-    'providers/ollama',
-  ],
-  'v0.4': [
-    '',
-    'getting-started/installation',
-    'getting-started/quickstart',
-    'getting-started/core-concepts',
-    'guides/agents',
-    'guides/tools',
-    'guides/multi-agent-handoffs',
-    'guides/runner-lifecycle',
-    'guides/sessions-state',
-    'integrations/telegram',
-    'integrations/whatsapp',
-    'integrations/webhook',
-    'production/configuration',
-    'production/deployment',
-    'production/error-handling',
-    'production/observability',
-    'production/security',
-    'providers',
-    'providers/openai',
-    'providers/gemini-anthropic',
-    'providers/ollama',
-  ],
-};
+import { TRACK_AVAILABLE_TOPICS } from './docs-topics-manifest';
+export { TRACK_AVAILABLE_TOPICS };
 
 /**
  * Type guard to check if a string is a valid documentation track identifier.

@@ -11,11 +11,13 @@ import {
   buildUnversionedDocPath,
   isTopicAvailableInTrack,
   resolveVersionSwitchUrl,
+  TRACK_AVAILABLE_TOPICS,
 } from '@/config/docs-versions';
 import {
   DOCUMENTATION_ROUTE_INVENTORY,
   getRouteRedirectMap,
 } from '@/config/docs-routes-inventory';
+import { getAvailableTopicsForTrack } from '@/lib/source';
 
 describe('Documentation Version Registry', () => {
   it('defines exactly two version tracks: v0.3 and v0.4', () => {
@@ -210,4 +212,26 @@ describe('Documentation Route Inventory', () => {
     expect(mapEs['/es/docs/guides/tools']).toBe('/es/docs/v0.3/guides/tools');
   });
 });
+
+describe('Topic Registry Synchronization & Source Parity Suite (Phase 6D)', () => {
+  it('synchronizes v0.3 topic manifest with in-memory documentation source', () => {
+    const sourceTopics = getAvailableTopicsForTrack('v0.3');
+    expect(sourceTopics.length).toBe(21);
+    expect(Array.from(TRACK_AVAILABLE_TOPICS['v0.3']).sort()).toEqual(sourceTopics);
+  });
+
+  it('synchronizes v0.4 topic manifest with in-memory documentation source', () => {
+    const sourceTopics = getAvailableTopicsForTrack('v0.4');
+    expect(sourceTopics.length).toBe(21);
+    expect(Array.from(TRACK_AVAILABLE_TOPICS['v0.4']).sort()).toEqual(sourceTopics);
+  });
+
+  it('detects missing and nonexistent topics correctly without filesystem calls', () => {
+    expect(isTopicAvailableInTrack('v0.3', ['guides', 'agents'])).toBe(true);
+    expect(isTopicAvailableInTrack('v0.4', ['guides', 'agents'])).toBe(true);
+    expect(isTopicAvailableInTrack('v0.3', ['unknown', 'feature'])).toBe(false);
+    expect(isTopicAvailableInTrack('v0.4', ['nonexistent', 'topic'])).toBe(false);
+  });
+});
+
 

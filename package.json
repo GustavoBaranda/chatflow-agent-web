@@ -23,7 +23,9 @@
     "test:sdk:prerelease": "node scripts/run-sdk-parity.mjs --version 0.4.0rc1",
     "test:sdk:parity": "node scripts/run-sdk-parity.mjs --all",
     "check:i18n": "node scripts/check-i18n.mjs",
-    "verify": "pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm test && pnpm test:sdk:parity",
+    "check:links": "node scripts/check-links.mjs",
+    "check:topics": "node scripts/sync-docs-topics.mjs --check",
+    "verify": "pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm check:links && pnpm check:topics && pnpm test && pnpm test:sdk:parity",
     "postinstall": "fumadocs-mdx"
   },
   "dependencies": {

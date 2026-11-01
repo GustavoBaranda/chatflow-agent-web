@@ -182,4 +182,59 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
     const mobileSelector = page.locator('[data-testid="version-selector-trigger"]:visible');
     await expect(mobileSelector).toBeVisible();
   });
+
+  test('search endpoint returns strictly isolated results for v0.3 and v0.4 without cross-leaks', async ({ request }) => {
+    // 1. Unversioned legacy search defaults to v0.3
+    const legacyRes = await request.get('/api/search?query=agents');
+    expect(legacyRes.status()).toBe(200);
+    const legacyJson = await legacyRes.json();
+    expect(legacyJson.length).toBeGreaterThan(0);
+    for (const item of legacyJson) {
+      expect(item.url).toContain('/docs/v0.3');
+      expect(item.url).not.toContain('/docs/v0.4');
+    }
+
+    // 2. Explicit v0.3 search
+    const v03Res = await request.get('/api/search?query=agents&tag=v0.3');
+    expect(v03Res.status()).toBe(200);
+    const v03Json = await v03Res.json();
+    expect(v03Json.length).toBeGreaterThan(0);
+    for (const item of v03Json) {
+      expect(item.url).toContain('/docs/v0.3');
+      expect(item.url).not.toContain('/docs/v0.4');
+    }
+
+    // 3. Explicit v0.4 search
+    const v04Res = await request.get('/api/search?query=agents&tag=v0.4');
+    expect(v04Res.status()).toBe(200);
+    const v04Json = await v04Res.json();
+    expect(v04Json.length).toBeGreaterThan(0);
+    for (const item of v04Json) {
+      expect(item.url).toContain('/docs/v0.4');
+      expect(item.url).not.toContain('/docs/v0.3');
+    }
+  });
+
+  test('internal documentation links stay within their respective version tracks', async ({ page }) => {
+    // 1. Navigate within v0.4
+    await page.goto('/en/docs/v0.4');
+    await page.waitForLoadState('networkidle');
+
+    const v04InstallLink = page.locator('main a[href*="/getting-started/installation"]').first();
+    await expect(v04InstallLink).toHaveAttribute('href', '/en/docs/v0.4/getting-started/installation');
+    await v04InstallLink.click();
+    await page.waitForURL('**/en/docs/v0.4/getting-started/installation');
+    expect(page.url()).toContain('/en/docs/v0.4/getting-started/installation');
+
+    // 2. Navigate within v0.3
+    await page.goto('/en/docs/v0.3');
+    await page.waitForLoadState('networkidle');
+
+    const v03InstallLink = page.locator('main a[href*="/getting-started/installation"]').first();
+    await expect(v03InstallLink).toHaveAttribute('href', '/en/docs/v0.3/getting-started/installation');
+    await v03InstallLink.click();
+    await page.waitForURL('**/en/docs/v0.3/getting-started/installation');
+    expect(page.url()).toContain('/en/docs/v0.3/getting-started/installation');
+  });
 });
+

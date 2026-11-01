@@ -535,7 +535,8 @@ assert res_local.content == "Offline response"
 
 print("All documentation examples successfully executed end-to-end!")
 `;
-    const run = spawnSync(PYTHON_PATH, ['-c', executeExamplesScript], {
+    const run = spawnSync(PYTHON_PATH, ['-'], {
+      input: executeExamplesScript,
       encoding: 'utf-8',
       env: getPythonEnv(),
       timeout: 30000,

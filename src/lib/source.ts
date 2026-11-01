@@ -82,12 +82,12 @@ export function resolveDocPage(slug: string[] = [], locale: string) {
   const targetSlug = isExplicitTrack ? slug : [track, ...cleanSlug];
 
   let page = source.getPage(targetSlug, locale);
-  let isFallback = false;
 
   if (!page && locale !== 'en') {
     page = source.getPage(targetSlug, 'en');
-    isFallback = Boolean(page);
   }
+
+  const isFallback = locale !== 'en' && Boolean(page?.path && !page.path.startsWith(`${locale}/`));
 
   return {
     page,

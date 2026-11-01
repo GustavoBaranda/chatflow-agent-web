@@ -69,6 +69,14 @@ describe('Documentation Engine & Source Loader', () => {
   it('should return undefined for non-existent pages', () => {
     const page = source.getPage(['v0.3', 'non-existent-slug-test'], 'en');
     expect(page).toBeUndefined();
+
+    const fallbackRes = resolveDocPage(['v0.4', 'guides', 'agents'], 'es');
+    expect(fallbackRes.isFallback).toBe(true);
+    expect(fallbackRes.page).toBeDefined();
+
+    const translatedRes = resolveDocPage(['v0.3'], 'es');
+    expect(translatedRes.isFallback).toBe(false);
+    expect(translatedRes.page).toBeDefined();
   });
 
   it('should generate static params for all versioned routes', () => {

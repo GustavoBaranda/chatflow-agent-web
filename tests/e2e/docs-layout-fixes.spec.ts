@@ -24,23 +24,29 @@ test.describe('Phase 6F.1 Documentation Layout and Navigation Fixes Suite', () =
     await expect(langBtn).toBeVisible();
     await expect(langBtn).toContainText('Español');
 
-    // 3. Verify complete sidebar topic tree
+    // 3. Verify complete sidebar topic tree in Spanish
     const sidebar = page.locator('#nd-sidebar');
     await expect(sidebar).toBeVisible();
 
     await expect(sidebar.getByText('Visión General de la Documentación')).toBeVisible();
-    await expect(sidebar.getByText('Getting Started')).toBeVisible();
-    await expect(sidebar.getByText('Core Architecture')).toBeVisible();
+    await expect(sidebar.getByText(/Primeros Pasos|Getting Started/i)).toBeVisible();
+    await expect(sidebar.getByText(/Arquitectura Central|Core Architecture/i)).toBeVisible();
 
     // 4. Verify active page highlighting in sidebar
     const activeLink = sidebar.locator('a[data-active="true"]');
     await expect(activeLink).toBeVisible();
-    await expect(activeLink).toContainText('Installation');
+    await expect(activeLink).toContainText(/Instalación|Installation/i);
 
-    // 5. Verify translation fallback banner identifies Spanish
+    // 5. Genuine Spanish documentation must NOT display translation fallback banner
     const translationNotice = page.locator('aside[role="alert"]');
-    await expect(translationNotice).toBeVisible();
-    await expect(translationNotice).toContainText('Spanish');
+    await expect(translationNotice).toHaveCount(0);
+
+    // 6. Verify fallback notice is displayed when visiting an untranslated locale (e.g. Portuguese)
+    await page.goto('/pt-BR/docs/v0.3/getting-started/installation');
+    await page.waitForLoadState('networkidle');
+    const ptNotice = page.locator('aside[role="alert"]');
+    await expect(ptNotice).toBeVisible();
+    await expect(ptNotice).toContainText('Portuguese');
   });
 
   test('should preserve version and topic when switching language from es to en', async ({ page }) => {

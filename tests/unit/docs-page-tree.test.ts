@@ -15,11 +15,19 @@ describe('Version-Aware Page Tree & Locale Fallback Suite', () => {
 
         // Find subfolders or pages in children
         const names = tree.children.map((c) => (typeof c.name === 'string' ? c.name : ''));
-        expect(names).toContain('Getting Started');
-        expect(names).toContain('Core Architecture');
-        expect(names).toContain('LLM Providers');
-        expect(names).toContain('Channels & Integrations');
-        expect(names).toContain('Production Patterns');
+        if (track === 'v0.3' && locale === 'es') {
+          expect(names).toContain('Primeros Pasos');
+          expect(names).toContain('Arquitectura Central');
+          expect(names).toContain('Proveedores de LLM');
+          expect(names).toContain('Canales e Integraciones');
+          expect(names).toContain('Patrones de Producción');
+        } else {
+          expect(names).toContain('Getting Started');
+          expect(names).toContain('Core Architecture');
+          expect(names).toContain('LLM Providers');
+          expect(names).toContain('Channels & Integrations');
+          expect(names).toContain('Production Patterns');
+        }
 
         // Verify all URLs in tree belong to the requested locale and track
         function verifyUrls(nodes: typeof tree.children) {

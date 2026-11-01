@@ -8,6 +8,7 @@ import {
 import sitemap from '@/app/sitemap';
 import robots from '@/app/robots';
 import { DEFAULT_STABLE_TRACK, DEFAULT_PRERELEASE_TRACK } from '@/config/docs-versions';
+import { TRACK_AVAILABLE_TOPICS } from '@/config/docs-topics-manifest';
 
 describe('Centralized Documentation SEO Policy', () => {
   describe('Site Origin & Locales', () => {
@@ -32,10 +33,17 @@ describe('Centralized Documentation SEO Policy', () => {
       expect(isGenuineTranslation(DEFAULT_STABLE_TRACK, [], 'pt-BR')).toBe(true);
     });
 
+    it('identifies all 21 genuine Spanish translations in v0.3', () => {
+      for (const topic of TRACK_AVAILABLE_TOPICS['v0.3']) {
+        const cleanSlug = topic ? topic.split('/') : [];
+        expect(isGenuineTranslation(DEFAULT_STABLE_TRACK, cleanSlug, 'es')).toBe(true);
+      }
+    });
+
     it('rejects English fallback pages from masquerading as translated Spanish or Portuguese', () => {
-      // Untranslated guides/agents page in es or pt-BR is served via English fallback
-      expect(isGenuineTranslation(DEFAULT_STABLE_TRACK, ['guides', 'agents'], 'es')).toBe(false);
+      // Untranslated guides/agents page in pt-BR (v0.3) or es (v0.4) is served via English fallback
       expect(isGenuineTranslation(DEFAULT_STABLE_TRACK, ['guides', 'agents'], 'pt-BR')).toBe(false);
+      expect(isGenuineTranslation(DEFAULT_PRERELEASE_TRACK, ['guides', 'agents'], 'es')).toBe(false);
     });
 
     it('returns false for nonexistent topics or invalid locales', () => {
@@ -60,8 +68,9 @@ describe('Centralized Documentation SEO Policy', () => {
       expect(seo.canonicalUrl).toBe('https://chatflowagent.org/en/docs/v0.3/guides/agents');
       expect(seo.languages['en']).toBe('https://chatflowagent.org/en/docs/v0.3/guides/agents');
       expect(seo.languages['x-default']).toBe('https://chatflowagent.org/en/docs/v0.3/guides/agents');
-      // No genuine translations exist for this subtopic yet
-      expect(seo.languages['es']).toBeUndefined();
+      // Spanish translation exists in v0.3
+      expect(seo.languages['es']).toBe('https://chatflowagent.org/es/docs/v0.3/guides/agents');
+      // Portuguese translation does not exist yet
       expect(seo.languages['pt-BR']).toBeUndefined();
     });
 
@@ -132,8 +141,8 @@ describe('Centralized Documentation SEO Policy', () => {
   describe('Sitemap Generator', () => {
     const entries = sitemap();
 
-    it('generates exactly 32 indexable canonical entries', () => {
-      expect(entries.length).toBe(32);
+    it('generates exactly 52 indexable canonical entries', () => {
+      expect(entries.length).toBe(52);
     });
 
     it('ensures all entries use the absolute SITE_ORIGIN', () => {
@@ -164,11 +173,17 @@ describe('Centralized Documentation SEO Policy', () => {
       expect(enV03Docs.length).toBe(21);
     });
 
-    it('includes only genuine v0.3 Spanish and Portuguese overview docs', () => {
+    it('includes all 21 genuine v0.3 Spanish documentation pages', () => {
       const esDocs = entries.filter((e) => e.url.startsWith(`${SITE_ORIGIN}/es/docs/`));
-      expect(esDocs.length).toBe(1);
-      expect(esDocs[0].url).toBe(`${SITE_ORIGIN}/es/docs/v0.3`);
+      expect(esDocs.length).toBe(21);
+      for (const topic of TRACK_AVAILABLE_TOPICS['v0.3']) {
+        const subpath = topic ? `/${topic}` : '';
+        const expectedUrl = `${SITE_ORIGIN}/es/docs/v0.3${subpath}`;
+        expect(esDocs.some((d) => d.url === expectedUrl)).toBe(true);
+      }
+    });
 
+    it('includes only genuine root overview for Portuguese in v0.3', () => {
       const ptDocs = entries.filter((e) => e.url.startsWith(`${SITE_ORIGIN}/pt-BR/docs/`));
       expect(ptDocs.length).toBe(1);
       expect(ptDocs[0].url).toBe(`${SITE_ORIGIN}/pt-BR/docs/v0.3`);
@@ -188,8 +203,8 @@ describe('Centralized Documentation SEO Policy', () => {
     });
 
     it('strictly excludes untranslated fallback pages from the sitemap', () => {
-      const esGuides = entries.filter((e) => e.url.includes('/es/docs/v0.3/guides'));
-      expect(esGuides.length).toBe(0);
+      const ptGuides = entries.filter((e) => e.url.includes('/pt-BR/docs/v0.3/guides'));
+      expect(ptGuides.length).toBe(0);
     });
   });
 

@@ -287,15 +287,22 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
     const xDefault = page.locator('link[rel="alternate"][hreflang="x-default"]');
     await expect(xDefault).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.3');
 
-    // 2. Untranslated fallback page: /es/docs/v0.3/guides/agents must NOT advertise es or pt-BR alternates
+    // 2. Genuine translated page: /es/docs/v0.3/guides/agents advertises es and en, but not untranslated pt-BR
     await page.goto('/es/docs/v0.3/guides/agents');
     await page.waitForLoadState('networkidle');
 
-    const ungenuineEs = page.locator('link[rel="alternate"][hreflang="es"]');
-    await expect(ungenuineEs).toHaveCount(0);
+    const esGuideAlt = page.locator('link[rel="alternate"][hreflang="es"]');
+    await expect(esGuideAlt).toHaveAttribute('href', 'https://chatflowagent.org/es/docs/v0.3/guides/agents');
 
     const ungenuinePt = page.locator('link[rel="alternate"][hreflang="pt-BR"]');
     await expect(ungenuinePt).toHaveCount(0);
+
+    // 3. Untranslated fallback page: /pt-BR/docs/v0.3/guides/agents must NOT advertise pt-BR alternate
+    await page.goto('/pt-BR/docs/v0.3/guides/agents');
+    await page.waitForLoadState('networkidle');
+
+    const fallbackPtAlt = page.locator('link[rel="alternate"][hreflang="pt-BR"]');
+    await expect(fallbackPtAlt).toHaveCount(0);
 
     // But English and x-default are present
     const fallbackEn = page.locator('link[rel="alternate"][hreflang="en"]');
@@ -311,14 +318,17 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
     expect(text).toContain('https://chatflowagent.org/es/docs/v0.3');
     expect(text).toContain('https://chatflowagent.org/pt-BR/docs/v0.3');
 
+    // Includes genuine Spanish translated guides
+    expect(text).toContain('https://chatflowagent.org/es/docs/v0.3/guides/agents');
+
     // Strictly excludes v0.4
     expect(text).not.toContain('/docs/v0.4');
 
     // Strictly excludes unversioned doc aliases
     expect(text).not.toContain('https://chatflowagent.org/en/docs/guides');
 
-    // Strictly excludes untranslated fallbacks
-    expect(text).not.toContain('https://chatflowagent.org/es/docs/v0.3/guides');
+    // Strictly excludes untranslated fallbacks (e.g. Portuguese guides)
+    expect(text).not.toContain('https://chatflowagent.org/pt-BR/docs/v0.3/guides');
   });
 
   test('robots.txt returns 200 OK, allows crawling for noindex detection, and links sitemap', async ({ request }) => {

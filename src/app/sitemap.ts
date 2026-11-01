@@ -24,7 +24,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = [];
 
   // 1. Static Public Marketing & Institutional Routes
-  const staticRoutes = ['', '/about'];
+  const staticRoutes = ['', '/about', '/community'];
   for (const route of staticRoutes) {
     for (const locale of SUPPORTED_LOCALES) {
       const languages: Record<string, string> = {};

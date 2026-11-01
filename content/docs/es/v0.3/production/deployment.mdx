@@ -1,0 +1,178 @@
+---
+title: "Patrones de Despliegue en Producción"
+description: "Despliega aplicaciones chatflow-agent en producción, servicios ASGI con FastAPI, patrones de concurrencia en SQLite, contenedorización con Docker y gestión de procesos."
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+Desplegar enjambres de `chatflow-agent` en entornos de producción requiere una arquitectura que equilibre operaciones de E/S no bloqueantes, concurrencia segura de sesiones y resiliencia operativa.
+
+Esta guía detalla los patrones recomendados de despliegue, abarcando integración ASGI con FastAPI, consideraciones de almacenamiento con SQLite, contenedorización en Docker y monitorización mediante health checks.
+
+## Esquema Arquitectónico
+
+```text
+Tráfico Entrante (Clientes / Webhooks)
+          │
+          ▼
+Reverse Proxy (Nginx / Cloudflare / Traefik)
+  ├── Terminación TLS (HTTPS / WSS)
+  ├── Tiempo Límite de Petición >= 120s
+  └── Limitación de Tasa y Protección DDoS
+          │
+          ▼
+Servidor de Aplicaciones ASGI (Uvicorn / Gunicorn)
+  ├── Proceso único o Multi-Worker con Almacenamiento Aislado/Compartido
+  ├── Aplicación FastAPI / Starlette
+  └── chatflow-agent Runner
+        ├── SQLiteSessionStore (Modo WAL) o Almacenamiento Distribuido Personalizado
+        └── Despacho Concurrente de Tareas
+```
+
+## Integración como Servicio ASGI con FastAPI
+
+`chatflow-agent` se integra de forma natural con FastAPI. Al utilizar `runner.run_async()`, las peticiones HTTP entrantes se ejecutan concurrentemente en el bucle de eventos sin bloquear el servidor:
+
+```python
+import os
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from chatflow_agent import Agent, Runner
+from chatflow_agent.core.memory import SQLiteSessionStore
+
+class ChatRequest(BaseModel):
+    session_id: str
+    message: str
+
+class ChatResponse(BaseModel):
+    content: str
+    agent: str
+
+runner: Runner | None = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global runner
+    store = SQLiteSessionStore("production_sessions.db", default_max_turns=40)
+    agent = Agent(
+        name="ProductionBot",
+        model="gpt-4o",
+        instructions="Provide concise, accurate enterprise responses.",
+    )
+    runner = Runner(starting_agent=agent, session_store=store)
+    yield
+
+app = FastAPI(title="ChatFlow Enterprise API", lifespan=lifespan)
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat_endpoint(payload: ChatRequest):
+    if runner is None:
+        raise HTTPException(status_code=503, detail="Runner service initializing.")
+    try:
+        result = await runner.run_async(
+            session_id=payload.session_id,
+            user_message=payload.message,
+        )
+        return ChatResponse(
+            content=result.content,
+            agent=result.active_agent_name,
+        )
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail="Inference turn timed out.")
+    except Exception as err:
+        raise HTTPException(status_code=500, detail="Internal agent execution failure.")
+
+@app.get("/healthz")
+async def health_check():
+    """Health check endpoint for container orchestrators."""
+    return {"status": "ok", "service": "chatflow-agent"}
+```
+
+## Consideraciones de Concurrencia en SQLite
+
+`SQLiteSessionStore` ofrece persistencia sin infraestructura externa y con cero dependencias ajenas. Al utilizar SQLite en producción, aplica las siguientes configuraciones:
+
+1. **Modo WAL (Write-Ahead Logging):** El modo de diario por defecto en SQLite bloquea el archivo completo durante escrituras. El modo WAL permite lectores concurrentes mientras se realiza una escritura.
+2. **Descarga a Hilos de Trabajo:** En `v0.4.0rc1`, `chatflow-agent` delega las operaciones de base de datos a hilos secundarios vía `_run_blocking()`, garantizando que la E/S en disco no bloquee el bucle de eventos asyncio.
+3. **Aislamiento de Procesos:** SQLite no admite escrituras concurrentes de alta frecuencia seguras entre múltiples procesos independientes del sistema operativo (ej. `gunicorn -w 8`). Ejecuta un único proceso worker con alta concurrencia asíncrona (`uvicorn --workers 1`) o segmenta las sesiones por identificador de usuario.
+
+## Contenedorización con Docker
+
+Un Dockerfile multi-etapa optimiza el tamaño final de la imagen y refuerza la seguridad ejecutándose bajo un usuario sin privilegios:
+
+```dockerfile
+# Dockerfile multi-etapa para aplicaciones chatflow-agent
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Imagen final de ejecución
+FROM python:3.11-slim AS runner
+
+WORKDIR /app
+
+# Ejecutar como usuario sin privilegios root
+RUN addgroup --system appgroup && adduser --system --group appuser
+
+COPY --from=builder /root/.local /home/appuser/.local
+COPY --chown=appuser:appgroup . .
+
+ENV PATH=/home/appuser/.local/bin:$PATH
+ENV PYTHONUNBUFFERED=1
+
+USER appuser
+
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+## Configuración de Reverse Proxy (Nginx)
+
+Las respuestas de modelos de lenguaje y los bucles de herramientas multi-agente pueden tomar varios segundos en completarse. Asegúrate de que el reverse proxy no corte prematuramente las conexiones:
+
+```nginx
+server {
+    listen 80;
+    server_name agent.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Tiempos de espera holgados para turnos de inferencia multi-agente
+        proxy_connect_timeout 120s;
+        proxy_send_timeout 120s;
+        proxy_read_timeout 120s;
+    }
+}
+```
+
+## Lista de Verificación para Producción
+
+| Categoría | Elemento de Verificación | Ajuste Recomendado |
+| :--- | :--- | :--- |
+| **Redes** | Tiempo de Lectura del Proxy | `timeout >= 120s` |
+| **Resiliencia** | Tiempo Límite de Turno | Configurar `turn_timeout=45.0` para evitar bloqueos |
+| **Persistencia** | Modo de Diario en SQLite | `PRAGMA journal_mode=WAL;` |
+| **Seguridad** | Gestión de Secretos | Inyectados vía variables de entorno; nunca en código |
+| **Monitorización** | Comprobación de Estado | Endpoint `/healthz` respondiendo HTTP 200 |
+| **Modelo de Proceso** | Concurrencia | 1 proceso worker por contenedor con concurrencia asíncrona |

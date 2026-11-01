@@ -1,0 +1,130 @@
+---
+title: "Prácticas de Seguridad Recomendadas"
+description: "Directrices de seguridad en profundidad para chatflow-agent, aislamiento de credenciales, mitigación de inyecciones de prompt, firmas de webhooks y privacidad de datos."
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+Los agentes autónomos capaces de invocar herramientas, consultar bases de datos internas y comunicarse por canales externos plantean retos de seguridad singulares. La defensa en profundidad requiere proteger la frontera con el LLM, salvaguardar las credenciales contra filtraciones e imponer autorización estricta en webhooks.
+
+`chatflow-agent` incorpora mecanismos defensivos directamente en sus motores, runners e implementaciones de canales.
+
+## Arquitectura Central de Seguridad
+
+```text
+Entrada No Confiable (Webhooks / Canales de Chat)
+          │
+          ▼
+1. Seguridad de Transporte y Autenticación (HMAC SHA-256 / Tokens Bearer / Verificación de Admin)
+          │
+          ▼
+2. Concurrencia de Sesión y Barreras de Reentrada (ReentrantTurnError / Bloqueo de Sesión)
+          │
+          ▼
+3. Fronteras del Agente y Aislamiento de Herramientas (Validación / Verificación de Tipos / Límites de Iteración)
+          │
+          ▼
+4. Aislamiento de Credenciales y Control de Egreso (ValueError en Host Personalizado / Cero Fuga de Claves)
+```
+
+## Protección de Credenciales y Control de Egreso
+
+Al conectar pasarelas o proxies privados de inferencia, los desarrolladores suelen personalizar `base_url`. Si un motor enviara credenciales oficiales de la nube (como `OPENAI_API_KEY`) a un endpoint de terceros no verificado, se produciría una fuga de secretos.
+
+`chatflow-agent` aplica un control automático de credenciales en `OpenAIEngine`:
+
+```python
+from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
+
+# [SEGURO] Endpoint oficial con variable de entorno
+official_engine = OpenAIEngine(provider="openai")
+
+# [SEGURO] Endpoint personalizado con token interno suministrado explícitamente
+internal_engine = OpenAIEngine(
+    base_url="https://gateway.internal.corp/v1",
+    api_key="internal-bearer-token",
+)
+
+# [SEGURO] Inferencia local offline con clave ficticia
+local_engine = OpenAIEngine(
+    base_url="http://localhost:11434/v1",
+    provider="ollama",
+)
+assert local_engine.api_key == "ollama"
+```
+
+<Callout type="warn" title="Protección Automática con ValueError">
+Si especificas un `base_url` personalizado sin proporcionar una `api_key` explícita, `OpenAIEngine` rechaza reutilizar la clave `OPENAI_API_KEY` del entorno y genera un `ValueError`. Esto evita la exfiltración accidental de credenciales a proxies no confiables.
+</Callout>
+
+## Protocolos de Seguridad en Canales
+
+### Firmas HMAC SHA-256 en WhatsApp
+
+Meta entrega los eventos de webhook de WhatsApp con una cabecera `X-Hub-Signature-256` calculada como `HMAC-SHA256(payload, app_secret)`.
+
+`WhatsAppChannel` valida cada carga útil entrante antes de procesar el JSON o despachar turnos:
+
+```python
+import os
+from chatflow_agent.channels import WhatsAppChannel
+
+# Habilita siempre la verificación de firmas en producción
+channel = WhatsAppChannel(
+    verify_token=os.environ.get("WHATSAPP_VERIFY_TOKEN", ""),
+    access_token=os.environ.get("WHATSAPP_ACCESS_TOKEN", ""),
+    phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID", ""),
+    app_secret=os.environ.get("META_APP_SECRET", ""),
+    verify_signature=True,  # Rechaza intentos no autenticados con HTTP 403
+)
+```
+
+### Enmascaramiento Automático de Números Telefónicos
+
+Los números de teléfono de clientes recibidos por WhatsApp constituyen Información de Identificación Personal (PII). `WhatsAppChannel` enmascara automáticamente los números en los registros (`+1415****71`) mediante su filtro interno `_mask_phone`, previniendo fugas de PII a plataformas de monitorización.
+
+### Administración de Chats Grupales en Telegram
+
+En chats grupales, múltiples usuarios interactúan con el mismo bot. Permitir que cualquier miembro ejecute `/reset` podría interrumpir la conversación de otros participantes.
+
+`TelegramChannel` impone controles de autorización en `/reset`: consulta `get_chat_member` y permite el reinicio únicamente si el remitente tiene rango de `creator` o `administrator` en el grupo.
+
+## Inyección de Prompts y Fronteras de Herramientas
+
+La inyección de prompts ocurre cuando entradas no confiables del usuario engañan al LLM para saltarse instrucciones del sistema o invocar herramientas no autorizadas.
+
+Para mitigar riesgos de inyección de prompts:
+
+1. **Principio de Menor Privilegio:** Asigna a cada agente especializado únicamente las herramientas que necesita de forma estricta. Un `BillingAgent` no debe tener acceso a herramientas de eliminación de bases de datos o reinicio de servidores.
+2. **Validación Determinista de Argumentos:** Valida todas las entradas de herramientas con pistas de tipo explícitas y comprobaciones en tiempo de ejecución:
+
+```python
+from chatflow_agent import tool
+
+@tool
+def update_email(user_id: int, new_email: str) -> str:
+    """Update a user's verified email address.
+
+    Args:
+        user_id: Numeric user identifier.
+        new_email: Valid email address.
+    """
+    if "@" not in new_email or "." not in new_email:
+        raise ValueError("Invalid email format.")
+    # Ejecutar actualización
+    return f"Email updated for user {user_id}."
+```
+
+3. **Triaje Multi-Agente:** Utiliza un agente inicial de triaje sin privilegios para clasificar solicitudes antes de enrutarlas a agentes con permisos de escritura en producción.
+
+## Seguridad ante Reentrada y Concurrencia
+
+<VersionBadge version="0.4.0rc1" status="prerelease" />
+
+A partir de `v0.4.0rc1`, `Runner` protege las sesiones frente a turnos reentrantes concurrentes:
+- Si una herramienta dispara código que invoca `runner.run_async` sobre la misma sesión mientras el bloqueo está activo, el `Runner` lanza un `ReentrantTurnError`.
+- Esto previene condiciones de carrera, recursión infinita y mutaciones concurrentes en el historial.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { source, resolveDocPage, getVersionPageTree } from '@/lib/source';
+import { source, resolveDocPage, getVersionPageTree, createUnversionedPageTree } from '@/lib/source';
 
 describe('Documentation Engine & Source Loader', () => {
   it('should load authoritative English index pages for both v0.3 and v0.4', () => {
@@ -99,5 +99,32 @@ describe('Documentation Engine & Source Loader', () => {
 
     const quickstart04 = source.getPage(['v0.4', 'getting-started', 'quickstart'], 'en');
     expect(quickstart04).toBeDefined();
+  });
+
+  it('should create unversioned page tree stripping v0.3 track prefix from URLs', () => {
+    const v03Tree = getVersionPageTree('v0.3', 'en');
+    const unversionedTree = createUnversionedPageTree(v03Tree, 'v0.3');
+
+    expect(unversionedTree).toBeDefined();
+    expect(unversionedTree.children.length).toBeGreaterThan(0);
+
+    // Recursively check that no URLs in unversionedTree contain /v0.3
+    function checkUrls(nodes: typeof unversionedTree.children) {
+      for (const node of nodes) {
+        if (node.type === 'page') {
+          expect(node.url).not.toContain('/docs/v0.3');
+          expect(node.url).toMatch(/^\/en\/docs/);
+        }
+        if (node.type === 'folder') {
+          if (node.index) {
+            expect(node.index.url).not.toContain('/docs/v0.3');
+            expect(node.index.url).toMatch(/^\/en\/docs/);
+          }
+          checkUrls(node.children);
+        }
+      }
+    }
+
+    checkUrls(unversionedTree.children);
   });
 });

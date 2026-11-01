@@ -65,6 +65,58 @@ export const DOC_VERSIONS: Record<DocVersionTrack, DocVersionConfig> = {
 export const ALL_DOC_TRACKS: readonly DocVersionTrack[] = ['v0.3', 'v0.4'] as const;
 
 /**
+ * Known valid documentation topics per track (unversioned subpath strings).
+ */
+export const TRACK_AVAILABLE_TOPICS: Record<DocVersionTrack, readonly string[]> = {
+  'v0.3': [
+    '',
+    'getting-started/installation',
+    'getting-started/quickstart',
+    'getting-started/core-concepts',
+    'guides/agents',
+    'guides/tools',
+    'guides/multi-agent-handoffs',
+    'guides/runner-lifecycle',
+    'guides/sessions-state',
+    'integrations/telegram',
+    'integrations/whatsapp',
+    'integrations/webhook',
+    'production/configuration',
+    'production/deployment',
+    'production/error-handling',
+    'production/observability',
+    'production/security',
+    'providers',
+    'providers/openai',
+    'providers/gemini-anthropic',
+    'providers/ollama',
+  ],
+  'v0.4': [
+    '',
+    'getting-started/installation',
+    'getting-started/quickstart',
+    'getting-started/core-concepts',
+    'guides/agents',
+    'guides/tools',
+    'guides/multi-agent-handoffs',
+    'guides/runner-lifecycle',
+    'guides/sessions-state',
+    'integrations/telegram',
+    'integrations/whatsapp',
+    'integrations/webhook',
+    'production/configuration',
+    'production/deployment',
+    'production/error-handling',
+    'production/observability',
+    'production/security',
+    'providers',
+    'providers/openai',
+    'providers/gemini-anthropic',
+    'providers/ollama',
+  ],
+};
+
+/**
  * Type guard to check if a string is a valid documentation track identifier.
  */
 export function isValidVersionTrack(track: unknown): track is DocVersionTrack {
@@ -139,4 +191,83 @@ export function buildUnversionedDocPath(slug: string[] = [], locale: string = 'e
   const parts = [locale, 'docs', ...slug].filter(Boolean);
   return `/${parts.join('/')}`;
 }
+
+/**
+ * Check if a documentation topic (represented by its clean slug segments) exists in a track.
+ */
+export function isTopicAvailableInTrack(track: DocVersionTrack, cleanSlug: string[] = []): boolean {
+  if (cleanSlug.length === 0) return true;
+  const subpath = cleanSlug.join('/');
+  const topics = TRACK_AVAILABLE_TOPICS[track];
+  return topics ? topics.includes(subpath) : false;
+}
+
+/**
+ * Determine the destination URL when switching documentation versions.
+ *
+ * Preserves the current locale, and preserves the current topic if it exists in the
+ * destination track. If the topic does not exist, falls back to the destination track overview.
+ * Never duplicates version prefixes.
+ *
+ * Examples:
+ *   /es/docs/v0.3/guides/agents (to v0.4)             -> /es/docs/v0.4/guides/agents
+ *   /en/docs/v0.4/guides/runner-lifecycle (to v0.3)   -> /en/docs/v0.3/guides/runner-lifecycle
+ *   /pt-BR/docs/guides/agents (to v0.4)               -> /pt-BR/docs/v0.4/guides/agents
+ *   /en/docs/v0.4/unknown-topic (to v0.3)             -> /en/docs/v0.3
+ *   /es/docs (to v0.4)                                -> /es/docs/v0.4
+ */
+export function resolveVersionSwitchUrl({
+  currentPathname,
+  targetTrack,
+  locale,
+}: {
+  currentPathname: string;
+  targetTrack: DocVersionTrack;
+  locale?: string;
+}): string {
+  const cleanPath = currentPathname.split('?')[0].split('#')[0];
+  const segments = cleanPath.split('/').filter(Boolean);
+
+  let detectedLocale = locale || 'en';
+  let docsIndex = -1;
+
+  for (let i = 0; i < segments.length; i++) {
+    if (['en', 'es', 'pt-BR'].includes(segments[i])) {
+      detectedLocale = segments[i];
+    }
+    if (segments[i] === 'docs') {
+      docsIndex = i;
+      break;
+    }
+  }
+
+  // If not currently on a /docs route, navigate to target track overview
+  if (docsIndex === -1) {
+    return `/${detectedLocale}/docs/${targetTrack}`;
+  }
+
+  const afterDocs = segments.slice(docsIndex + 1);
+
+  // Strip any existing version prefix so we never duplicate it
+  let cleanSlug: string[] = [];
+  if (afterDocs.length > 0 && isValidVersionTrack(afterDocs[0])) {
+    cleanSlug = afterDocs.slice(1);
+  } else {
+    cleanSlug = afterDocs;
+  }
+
+  // If at root of docs, go to target track overview
+  if (cleanSlug.length === 0) {
+    return `/${detectedLocale}/docs/${targetTrack}`;
+  }
+
+  // Check if topic exists in target track
+  if (isTopicAvailableInTrack(targetTrack, cleanSlug)) {
+    return `/${detectedLocale}/docs/${targetTrack}/${cleanSlug.join('/')}`;
+  }
+
+  // Missing topic fallback: destination track overview
+  return `/${detectedLocale}/docs/${targetTrack}`;
+}
+
 

@@ -41,6 +41,39 @@ export function getVersionPageTree(track: DocVersionTrack, locale: string): Page
 }
 
 /**
+ * Create an unversioned view of the stable (v0.3) page tree by stripping
+ * the /v0.3 track segment from all page/index URLs.
+ * This allows unversioned legacy routes (e.g., /en/docs/guides/agents)
+ * to match exact active nodes in the sidebar without mixing tracks.
+ */
+export function createUnversionedPageTree(
+  tree: PageTree.Root,
+  track: DocVersionTrack = DEFAULT_STABLE_TRACK,
+): PageTree.Root {
+  function rewriteNode<T extends PageTree.Node>(node: T): T {
+    if (node.type === 'page') {
+      return {
+        ...node,
+        url: node.url.replace(new RegExp(`/docs/${track}(/|$)`), '/docs$1'),
+      };
+    }
+    if (node.type === 'folder') {
+      return {
+        ...node,
+        index: node.index ? rewriteNode(node.index) : undefined,
+        children: node.children.map(rewriteNode),
+      };
+    }
+    return node;
+  }
+
+  return {
+    ...tree,
+    children: tree.children.map(rewriteNode),
+  };
+}
+
+/**
  * Resolve a documentation page supporting both versioned paths (/v0.3/...)
  * and unversioned backward-compatible paths (/getting-started/...).
  */

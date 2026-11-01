@@ -9,6 +9,8 @@ import {
   resolveVersionAndSlug,
   buildVersionedDocPath,
   buildUnversionedDocPath,
+  isTopicAvailableInTrack,
+  resolveVersionSwitchUrl,
 } from '@/config/docs-versions';
 import {
   DOCUMENTATION_ROUTE_INVENTORY,
@@ -86,6 +88,108 @@ describe('Documentation Version Registry', () => {
   it('builds unversioned legacy URLs', () => {
     expect(buildUnversionedDocPath(['guides', 'agents'], 'en')).toBe('/en/docs/guides/agents');
     expect(buildUnversionedDocPath([], 'es')).toBe('/es/docs');
+  });
+
+  describe('Version Switching & Topic Preservation', () => {
+    it('correctly verifies if a topic exists in a track', () => {
+      expect(isTopicAvailableInTrack('v0.3', ['guides', 'agents'])).toBe(true);
+      expect(isTopicAvailableInTrack('v0.4', ['guides', 'agents'])).toBe(true);
+      expect(isTopicAvailableInTrack('v0.3', ['getting-started', 'installation'])).toBe(true);
+      expect(isTopicAvailableInTrack('v0.4', ['getting-started', 'installation'])).toBe(true);
+      expect(isTopicAvailableInTrack('v0.3', ['non-existent-topic'])).toBe(false);
+      expect(isTopicAvailableInTrack('v0.4', ['non-existent-topic'])).toBe(false);
+      expect(isTopicAvailableInTrack('v0.3', [])).toBe(true);
+    });
+
+    it('switches version preserving locale and topic', () => {
+      expect(
+        resolveVersionSwitchUrl({
+          currentPathname: '/es/docs/v0.3/guides/agents',
+          targetTrack: 'v0.4',
+        }),
+      ).toBe('/es/docs/v0.4/guides/agents');
+
+      expect(
+        resolveVersionSwitchUrl({
+          currentPathname: '/en/docs/v0.4/guides/runner-lifecycle',
+          targetTrack: 'v0.3',
+        }),
+      ).toBe('/en/docs/v0.3/guides/runner-lifecycle');
+
+      expect(
+        resolveVersionSwitchUrl({
+          currentPathname: '/pt-BR/docs/v0.3/production/observability',
+          targetTrack: 'v0.4',
+        }),
+      ).toBe('/pt-BR/docs/v0.4/production/observability');
+    });
+
+    it('switches from legacy unversioned URLs preserving topic', () => {
+      expect(
+        resolveVersionSwitchUrl({
+          currentPathname: '/en/docs/guides/agents',
+          targetTrack: 'v0.4',
+        }),
+      ).toBe('/en/docs/v0.4/guides/agents');
+
+      expect(
+        resolveVersionSwitchUrl({
+          currentPathname: '/es/docs/getting-started/quickstart',
+          targetTrack: 'v0.3',
+        }),
+      ).toBe('/es/docs/v0.3/getting-started/quickstart');
+    });
+
+    it('handles overview routes cleanly', () => {
+      expect(
+        resolveVersionSwitchUrl({
+          currentPathname: '/en/docs/v0.3',
+          targetTrack: 'v0.4',
+        }),
+      ).toBe('/en/docs/v0.4');
+
+      expect(
+        resolveVersionSwitchUrl({
+          currentPathname: '/es/docs',
+          targetTrack: 'v0.4',
+        }),
+      ).toBe('/es/docs/v0.4');
+
+      expect(
+        resolveVersionSwitchUrl({
+          currentPathname: '/pt-BR/docs',
+          targetTrack: 'v0.3',
+        }),
+      ).toBe('/pt-BR/docs/v0.3');
+    });
+
+    it('falls back to destination overview when topic does not exist in target track', () => {
+      expect(
+        resolveVersionSwitchUrl({
+          currentPathname: '/en/docs/v0.4/non-existent-beta-feature',
+          targetTrack: 'v0.3',
+        }),
+      ).toBe('/en/docs/v0.3');
+    });
+
+    it('never produces duplicate version prefixes', () => {
+      const url = resolveVersionSwitchUrl({
+        currentPathname: '/en/docs/v0.3/guides/agents',
+        targetTrack: 'v0.4',
+      });
+      expect(url).toBe('/en/docs/v0.4/guides/agents');
+      expect(url).not.toContain('/v0.3/v0.4');
+      expect(url).not.toContain('/v0.4/v0.3');
+    });
+
+    it('handles non-docs routes by falling back to target overview', () => {
+      expect(
+        resolveVersionSwitchUrl({
+          currentPathname: '/es/about',
+          targetTrack: 'v0.4',
+        }),
+      ).toBe('/es/docs/v0.4');
+    });
   });
 });
 

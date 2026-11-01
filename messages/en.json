@@ -21,6 +21,18 @@
     "currentLanguage": "Current language: {language}",
     "changeLanguage": "Change language"
   },
+  "versionSelector": {
+    "label": "Documentation Version",
+    "switchVersion": "Switch documentation version",
+    "currentVersion": "Current version: {version}",
+    "stable": "Stable",
+    "prerelease": "Prerelease"
+  },
+  "prereleaseBanner": {
+    "title": "Prerelease Documentation ({version})",
+    "description": "You are viewing preview documentation for published release chatflow-agent {version}. This release contains prerelease capabilities that are subject to change.",
+    "switchToStable": "Switch to stable documentation ({version})"
+  },
   "theme": {
     "toggle": "Toggle theme",
     "light": "Light",

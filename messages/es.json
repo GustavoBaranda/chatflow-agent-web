@@ -21,6 +21,18 @@
     "currentLanguage": "Idioma actual: {language}",
     "changeLanguage": "Cambiar idioma"
   },
+  "versionSelector": {
+    "label": "Versión de la Documentación",
+    "switchVersion": "Cambiar versión de la documentación",
+    "currentVersion": "Versión actual: {version}",
+    "stable": "Estable",
+    "prerelease": "Versión preliminar"
+  },
+  "prereleaseBanner": {
+    "title": "Documentación de Versión Preliminar ({version})",
+    "description": "Estás viendo la documentación preliminar de la versión publicada chatflow-agent {version}. Esta versión contiene funcionalidades preliminares sujetas a cambios.",
+    "switchToStable": "Cambiar a la documentación estable ({version})"
+  },
   "theme": {
     "toggle": "Alternar tema",
     "light": "Claro",

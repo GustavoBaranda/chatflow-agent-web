@@ -18,25 +18,118 @@ export const source = loader({
   },
 });
 
-/**
- * Retrieve the isolated page tree for a specific documentation track and locale.
- * Isolates navigation between v0.3 and v0.4 so tracks are never mixed in the sidebar.
- */
-export function getVersionPageTree(track: DocVersionTrack, locale: string): PageTree.Root {
-  const fullTree = source.getPageTree(locale);
-  for (const node of fullTree.children) {
+function getNodeKey(node: PageTree.Node): string {
+  if (node.type === 'page') {
+    return node.url;
+  }
+  if (node.type === 'folder') {
+    const refFolder = (node as { $ref?: { folder?: string } }).$ref?.folder;
+    if (refFolder) return refFolder;
+    return typeof node.name === 'string' ? node.name : '';
+  }
+  if (node.type === 'separator') {
+    return typeof node.name === 'string' ? node.name : '';
+  }
+  return '';
+}
+
+function mergeTreeNodes(primary: PageTree.Node[], fallback: PageTree.Node[]): PageTree.Node[] {
+  const primaryKeyMap = new Map<string, PageTree.Node>();
+  for (const node of primary) {
+    const key = getNodeKey(node);
+    if (key) primaryKeyMap.set(key, node);
+  }
+
+  const result: PageTree.Node[] = [];
+
+  // 1. Process all primary nodes; if a folder also exists in fallback, merge children recursively
+  for (const pNode of primary) {
+    const key = getNodeKey(pNode);
+    const fNode = key ? fallback.find((n) => getNodeKey(n) === key) : undefined;
+    if (pNode.type === 'folder' && fNode?.type === 'folder') {
+      result.push({
+        ...pNode,
+        children: mergeTreeNodes(pNode.children, fNode.children),
+      });
+    } else {
+      result.push(pNode);
+    }
+  }
+
+  // 2. Add all fallback nodes that were not present in primary
+  for (const fNode of fallback) {
+    const key = getNodeKey(fNode);
+    if (!key || !primaryKeyMap.has(key)) {
+      result.push(fNode);
+    }
+  }
+
+  return result;
+}
+
+function findTrackFolder(
+  children: PageTree.Node[],
+  track: DocVersionTrack,
+): PageTree.Folder | undefined {
+  for (const node of children) {
     if (node.type === 'folder') {
       const matchesTrack =
         (typeof node.index?.url === 'string' && node.index.url.includes(`/docs/${track}`)) ||
         (typeof node.name === 'string' && node.name.toLowerCase().includes(track.toLowerCase()));
       if (matchesTrack) {
-        return {
-          name: node.name,
-          children: node.index ? [node.index, ...node.children] : node.children,
-        };
+        return node;
       }
     }
   }
+  return undefined;
+}
+
+/**
+ * Retrieve the isolated page tree for a specific documentation track and locale.
+ * Isolates navigation between v0.3 and v0.4 so tracks are never mixed in the sidebar.
+ * Seamlessly merges authoritative English fallback tree when localized translations
+ * are missing so the sidebar always displays the full documentation structure.
+ */
+export function getVersionPageTree(track: DocVersionTrack, locale: string): PageTree.Root {
+  const fullTree = source.getPageTree(locale);
+  const primaryFolder = findTrackFolder(fullTree.children, track);
+
+  const fallbackFolder = (fullTree as { fallback?: PageTree.Root }).fallback
+    ? findTrackFolder((fullTree as { fallback?: PageTree.Root }).fallback!.children, track)
+    : undefined;
+
+  if (primaryFolder && fallbackFolder) {
+    const primaryChildren = primaryFolder.index
+      ? [primaryFolder.index, ...primaryFolder.children]
+      : primaryFolder.children;
+    const fallbackChildren = fallbackFolder.index
+      ? [fallbackFolder.index, ...fallbackFolder.children]
+      : fallbackFolder.children;
+
+    return {
+      name: primaryFolder.name,
+      children: mergeTreeNodes(primaryChildren, fallbackChildren),
+    };
+  }
+
+  if (primaryFolder) {
+    return {
+      name: primaryFolder.name,
+      children: primaryFolder.index
+        ? [primaryFolder.index, ...primaryFolder.children]
+        : primaryFolder.children,
+    };
+  }
+
+  if (fallbackFolder) {
+    return {
+      name: fallbackFolder.name,
+      children: fallbackFolder.index
+        ? [fallbackFolder.index, ...fallbackFolder.children]
+        : fallbackFolder.children,
+    };
+  }
+
   return fullTree;
 }
 

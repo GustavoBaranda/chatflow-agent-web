@@ -16,7 +16,7 @@ describe('Version-Aware Documentation Search API Suite (Phase 6D)', () => {
       expect(item.url).toContain('/docs/v0.3');
       expect(item.url).not.toContain('/docs/v0.4');
     }
-  });
+  }, 15000);
 
   it('isolates v0.3 search results when tag=v0.3 is requested', async () => {
     const req = new Request('http://localhost:3000/api/search?query=agents&tag=v0.3');

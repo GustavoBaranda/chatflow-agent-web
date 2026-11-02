@@ -1,0 +1,255 @@
+---
+title: "Handoffs Multiagente"
+description: "Orquestrando enxames autônomos, delegação ponto a ponto, ferramentas sintéticas de transferência e prevenção de ciclos no chatflow-agent."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+A coordenação multiagente no **chatflow-agent** é baseada no modelo de **enxames autônomos ponto a ponto (peer-to-peer swarms)**. Em vez de depender de um coordenador centralizado ou de grafos estáticos engessados, os agentes delegam tarefas autonomamente para parceiros especializados através da invocação de ferramentas sintéticas de transferência (*handoff*).
+
+Quando um agente aciona um handoff, o contexto conversacional é preservado de forma transparente, o ponteiro do agente ativo é atualizado e o novo agente assume imediatamente o turno dentro do mesmo ciclo de execução.
+
+---
+
+## O Modelo Mental de Enxame
+
+Em uma arquitetura de enxame, cada agente se especializa em um domínio distinto (ex.: triagem, faturamento, suporte técnico, reembolsos). A coordenação ocorre naturalmente através do diálogo:
+
+1. **Delegação Descentralizada:** Os agentes conhecem os parceiros para os quais podem transferir o controle através de sua lista `handoffs`.
+2. **Tomada de Decisão Dinâmica:** O LLM decide em tempo de execução se responde diretamente, se aciona uma ferramenta de domínio ou se transfere o controle para um parceiro.
+3. **Execução Transparente:** O usuário interage com um ponto de entrada unificado (`Runner`), sem perceber que múltiplos modelos ou agentes especializados colaboram nos bastidores.
+
+---
+
+## Declarando Handoffs entre Agentes
+
+As relações de transferência são declaradas durante a instanciação ou de forma imperativa:
+
+### Método 1: Declaração no Construtor
+Passe uma lista de instâncias de `Agent` de destino no parâmetro `handoffs`:
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from chatflow_agent import Agent
+
+# Definir primeiro os agentes especialistas de destino
+billing_agent = Agent(
+    name="BillingSpecialist",
+    instructions="Handle payments, invoice queries, and subscription upgrades.",
+    model="gemini-2.5-flash",
+)
+
+technical_agent = Agent(
+    name="TechnicalSupport",
+    instructions="Diagnose software bugs, API errors, and configuration issues.",
+    model="gemini-2.5-flash",
+)
+
+# O agente de triagem roteia para os especialistas
+triage_agent = Agent(
+    name="TriageAgent",
+    instructions=(
+        "Welcome the user and determine their needs. "
+        "Transfer billing questions to BillingSpecialist and technical questions to TechnicalSupport."
+    ),
+    handoffs=[billing_agent, technical_agent],
+    model="gemini-2.5-flash",
+)
+```
+
+### Método 2: Handoffs Bidirecionais e Cíclicos
+Especialistas frequentemente precisam transferir usuários de volta para a triagem ou entre si. Use `agent.add_handoff()` para estabelecer vínculos bidirecionais:
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from chatflow_agent import Agent
+
+support = Agent(name="Support", instructions="General support", model="gpt-4o")
+billing = Agent(name="Billing", instructions="Billing support", model="gpt-4o")
+
+# Estabelecer transferência bidirecional
+support.add_handoff(billing)
+billing.add_handoff(support)
+
+assert any(h.name == "Billing" for h in support.handoffs)
+assert any(h.name == "Support" for h in billing.handoffs)
+```
+
+<Callout type="warn" title="Proibição de Auto-Handoff">
+Um agente não pode registrar uma transferência para si mesmo. Chamar <code>agent.add_handoff(agent)</code> levanta imediatamente um <code>ValueError("Agent 'X' cannot register a handoff to itself.")</code>.
+</Callout>
+
+---
+
+## Ferramentas Sintéticas de Roteamento nos Bastidores
+
+Quando um agente define parceiros em `handoffs`, o `chatflow-agent` sintetiza automaticamente ferramentas de roteamento dedicadas, expostas através de `agent.get_all_tools()`.
+
+Para cada agente parceiro:
+* **Nome da Ferramenta:** Gerado como `transfer_to_<sanitized_name>` (ex.: `transfer_to_billingspecialist`).
+* **Descrição da Ferramenta:** Combina o nome do agente alvo com um trecho de suas instruções:
+  `"Hand off the dialogue to 'BillingSpecialist'. Target agent specialty: Handle payments, invoice queries..."`
+* **Assinatura:** Aceita um parâmetro opcional `reason: str | None = None`.
+* **Valor de Retorno:** Retorna um payload tipado `Handoff(target_agent_name="BillingSpecialist", reason=...)`.
+
+Como as ferramentas de handoff se parecem e se comportam exatamente como chamadas de função normais, o modelo aprende naturalmente quando transferir o controle com base na intenção do usuário e nas descrições das ferramentas.
+
+---
+
+## Ciclo de Execução de Handoff no `Runner`
+
+Quando `runner.run_async()` processa um turno:
+
+```
+[Mensagem do Usuário] 
+       │
+       ▼
+ [Agente Ativo] ──(Gera Chamada de Ferramenta)──► transfer_to_billingspecialist(reason="...")
+                                                                │
+                                                                ▼
+                                                       [Executa o Handoff]
+                                                                │
+                                                                ▼
+                                                    [Alterna Agente Ativo]
+                                                  (session.set_active_agent)
+                                                                │
+                                                                ▼
+                                                   [Próxima Geração do Modelo]
+                                                (BillingSpecialist responde)
+                                                                │
+                                                                ▼
+                                                        [Resposta Final]
+```
+
+1. **Invocação da Ferramenta:** O LLM emite uma chamada de ferramenta para `transfer_to_billingspecialist`.
+2. **Verificação no Registro:** O `Runner` verifica se `BillingSpecialist` existe no seu registro interno de agentes. Caso o agente não seja encontrado, levanta um `AgentHandoffError`.
+3. **Alternância do Agente Ativo:** O `Runner` atualiza `session.set_active_agent(target_agent)`.
+4. **Injeção do Resultado do Handoff:** Um `ToolResult` contendo `status: "HANDOFF_SUCCESS"` e o motivo da transferência é anexado ao histórico da sessão.
+5. **Continuação Imediata do Turno:** Dentro da mesma chamada `runner.run()`, o novo agente ativo é acionado com o histórico atualizado para formular sua resposta.
+
+---
+
+## Prevenção de Ciclos e Limites de Turno
+
+Transferências descontroladas entre agentes poderiam gerar loops infinitos caso os prompts sejam ambíguos. O `chatflow-agent` protege sua execução com salvaguardas nativas:
+
+* **`max_handoffs_per_turn` (Padrão: 5):**
+  O número máximo de transferências de agentes permitidas dentro de um único turno de mensagem do usuário. Se esse limite for atingido, o runner interrompe novas transferências e injeta um resultado de erro:
+  `"Maximum agent transfers exceeded for a single turn."`
+* **`max_tool_iterations` (Padrão: 10):**
+  O limite geral de execuções de ferramentas por turno, garantindo encerramento determinístico mesmo se ferramentas encadearem chamadas consecutivas.
+
+```python
+from chatflow_agent import Agent, Runner
+
+triage = Agent(name="Triage", instructions="...", model="gpt-4o")
+
+# Configurar limites mais estritos para endpoints de alto volume ou baixo custo
+runner = Runner(
+    starting_agent=triage,
+    max_handoffs_per_turn=3,
+    max_tool_iterations=6,
+)
+```
+
+---
+
+## Diferenças de Versão e Recursos de Pré-lançamento
+
+A geração e sanitização de handoffs receberam melhorias significativas de confiabilidade em versões mais recentes:
+
+### Versão Estável (`v0.3.4`)
+* <VersionBadge version="0.3.4" status="stable" /> Sanitização básica via expressão regular: `clean = re.sub(r"[^a-zA-Z0-9_]", "_", name.strip().lower())`.
+* Histórico de sessão compartilhado mantém contexto conversacional completo entre transferências.
+
+### Melhorias de Pré-lançamento (`v0.4.0rc1`)
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Transliteração Unicode NFKD:** Normaliza automaticamente caracteres com acentuação para ASCII simples (ex.: `AtenciónAlCliente` torna-se `transfer_to_atencionalcliente`).
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Fallbacks Determinísticos com Hash:** Nomes de agentes em alfabetos não latinos (ex.: japonês, árabe, cirílico) ou emojis utilizam um prefixo determinístico de hash SHA-256 (`transfer_to_u<hash>`) para garantir identificadores válidos.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Desambiguação em Colisões:** Se dois agentes gerarem nomes sanitizados idênticos, sufixos numéricos (`_2`, `_3`) são adicionados automaticamente para evitar sobrescritas.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Limite de Caracteres:** Identificadores de ferramentas de handoff são limitados a 60 caracteres para conformidade com provedores.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Encaminhamento de Atualizações de Contexto:** O método `session.set_active_agent(agent, context_updates)` permite atualizar metadados junto com o evento de transferência.
+
+---
+
+## Exemplo Completo: Enxame de Suporte em Múltiplos Níveis
+
+```python
+from chatflow_agent import Agent, Runner, tool
+from chatflow_agent.core.memory import SessionStore
+
+# 1. Ferramentas especializadas
+@tool
+def issue_refund(transaction_id: str, amount: float) -> dict:
+    """Process a refund back to customer original payment method."""
+    return {"status": "REFUNDED", "transaction_id": transaction_id, "amount": amount}
+
+@tool
+def lookup_kb_article(topic: str) -> str:
+    """Search knowledge base for troubleshooting steps."""
+    return f"Knowledge base instructions for {topic}: Clear cache and restart application."
+
+# 2. Agentes de destino especializados
+billing_agent = Agent(
+    name="BillingAgent",
+    instructions="Assist with refunds and payment disputes. Use issue_refund when appropriate.",
+    tools=[issue_refund],
+    model="gemini-2.5-flash",
+)
+
+tech_agent = Agent(
+    name="TechSupportAgent",
+    instructions="Assist with software errors. Use lookup_kb_article for troubleshooting.",
+    tools=[lookup_kb_article],
+    model="gemini-2.5-flash",
+)
+
+# 3. Agente de triagem
+triage_agent = Agent(
+    name="TriageAgent",
+    instructions=(
+        "Welcome the user. Ask what they need help with. "
+        "Transfer billing/refund issues to BillingAgent and technical bugs to TechSupportAgent."
+    ),
+    handoffs=[billing_agent, tech_agent],
+    model="gemini-2.5-flash",
+)
+
+# 4. Permitir que os especialistas transfiram de volta para a triagem se necessário
+billing_agent.add_handoff(triage_agent)
+tech_agent.add_handoff(triage_agent)
+
+# 5. Inicializar o runner
+store = SessionStore()
+runner = Runner(starting_agent=triage_agent, session_store=store)
+
+# 6. Executar o diálogo
+response = runner.run(
+    session_id="customer-session-101",
+    user_message="I have an unexpected charge on my invoice and need a refund.",
+)
+
+print("Active Agent:", response.active_agent_name)
+print("Response:", response.content)
+print("Handoff:", response.handoff)
+```
+
+---
+
+## Armadilhas Comuns e Boas Práticas
+
+### 1. Agentes Inalcançáveis no Registro
+O `Runner` indexa automaticamente todos os agentes alcançáveis a partir da árvore de handoffs do `starting_agent`. Caso um agente seja introduzido de forma dinâmica fora do grafo inicial, registre-o explicitamente:
+```python
+# Se um agente for introduzido dinamicamente:
+runner.register_agent(specialist_agent)
+```
+
+### 2. Instruções de Handoff Excessivamente Genéricas
+Certifique-se de que as instruções do agente de destino declarem claramente quais problemas ele resolve. Se dois agentes possuírem descrições sobrepostas, os modelos podem hesitar ou tomar decisões de roteamento imprevisíveis.
+
+### 3. Preservando a Identidade da Sessão
+Nunca crie um novo `session_id` esperando que uma transferência continue. O estado do handoff e a transição de agente são registrados dentro da sessão ativa.

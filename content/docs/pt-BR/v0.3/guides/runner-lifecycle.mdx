@@ -1,0 +1,239 @@
+---
+title: "Runner e Ciclo de Execução"
+description: "Guia detalhado sobre o loop conversacional de múltiplos turnos, resolução de motores, fluxo de execução de ferramentas, limites de tempo e reversão transacional no chatflow-agent."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+O `Runner` é o motor de execução do **chatflow-agent**. Ele conduz o loop conversacional de múltiplos turnos, resolve motores de LLM, coordena a execução de ferramentas, orquestra transferências autônomas (*handoffs*) e garante a integridade transacional do estado.
+
+As aplicações interagem com o `Runner` como interface primária: seu código fornece um `session_id` e uma mensagem do usuário, e o `Runner` executa o turno conversacional até a conclusão, retornando um objeto tipado `AgentResponse`.
+
+---
+
+## Construtor e Parâmetros
+
+```python
+from chatflow_agent import Agent, OpenAIEngine, Runner
+from chatflow_agent.core.memory import SessionStore
+
+starting_agent = Agent(name="Greeter", instructions="Greet users warmly.", model="gpt-4o")
+memory_store = SessionStore()
+engine = OpenAIEngine()
+
+runner = Runner(
+    starting_agent=starting_agent,
+    session_store=memory_store,
+    engine=engine,
+    max_handoffs_per_turn=5,
+    max_tool_iterations=10,
+)
+```
+
+### Referência Completa de Parâmetros
+
+| Parâmetro | Tipo | Padrão | Descrição |
+| :--- | :--- | :--- | :--- |
+| `starting_agent` | `Agent` | *Obrigatório* | O agente raiz atribuído para gerenciar os turnos iniciais de novas sessões criadas. |
+| `session_store` | `BaseSessionStore \| SessionStore \| None` | `SessionStore()` | Mecanismo de persistência para histórico de conversa e ponteiros do agente ativo. |
+| `engine` | `BaseEngine \| None` | `GeminiEngine(...)` | Motor LLM padrão utilizado quando o agente não define seu próprio motor. |
+| `api_key` | `str \| None` | `None` | Chave de API padrão repassada ao motor de fallback caso `engine` seja omitido. |
+| `max_handoffs_per_turn` | `int` | `5` | Número máximo de transferências entre agentes permitidas dentro de um único turno. |
+| `max_tool_iterations` | `int` | `10` | Número máximo de ciclos de raciocínio modelo-ferramenta antes do encerramento forçado. |
+
+---
+
+## Indexação da Árvore de Agentes
+
+Ao ser inicializado, o `Runner` percorre recursivamente o `starting_agent` e cada parceiro na sua lista `handoffs`, construindo um registro interno (`_agents_registry`). Isso garante que qualquer agente de destino seja localizado instantaneamente durante transferências:
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from chatflow_agent import Agent, Runner
+
+billing = Agent(name="Billing", instructions="Billing", model="gpt-4o")
+support = Agent(name="Support", instructions="Support", handoffs=[billing], model="gpt-4o")
+
+runner = Runner(starting_agent=support)
+# Ambos os agentes (Support e Billing) são indexados automaticamente
+assert "Billing" in runner._agents_registry
+```
+
+Caso um agente seja instanciado fora do grafo inicial de handoffs, registre-o explicitamente utilizando `runner.register_agent(agent)`.
+
+---
+
+## Ciclo de Vida da Execução do Turno
+
+Cada chamada a `runner.run_async()` segue uma sequência determinística e protegida transacionalmente:
+
+```
+1. Recuperação da Sessão e Aquisição de Bloqueio
+   └── Obtém ou cria a sessão; adquire session.lock para serializar turnos concorrentes.
+
+2. Criação do Ponto de Restauração (Checkpoint)
+   └── Registra checkpoint_len = len(session.history) para proteção de reversão (rollback).
+
+3. Ingestão da Mensagem Recebida
+   └── Anexa Message(role=Role.USER, content=user_message) ao histórico.
+
+4. Loop de Execução (Até max_tool_iterations)
+   ├── A. Resolve o agente ativo (a partir de session.active_agent)
+   ├── B. Resolve o motor LLM (agent.engine ou runner.engine)
+   ├── C. Gera o turno do modelo via engine.generate_turn_async()
+   ├── D. Se o Modelo Solicitar Ferramentas:
+   │      ├── Anexa Message(role=Role.MODEL, tool_calls=[...])
+   │      ├── Executa ferramentas / avalia handoffs sintéticos
+   │      ├── Se ocorrer Handoff: alterna o agente ativo e verifica max_handoffs_per_turn
+   │      └── Anexa Message(role=Role.TOOL, tool_results=[...])
+   │      └── Continua o loop para a próxima avaliação do agente
+   └── E. Se Texto Final For Gerado:
+          └── Anexa Message(role=Role.MODEL, content=final_text)
+          └── Retorna AgentResponse
+
+5. Tratamento de Exceções / Limites de Tempo
+   └── Se ocorrer um erro, session.rollback_to(checkpoint_len) restaura o estado limpo.
+```
+
+---
+
+## Integridade Transacional de Estado e Rollback
+
+Em sistemas distribuídos e fluxos de IA conversacional, quedas de conexão, limites de taxa de requisições e exceções em ferramentas podem deixar o histórico em um estado inconsistente (como uma chamada de ferramenta sem seu respectivo resultado).
+
+O `chatflow-agent` garante **atomicidade em nível de turno**:
+
+* **Ponto de Restauração Pré-Turno:** Antes de anexar a mensagem do usuário, o `Runner` armazena `checkpoint_len = len(session.history)`.
+* **Reversão Automática (Rollback):** Se o motor disparar um `ProviderError`, uma ferramenta falhar com uma exceção não tratada ou ocorrer cancelamento assíncrono:
+
+```python
+try:
+    # Lógica de execução do turno
+    pass
+except Exception:
+    if hasattr(session, "rollback_to"):
+        session.rollback_to(checkpoint_len)
+    else:
+        session.history = session.history[:checkpoint_len]
+    raise
+```
+* **Garantia de Integridade:** O turno que falhou é descartado por completo do histórico, evitando que chamadas de ferramentas órfãs invalidem requisições subsequentes ao provedor.
+
+---
+
+## Assíncrono Nativo vs. Invólucro Síncrono
+
+O `chatflow-agent` é construído nativamente sobre o `asyncio`.
+
+### Execução Assíncrona (`run_async`)
+A interface padrão não bloqueante para backends web, workers em segundo plano e webhooks de mensageria:
+
+```python
+import asyncio
+from chatflow_agent import Agent, Runner
+
+async def main():
+    agent = Agent(name="Bot", instructions="Concise assistant", model="gpt-4o")
+    runner = Runner(starting_agent=agent)
+
+    # Processar turno assincronamente
+    response = await runner.run_async(
+        session_id="user-session-1",
+        user_message="Hello!",
+        metadata={"channel": "web"},
+    )
+    print(response.content)
+
+asyncio.run(main())
+```
+
+### Invólucro Síncrono (`run`)
+Um utilitário de conveniência para scripts, REPLs interativos e testes unitários:
+
+```python
+# [min-version: 0.3.0]
+# [no-exec: requires LLM engine for turn response]
+from chatflow_agent import Agent, Runner
+
+agent = Agent(name="Bot", instructions="Concise assistant", model="gpt-4o")
+runner = Runner(starting_agent=agent)
+
+# Executa o loop de eventos internamente
+response = runner.run(session_id="repl-1", user_message="Tell me a joke")
+print(response.content)
+```
+
+<Callout type="warn" title="Uso de run() Síncrono em Loops Ativos">
+Não chame <code>runner.run()</code> dentro de um loop de eventos asyncio em execução (como dentro de rotas assíncronas do FastAPI ou tarefas ativas). O Python não permite a execução aninhada de loops de eventos. Em ambientes assíncronos, utilize sempre <code>await runner.run_async()</code>.
+</Callout>
+
+---
+
+## Diferenças de Versão e Recursos de Pré-lançamento
+
+O motor de execução do `Runner` recebeu melhorias significativas de desempenho e concorrência:
+
+### Versão Estável (`v0.3.4`)
+* <VersionBadge version="0.3.4" status="stable" /> Loop multiagente principal com `max_handoffs_per_turn` e `max_tool_iterations`.
+* Travamento de sessão via `session.lock` serializando mensagens por sessão.
+* Reversão baseada em ponto de restauração em exceções de turno.
+* Execução assíncrona diretamente via `await runner.run_async(...)`:
+
+```python
+# [no-exec: illustrative async request handler pattern]
+from chatflow_agent import Agent, Runner
+
+agent = Agent(name="Bot", instructions="Helper", model="gemini-2.5-flash")
+runner = Runner(starting_agent=agent)
+
+async def handle_requests():
+    # Na v0.3.x, execute turnos assíncronos diretamente na instância compartilhada do runner
+    res1 = await runner.run_async("s1", "First query")
+    res2 = await runner.run_async("s1", "Second query")
+```
+
+<Callout type="info" title="Nota de Prévia: Melhorias da v0.4.0rc1">
+Pool de conexões assíncronas via <code>async with runner:</code>, proteção contra reentrância com <code>ReentrantTurnError</code> e rastreamento de cancelamento de threads foram introduzidos na versão preliminar <strong>v0.4.0rc1</strong>. Na versão estável v0.3.x, execute turnos diretamente na instância compartilhada do runner.
+</Callout>
+
+---
+
+## Armadilhas Comuns e Anti-padrões
+
+### 1. Reinstanciar o `Runner` a Cada Requisição
+O `Runner` indexa a árvore de agentes e coordena caches de sessão. Crie uma instância única (*singleton*) do `Runner` para o ciclo de vida da aplicação e compartilhe-a entre os manipuladores de requisição:
+```python
+# [INCORRETO]: Recriar o Runner a cada requisição HTTP reindexa árvores e redefine pools de conexão
+# def handle_post(msg):
+#     runner = Runner(starting_agent=agent)
+#     return runner.run("session", msg)
+
+# [CORRETO]: Runner singleton reutilizado entre requisições
+runner = Runner(starting_agent=agent)
+async def handle_post(session_id: str, msg: str):
+    return await runner.run_async(session_id, msg)
+```
+
+### 2. Chamar o `run()` Síncrono Dentro de Rotas Assíncronas
+```python
+# [INCORRETO]: Bloqueia threads de trabalho e falha na v0.4.0rc1
+# async def api_endpoint(req):
+#     return runner.run(req.session_id, req.message)
+
+# [CORRETO]: Use await runner.run_async
+async def api_endpoint(req_session_id: str, req_message: str):
+    return await runner.run_async(req_session_id, req_message)
+```
+
+### 3. Ignorar Metadados de `AgentResponse`
+`AgentResponse` entrega muito mais que apenas texto. Inspecione `active_agent_name`, `tool_calls_executed` e `handoff` para alimentar painéis de análise e indicadores de interface:
+```python
+response = runner.run(session_id="s1", user_message="Check order 505")
+print(f"Handled by: {response.active_agent_name}")
+print(f"Tools used: {response.tool_calls_executed}")
+if response.handoff:
+    print(f"Handoff target: {response.handoff.target_agent_name} (Reason: {response.handoff.reason})")
+```

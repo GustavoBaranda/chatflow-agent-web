@@ -21,7 +21,7 @@ describe('Version-Aware Page Tree & Locale Fallback Suite', () => {
           expect(names).toContain('Proveedores de LLM');
           expect(names).toContain('Canales e Integraciones');
           expect(names).toContain('Patrones de Producción');
-        } else if (track === 'v0.3' && locale === 'pt-BR') {
+        } else if (locale === 'pt-BR') {
           expect(names).toContain('Primeiros Passos');
           expect(names).toContain('Arquitetura Central');
           expect(names).toContain('Provedores de LLM');

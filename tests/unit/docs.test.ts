@@ -70,12 +70,11 @@ describe('Documentation Engine & Source Loader', () => {
     const page = source.getPage(['v0.3', 'non-existent-slug-test'], 'en');
     expect(page).toBeUndefined();
 
-    // Portuguese v0.4 is untranslated and falls back to authoritative English
-    const fallbackRes = resolveDocPage(['v0.4', 'guides', 'agents'], 'pt-BR');
-    expect(fallbackRes.isFallback).toBe(true);
-    expect(fallbackRes.page).toBeDefined();
+    // Both Spanish and Portuguese v0.4 are genuinely translated
+    const translatedPtV04Res = resolveDocPage(['v0.4', 'guides', 'agents'], 'pt-BR');
+    expect(translatedPtV04Res.isFallback).toBe(false);
+    expect(translatedPtV04Res.page).toBeDefined();
 
-    // Spanish v0.4 is genuinely translated
     const translatedV04Res = resolveDocPage(['v0.4', 'guides', 'agents'], 'es');
     expect(translatedV04Res.isFallback).toBe(false);
     expect(translatedV04Res.page).toBeDefined();
@@ -83,6 +82,10 @@ describe('Documentation Engine & Source Loader', () => {
     const translatedRes = resolveDocPage(['v0.3'], 'es');
     expect(translatedRes.isFallback).toBe(false);
     expect(translatedRes.page).toBeDefined();
+
+    const translatedPtRes = resolveDocPage(['v0.3'], 'pt-BR');
+    expect(translatedPtRes.isFallback).toBe(false);
+    expect(translatedPtRes.page).toBeDefined();
   });
 
   it('should generate static params for all versioned routes', () => {

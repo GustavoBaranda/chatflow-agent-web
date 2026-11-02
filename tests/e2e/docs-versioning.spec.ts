@@ -113,22 +113,21 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
     await expect(bannerOnV03).toHaveCount(0);
   });
 
-  test('preserves TranslationNotice and noindex on fallback pages in v0.4 while genuine Spanish translations omit notice', async ({ page }) => {
-    // 1. Fallback on untranslated pt-BR in v0.4
+  test('omits TranslationNotice on genuine translations in v0.4 for both Portuguese and Spanish while preserving noindex', async ({ page }) => {
+    // 1. Genuine Brazilian Portuguese translation on v0.4 does NOT show TranslationNotice
     await page.goto('/pt-BR/docs/v0.4/guides/agents');
     await page.waitForLoadState('networkidle');
 
-    // TranslationNotice banner should be present for non-translated fallback
-    const notice = page.locator('aside[role="alert"]');
-    await expect(notice).toBeVisible();
-    await expect(notice).toContainText('Authoritative English Content Displayed');
+    // TranslationNotice banner should NOT be present for genuine Portuguese translation
+    const ptNotice = page.locator('aside[role="alert"]');
+    await expect(ptNotice).toHaveCount(0);
 
     // HTML lang attribute matches requested locale
     await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
 
-    // Robots meta has noindex for fallback
-    const robots = page.locator('meta[name="robots"]');
-    await expect(robots).toHaveAttribute('content', 'noindex, follow');
+    // Robots meta has noindex, follow because v0.4 is prerelease
+    const ptRobots = page.locator('meta[name="robots"]');
+    await expect(ptRobots).toHaveAttribute('content', 'noindex, follow');
 
     // 2. Genuine Spanish translation on v0.4 does NOT show TranslationNotice
     await page.goto('/es/docs/v0.4/guides/agents');

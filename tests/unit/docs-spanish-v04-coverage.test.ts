@@ -64,12 +64,8 @@ describe('Phase 6T.3: Complete Spanish Documentation Coverage Suite (v0.4 Prerel
         expect(seo.languages['es']).toBe(expectedUrl);
         expect(seo.languages['en']).toBe(`${SITE_ORIGIN}/en/docs/v0.4${expectedSubpath}`);
         expect(seo.languages['x-default']).toBe(`${SITE_ORIGIN}/en/docs/v0.4${expectedSubpath}`);
-        // pt-BR subtopics remain untranslated in v0.4 and must not be advertised in hreflang
-        if (cleanSlug.length > 0) {
-          expect(seo.languages['pt-BR']).toBeUndefined();
-        } else {
-          expect(seo.languages['pt-BR']).toBe(`${SITE_ORIGIN}/pt-BR/docs/v0.4`);
-        }
+        // pt-BR is now genuinely translated in v0.4 and advertised in hreflang
+        expect(seo.languages['pt-BR']).toBe(`${SITE_ORIGIN}/pt-BR/docs/v0.4${expectedSubpath}`);
       });
     }
   });

@@ -1,0 +1,166 @@
+---
+title: "WhatsApp Business Cloud API"
+description: "Integração do WhatsApp para ambientes de produção com Meta Cloud API, webhooks FastAPI, validação de assinatura HMAC e gerenciamento de janela de 24 horas."
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+O `WhatsAppChannel` conecta enxames multiagente diretamente à API oficial do Meta WhatsApp Business Cloud. Projetado para ambientes de produção corporativos, ele inclui um servidor ASGI FastAPI integrado, webhooks criptograficamente validados, deduplicação de mensagens, rastreamento da janela de atendimento ao cliente e mascaramento de privacidade para números de telefone.
+
+## Instalação
+
+Instale o `chatflow-agent` com o extra `whatsapp` (`fastapi>=0.110.0`, `uvicorn>=0.29.0`):
+
+```bash
+pip install "chatflow-agent[whatsapp]"
+```
+
+## Arquitetura e Fluxo de Mensagens
+
+```
+Meta WhatsApp Cloud API
+         |
+         |  POST /webhook (Encrypted JSON + X-Hub-Signature-256)
+         v
++-------------------------------------------------------------------+
+|                         WhatsAppChannel                           |
+|  1. HMAC SHA-256 Signature Verification (app_secret)              |
+|  2. Message-ID Deduplication (dedup_ttl_hours = 192)              |
+|  3. Phone Number Masking in Logs (_mask_phone)                    |
+|  4. Immediate HTTP 200 Acknowledgement                            |
++---------------------------------+---------------------------------+
+                                  |
+                        dispatch_async()
+                                  |
+                                  v
++---------------------------------+---------------------------------+
+|                       chatflow-agent Runner                       |
+|   - Session Lock & Queue Timeout (queue_timeout_seconds=120)      |
+|   - Multi-Agent Turn Execution (llm_timeout_seconds=120)          |
+|   - Tool Calling & State Persistence                              |
++---------------------------------+---------------------------------+
+                                  |
+                                  v
++---------------------------------+---------------------------------+
+|                         Outbound Reply                            |
+|   - 24h Customer Service Window Check                             |
+|   - on_24h_window_expired Callback Hook                           |
+|   - Outbound Chunking (split_message)                             |
+|   - POST https://graph.facebook.com/v21.0/{phone_number_id}       |
++-------------------------------------------------------------------+
+```
+
+## Configuração Rápida do Webhook
+
+<Steps>
+  <Step>
+    ### Obter Credenciais da Meta Cloud API
+
+    No seu [Painel do Meta for Developers](https://developers.facebook.com/):
+    1. **Verify Token:** Um token secreto customizado que você define para verificação inicial do webhook.
+    2. **Access Token:** Token de Acesso permanente de Usuário do Sistema com permissões `whatsapp_business_messaging`.
+    3. **Phone Number ID:** O ID do seu número registrado do WhatsApp Business para testes ou produção.
+    4. **App Secret:** O App Secret da Meta localizado em Configurações do App &gt; Básico (usado na validação de assinatura HMAC).
+  </Step>
+
+  <Step>
+    ### Inicializar e Vincular o Canal
+
+```python
+import os
+from chatflow_agent import Agent, Runner
+from chatflow_agent.channels import WhatsAppChannel
+from chatflow_agent.core.memory import SQLiteSessionStore
+
+# Definir seu agente
+customer_service = Agent(
+    name="CustomerService",
+    instructions="Provide courteous, professional customer support.",
+)
+
+store = SQLiteSessionStore("whatsapp_sessions.db", dedup_ttl_hours=192)
+runner = Runner(starting_agent=customer_service, session_store=store)
+
+# Inicializar o Canal do WhatsApp
+whatsapp = WhatsAppChannel(
+    verify_token=os.environ.get("WHATSAPP_VERIFY_TOKEN", "my-verify-token"),
+    access_token=os.environ.get("WHATSAPP_ACCESS_TOKEN", "EAAB..."),
+    phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "1029384756"),
+    app_secret=os.environ.get("META_APP_SECRET", "secret-key"),
+    verify_signature=True,
+)
+
+whatsapp.attach(runner)
+
+if __name__ == "__main__":
+    # Executa o servidor ASGI FastAPI na porta 8000
+    whatsapp.run(host="0.0.0.0", port=8000)
+```
+  </Step>
+
+  <Step>
+    ### Configurar a URL do Webhook no Painel da Meta
+
+    Aponte a URL do Webhook da Meta para `https://seu-dominio.com/webhook` e informe o Verify Token correspondente. A Meta envia uma requisição `GET` para validar a subscrição, que o `WhatsAppChannel` responde imediatamente.
+  </Step>
+</Steps>
+
+## Padrões de Segurança e Verificação
+
+### Validação Criptográfica de Assinatura HMAC SHA-256
+
+A Meta assina toda carga útil de webhook POST recebida utilizando o seu App Secret e anexa a assinatura no cabeçalho `X-Hub-Signature-256`.
+
+<Callout type="warn" title="Política com Falha Segura (Fail-Closed)">
+Se `verify_signature=True` (o padrão) e `app_secret` for omitido ou inválido, o `WhatsAppChannel` bloqueia imediatamente a requisição com `HTTP 403 Forbidden`. Nunca desative a verificação de assinatura em implantações públicas de produção.
+</Callout>
+
+### Proteção de PII e Mascaramento de Números de Telefone
+
+Para cumprir regulamentações de privacidade de dados (LGPD, GDPR), o `WhatsAppChannel` mascara automaticamente os números de telefone dos usuários em todos os registros de log:
+
+```python
+# Telefone original recebido: "+1 (415) 555-2671"
+# Saída registrada no log:   "+1415****71"
+```
+
+## Concorrência, Timeouts e Prazos Limite
+
+Em canais de mensagens com alto volume, requisições recebidas exigem limites estritos de tempo:
+
+| Parâmetro | Padrão | Finalidade |
+| :--- | :--- | :--- |
+| `queue_timeout_seconds` | `120.0` | Tempo máximo que um turno pode aguardar na fila atrás de turnos anteriores para o mesmo número de telefone. |
+| `llm_timeout_seconds` | `120.0` | Prazo limite estrito para avaliação do modelo, execução de ferramentas e transferências. |
+| `max_concurrent_tasks` | `50` | Quantidade máxima de tarefas concorrentes de processamento de webhook executadas em paralelo. |
+
+Quando um turno ultrapassa o prazo limite, a tarefa em execução é cancelada, as alterações de sessão sofrem reversão (*rollback*) e o usuário recebe a `fallback_message` configurada.
+
+## Rastreamento da Janela de Atendimento de 24 Horas
+
+A Meta restringe estritamente o envio de mensagens livres para o intervalo de **24 horas após a última mensagem recebida do usuário**. Tentar enviar texto livre fora dessa janela retorna o código de erro `131047` da API da Meta.
+
+O `WhatsAppChannel` inclui um hook de callback dedicado chamado `on_24h_window_expired`:
+
+```python
+async def handle_expired_window(phone_number: str, response):
+    """Acionado quando a resposta não pode ser entregue via mensagem livre."""
+    print(f"24h window closed for {phone_number}. Queuing template notification...")
+    # Disparar mensagem de modelo aprovada do WhatsApp, ticket de CRM ou fallback por email
+
+whatsapp = WhatsAppChannel(
+    verify_token="token",
+    access_token="token",
+    phone_number_id="id",
+    app_secret="secret",
+    on_24h_window_expired=handle_expired_window,
+)
+```
+
+## Deduplicação de Mensagens (TTL)
+
+Os webhooks da Meta frequentemente reenviam requisições HTTP duplicadas caso a latência da rede atrase a confirmação de recebimento. O `WhatsAppChannel` coordena com o `SQLiteSessionStore(dedup_ttl_hours=192)` (8 dias) o rastreamento dos IDs de mensagens. Cargas úteis duplicadas recebem respostas imediatas de `HTTP 200` sem reexecutar turnos dos agentes ou disparar ações redundantes de ferramentas.

@@ -308,16 +308,21 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
     const ptGuideAlt = page.locator('link[rel="alternate"][hreflang="pt-BR"]');
     await expect(ptGuideAlt).toHaveAttribute('href', 'https://chatflowagent.org/pt-BR/docs/v0.3/guides/agents');
 
-    // 3. Untranslated fallback page on v0.4: /pt-BR/docs/v0.4/guides/agents must NOT advertise pt-BR alternate
+    // 3. Genuine translated page on v0.4: /pt-BR/docs/v0.4/guides/agents advertises pt-BR, es, en, and x-default
     await page.goto('/pt-BR/docs/v0.4/guides/agents');
     await page.waitForLoadState('networkidle');
 
-    const fallbackPtAlt = page.locator('link[rel="alternate"][hreflang="pt-BR"]');
-    await expect(fallbackPtAlt).toHaveCount(0);
+    const ptV04Alt = page.locator('link[rel="alternate"][hreflang="pt-BR"]');
+    await expect(ptV04Alt).toHaveAttribute('href', 'https://chatflowagent.org/pt-BR/docs/v0.4/guides/agents');
 
-    // But English and x-default are present
-    const fallbackEn = page.locator('link[rel="alternate"][hreflang="en"]');
-    await expect(fallbackEn).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.4/guides/agents');
+    const esV04Alt = page.locator('link[rel="alternate"][hreflang="es"]');
+    await expect(esV04Alt).toHaveAttribute('href', 'https://chatflowagent.org/es/docs/v0.4/guides/agents');
+
+    const enV04Alt = page.locator('link[rel="alternate"][hreflang="en"]');
+    await expect(enV04Alt).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.4/guides/agents');
+
+    const xDefV04 = page.locator('link[rel="alternate"][hreflang="x-default"]');
+    await expect(xDefV04).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.4/guides/agents');
   });
 
   test('sitemap.xml returns 200 OK, includes indexable stable docs, and excludes v0.4 and fallbacks', async ({ request }) => {

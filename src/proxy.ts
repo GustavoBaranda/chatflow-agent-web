@@ -6,6 +6,7 @@ import {
   getMaintenanceRetryAfter,
   isStaticAsset,
 } from './lib/maintenance';
+import { applySecurityHeaders } from './config/security-headers';
 
 const intlMiddleware = createMiddleware(routing);
 
@@ -16,7 +17,9 @@ export default function proxy(request: NextRequest) {
   if (isMaintenanceModeEnabled()) {
     // Immediately allow static assets, images, brand assets, and internal bundles
     if (isStaticAsset(pathname)) {
-      return NextResponse.next();
+      const response = NextResponse.next();
+      applySecurityHeaders(response.headers);
+      return response;
     }
 
     const retryAfter = getMaintenanceRetryAfter();
@@ -31,6 +34,7 @@ export default function proxy(request: NextRequest) {
       const response = intlMiddleware(request);
       response.headers.set('Retry-After', String(retryAfter));
       response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+      applySecurityHeaders(response.headers);
       return new NextResponse(response.body, {
         status: 503,
         statusText: 'Service Unavailable',
@@ -40,17 +44,21 @@ export default function proxy(request: NextRequest) {
 
     // Rewrite any other incoming route to the localized maintenance page with HTTP 503
     const maintenanceUrl = new URL(`/${targetLocale}/maintenance`, request.url);
+    const headers = new Headers({
+      'Retry-After': String(retryAfter),
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+    });
+    applySecurityHeaders(headers);
     return NextResponse.rewrite(maintenanceUrl, {
       status: 503,
       statusText: 'Service Unavailable',
-      headers: {
-        'Retry-After': String(retryAfter),
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-      },
+      headers,
     });
   }
 
-  return intlMiddleware(request);
+  const response = intlMiddleware(request);
+  applySecurityHeaders(response.headers);
+  return response;
 }
 
 export const config = {

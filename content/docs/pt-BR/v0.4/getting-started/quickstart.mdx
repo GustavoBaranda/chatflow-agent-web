@@ -1,0 +1,193 @@
+---
+title: "Início Rápido"
+description: "Construa e execute seu primeiro agente de IA conversacional com o chatflow-agent em menos de 5 minutos."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+---
+
+## 1. Criar um Agente Básico
+
+No `chatflow-agent`, um **`Agent`** representa uma persona com instruções e capacidades dedicadas, enquanto o **`Runner`** orquestra os turnos conversacionais e os ciclos de avaliação de ferramentas.
+
+Crie um novo arquivo chamado `quickstart.py`:
+
+```python
+# [min-version: 0.3.0]
+# [no-exec: requires real openai api key for live response]
+import os
+from chatflow_agent import Agent, Runner
+
+# 1. Definir a persona do agente, instruções e modelo alvo
+# O chatflow-agent roteia automaticamente "gpt-4o" para o motor OpenAI usando OPENAI_API_KEY
+agent = Agent(
+    name="Assistant",
+    instructions="You are a concise and helpful AI technical assistant.",
+    model="gpt-4o",
+)
+
+# 2. Inicializar o Runner com seu agente inicial
+runner = Runner(starting_agent=agent)
+
+# 3. Executar um turno conversacional
+response = runner.run(
+    session_id="quickstart_session",
+    user_message="Explain async Python in two concise sentences.",
+)
+
+# 4. Exibir a resposta
+print("Agent Response:")
+print(response.content)
+```
+
+Execute o script no terminal:
+
+```bash
+python quickstart.py
+```
+
+<Callout type="info" title="Proteção contra Execução no Event Loop">
+<code>runner.run()</code> é um método síncrono de conveniência projetado para scripts e utilitários CLI. Se você estiver dentro de um loop de eventos assíncrono existente (como FastAPI, Jupyter Notebook ou asyncio), utilize <code>await runner.run_async()</code>. Invocar <code>runner.run()</code> dentro de um loop ativo lança um <code>RuntimeError</code> claro.
+</Callout>
+
+---
+
+## 2. Adicionando Ferramentas com `@tool`
+
+Os agentes tornam-se exponencialmente mais poderosos quando recebem acesso a funções determinísticas. Use o decorador `@tool` para transformar qualquer função Python em uma ferramenta introspectável:
+
+```python
+# [min-version: 0.3.0]
+# [no-exec: requires real openai api key for live response]
+import os
+from chatflow_agent import Agent, Runner, tool
+
+# 1. Definir uma ferramenta com parâmetros tipados e docstrings
+@tool(name="calculate_discount", description="Calculate discounted price from original amount and percentage.")
+def calculate_discount(price: float, discount_percent: float) -> str:
+    """Calculate the final price after applying a percentage discount.
+
+    Args:
+        price: The original price in dollars.
+        discount_percent: The percentage discount to apply (e.g. 15 for 15%).
+    """
+    savings = price * (discount_percent / 100.0)
+    final_price = price - savings
+    return f"Original: ${price:.2f}, Savings: ${savings:.2f}, Final Price: ${final_price:.2f}"
+
+# 2. Anexar a ferramenta ao Agent
+agent = Agent(
+    name="SalesBot",
+    instructions="You help customers with purchase calculations. Always use calculate_discount for math.",
+    model="gpt-4o",
+    tools=[calculate_discount],
+)
+
+runner = Runner(starting_agent=agent)
+
+# 3. Fazer uma pergunta que exija a execução da ferramenta
+response = runner.run(
+    session_id="sales_session_1",
+    user_message="What is the final price for a jacket priced at $120 with a 25% discount?",
+)
+print(response.content)
+```
+
+### Inspecionando a Execução da Ferramenta
+
+O objeto `AgentResponse` retornado mantém total transparência sobre o turno conversacional:
+
+```python
+# Inspecionar os nomes das ferramentas executadas
+for tool_name in response.tool_calls_executed:
+    print(f"Tool executed: {tool_name}")
+```
+
+---
+
+## 3. Execução Assíncrona com `Runner.run_async`
+
+Para serviços web de alta concorrência, chatbots e loops de eventos assíncronos, utilize a API assíncrona nativa:
+
+```python
+import asyncio
+import os
+from chatflow_agent import Agent, Runner
+
+async def main() -> None:
+    agent = Agent(
+        name="AsyncBot",
+        instructions="Provide concise answers.",
+        model="gpt-4o",
+    )
+
+    runner = Runner(starting_agent=agent)
+
+    # Turno assíncrono
+    response = await runner.run_async(
+        session_id="async_session_1",
+        user_message="List three key advantages of asynchronous Python.",
+    )
+
+    print(response.content)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+---
+
+## 4. Flexibilidade Multiprovedor
+
+Como o `chatflow-agent` implementa motores diretos sobre REST, alternar entre provedores é instantâneo e não exige modificação na lógica do agente:
+
+```python
+import os
+from chatflow_agent import Agent, OpenAIEngine
+
+# Opção 1: Configuração direta por modelo (motores são resolvidos automaticamente)
+openai_agent = Agent(
+    name="OpenAIBot",
+    instructions="You are powered by GPT-4o.",
+    model="gpt-4o",
+)
+
+claude_agent = Agent(
+    name="ClaudeBot",
+    instructions="You are powered by Claude 3.5 Sonnet.",
+    model="claude-3-5-sonnet-20241022",
+)
+
+gemini_agent = Agent(
+    name="GeminiBot",
+    instructions="You are powered by Google Gemini.",
+    model="gemini-2.5-flash",
+)
+
+# Opção 2: Endpoints customizados via OpenAIEngine (Groq, Ollama, DeepSeek)
+groq_engine = OpenAIEngine(
+    base_url="https://api.groq.com/openai/v1",
+    api_key=os.getenv("GROQ_API_KEY"),
+    provider="groq",
+)
+
+groq_agent = Agent(
+    name="GroqBot",
+    instructions="You are powered by LLaMA 3.3 on Groq.",
+    model="llama-3.3-70b-versatile",
+    engine=groq_engine,
+)
+```
+
+<Callout type="warn" title="Diferenças de Provedores entre v0.3.4 e v0.4.0rc1">
+Na versão <VersionBadge version="0.3.4" status="stable" />, o <code>GeminiEngine</code> depende do pacote <code>google-genai</code>. Na versão <VersionBadge version="0.4.0rc1" status="prerelease" />, o <code>GeminiEngine</code> foi refatorado para operar sobre HTTP REST puro via <code>httpx</code>, eliminando qualquer dependência de SDKs externos do Google.
+</Callout>
+
+---
+
+## Próximos Passos
+
+Agora que você executou seus primeiros agentes, aprofunde-se nos conceitos fundamentais:
+
+* [Conceitos Fundamentais](/pt-BR/docs/v0.4/getting-started/core-concepts): Aprenda sobre Gerenciamento de Estado, Memória, Handoffs e Concorrência.

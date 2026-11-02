@@ -2,6 +2,11 @@
   "title": "chatflow-agent v0.4 (Prerelease)",
   "root": true,
   "pages": [
-    "index"
+    "index",
+    "getting-started",
+    "guides",
+    "providers",
+    "integrations",
+    "production"
   ]
 }

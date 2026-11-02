@@ -1,0 +1,227 @@
+---
+title: "Agentes e Instruções Dinâmicas"
+description: "Aprofunde-se na abstração Agent, callables de instruções dinâmicas em tempo de execução, vinculação de ferramentas e parâmetros de configuração no chatflow-agent."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+A classe `Agent` é o bloco de construção fundamental do **chatflow-agent**. Ela define uma entidade autônoma e especializada, caracterizada por uma identidade única, instruções comportamentais, identificador de modelo LLM, um conjunto delimitado de ferramentas e pares de transferência (*handoffs*).
+
+Diferentemente de frameworks pesados que acoplam o estado de execução diretamente às instâncias dos agentes, os objetos `Agent` no `chatflow-agent` atuam como **modelos sem estado (stateless blueprints)**. Todo o diálogo conversacional, checkpoints de histórico e travas de memória residem externamente no `SessionContext`, permitindo que as instâncias dos agentes atendam requisições concorrentes entre múltiplas sessões com total segurança.
+
+---
+
+## Construtor e Parâmetros
+
+Um `Agent` é configurado através do seu construtor. Cada parâmetro é fortemente tipado e projetado para suportar tanto padrões globais quanto sobreposições granulares por agente.
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from chatflow_agent import Agent
+
+agent = Agent(
+    name="CustomerSupportAgent",
+    instructions="You are a professional customer support assistant.",
+    model="gemini-2.5-flash",
+)
+```
+
+### Referência Completa de Parâmetros
+
+| Parâmetro | Tipo | Padrão | Descrição |
+| :--- | :--- | :--- | :--- |
+| `name` | `str` | *Obrigatório* | Nome único que identifica o agente na árvore de transferências e nos logs de sessão. |
+| `instructions` | `str \| Callable[[], str]` | *Obrigatório* | Instruções de sistema fornecidas como string estática ou função invocável (*callable*) dinâmica. |
+| `model` | `str` | `"gemini-2.5-flash"` | Identificador do modelo (ex.: `gemini-2.5-flash`, `gpt-4o`, `claude-3-5-sonnet-20241022`). |
+| `tools` | `list[Tool \| Callable] \| None` | `None` | Lista inicial de instâncias de `Tool` introspectadas ou funções Python convencionais. |
+| `handoffs` | `list[Agent] \| None` | `None` | Lista de agentes pares para os quais este agente pode transferir o diálogo de forma autônoma. |
+| `provider` | `str \| None` | `None` | Nome explícito do provedor (ex.: `"openai"`, `"anthropic"`, `"gemini"`, `"groq"`). |
+| `base_url` | `str \| None` | `None` | Endpoint de API REST customizado para gateways compatíveis com OpenAI. |
+| `api_key` | `str \| None` | `None` | Chave de API específica que sobrepõe variáveis de ambiente para este agente. |
+| `engine` | `BaseEngine \| None` | `None` | Instância pré-configurada de motor para sobrepor a resolução automática de engines. |
+
+<Callout type="info" title="O Modelo Pertence ao Agent, Não ao Engine">
+No <code>chatflow-agent</code>, a string do <code>model</code> é configurada diretamente no <code>Agent</code>, nunca no construtor do <code>Engine</code>. Isso desacopla a camada de conexão de rede das escolhas de modelos específicos, permitindo que diferentes agentes compartilhem uma única instância de motor enquanto consultam tamanhos de modelo distintos.
+</Callout>
+
+---
+
+## Instruções Estáticas vs. Dinâmicas
+
+As instruções de sistema governam o comportamento do agente durante cada interação com o LLM. O `chatflow-agent` suporta duas abordagens complementares:
+
+### 1. Instruções Estáticas
+Ideais para agentes cuja persona, restrições e regras de negócio permanecem constantes ao longo dos turnos:
+
+```python
+from chatflow_agent import Agent
+
+triage_agent = Agent(
+    name="TriageAgent",
+    instructions=(
+        "You are the front-desk triage specialist. "
+        "Categorize customer inquiries and transfer technical issues to TechSupportAgent "
+        "or billing inquiries to BillingAgent."
+    ),
+    model="gemini-2.5-flash",
+)
+```
+
+### 2. Instruções Dinâmicas por Callable
+Quando as instruções do prompt dependem de fatores em tempo real (como data e hora atual, atributos do perfil do usuário, flags de ambiente ou registros do banco de dados), passe uma função sem argumentos que retorne uma `str`:
+
+```python
+from datetime import datetime
+from chatflow_agent import Agent
+
+def dynamic_scheduler_prompt() -> str:
+    now = datetime.now()
+    current_time = now.strftime("%A, %B %d, %Y at %I:%M %p")
+    return (
+        f"You are a scheduling coordinator. The current date and time is {current_time}. "
+        "Ensure all proposed appointment slots are in the future."
+    )
+
+scheduler_agent = Agent(
+    name="SchedulerAgent",
+    instructions=dynamic_scheduler_prompt,
+    model="gemini-2.5-flash",
+)
+
+# Resolução em tempo de execução
+prompt = scheduler_agent.get_instructions()
+assert "You are a scheduling coordinator" in prompt
+```
+
+Sempre que o `Runner` executa um turno, ele invoca `agent.get_instructions()`. Se `instructions` for um callable, ele o avalia sob demanda, garantindo que os prompts nunca fiquem desatualizados.
+
+<Callout type="warn" title="Requisito de Resolução Síncrona">
+O invocável passado para <code>instructions</code> deve ser uma função síncrona (<code>Callable[[], str]</code>). Se suas instruções exigirem E/S assíncrona (como buscar uma configuração remota), execute a operação antes de inicializar o agente ou durante o pré-processamento de metadados da sessão.
+</Callout>
+
+---
+
+## Registrando Ferramentas em Agentes
+
+As ferramentas conferem capacidades de execução aos agentes. Você pode registrar ferramentas utilizando três métodos distintos:
+
+### Método 1: Lista no Construtor
+Passe funções decoradas com `@tool` ou callables convencionais no parâmetro `tools`:
+
+```python
+from chatflow_agent import Agent, tool
+
+@tool(name="fetch_user_plan", description="Retrieve the subscription plan for a user ID.")
+def fetch_user_plan(user_id: str) -> dict:
+    return {"user_id": user_id, "tier": "enterprise", "seats": 50}
+
+support_agent = Agent(
+    name="SupportBot",
+    instructions="Assist enterprise users.",
+    tools=[fetch_user_plan],
+    model="gpt-4o",
+)
+```
+
+### Método 2: Chamada Imperativa `add_tool`
+Adicione ferramentas dinamicamente após a instanciação. Registros duplicados com o mesmo nome são automaticamente substituídos pela definição mais recente:
+
+```python
+from chatflow_agent import Agent, tool
+
+agent = Agent(name="DynamicBot", instructions="Helper", model="gpt-4o")
+
+@tool
+def calculate_tax(amount: float, rate: float = 0.21) -> float:
+    return amount * rate
+
+# Registrar na instância
+agent.add_tool(calculate_tax)
+assert len(agent.tools) == 1
+```
+
+### Método 3: O Decorador `@agent.tool`
+Registre uma ferramenta diretamente em uma instância de agente. Isso vincula a função sem exigir uma definição `@tool` independente:
+
+```python
+from chatflow_agent import Agent
+
+agent = Agent(name="AnalyticsBot", instructions="Process metrics", model="gpt-4o")
+
+@agent.tool(name="query_active_users", description="Count active sessions in the last N minutes.")
+def query_active_users(minutes: int = 15) -> int:
+    # Consultar banco de dados ou serviço de telemetria
+    return 142
+
+assert any(t.name == "query_active_users" for t in agent.tools)
+```
+
+---
+
+## Diferenças entre Versões e Recursos de Pré-lançamento
+
+O `chatflow-agent` mantém uma mecânica consistente para agentes, ao mesmo tempo em que introduz validações mais estritas e normalização de caracteres nas versões mais recentes:
+
+### Versão Estável (`v0.3.4`)
+* <VersionBadge version="0.3.4" status="stable" /> Validação básica na construção do agente.
+* Ferramentas sintéticas de transferência formatadas como `transfer_to_<sanitized_name>`.
+
+### Melhorias de Pré-lançamento (`v0.4.0rc1`)
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Validação de Nomes Não Vazios:** O construtor rejeita explicitamente nomes vazios ou compostos exclusivamente por espaços em branco:
+
+```python
+from chatflow_agent import Agent
+
+# Em v0.4.0rc1: lança ValueError("Agent name must be a non-empty string.")
+try:
+    Agent(name="   ", instructions="test")
+except ValueError as err:
+    print("Caught expected validation error:", err)
+```
+
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Transliteração Unicode NFKD:** Nomes de agentes com acentos (ex.: `AtenciónAlCliente`) são transliterados de forma limpa para identificadores ASCII válidos (`transfer_to_atencionalcliente`).
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Desambiguação de Colisões:** Se múltiplos destinos de handoff gerarem nomes sanitizados equivalentes, sufixos numéricos (`_2`, `_3`) são adicionados automaticamente.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Limite de Comprimento em Nomes de Ferramentas:** Nomes de ferramentas sintéticas são estritamente limitados a 60 caracteres para cumprir os limites das APIs de provedores upstream.
+
+---
+
+## Armadilhas Comuns e Anti-Padrões
+
+### 1. Passar `model` para o Construtor do Engine
+```python
+# [INCORRECT]: Engine constructors do not accept "model"
+from chatflow_agent import Agent, OpenAIEngine
+# engine = OpenAIEngine(model="gpt-4o")  # TypeError!
+
+# [CORRECT]: Pass "model" to Agent, and network options to Engine
+engine = OpenAIEngine(api_key="sk-...")
+agent = Agent(name="Writer", instructions="...", model="gpt-4o", engine=engine)
+```
+
+### 2. Modificar Atributos do Agente em Tempo de Execução para Rastrear Estado
+```python
+# [ANTI-PATTERN]: Agents are shared, stateless blueprints!
+agent.current_user = "user_123"  # Vazará entre sessões concorrentes!
+
+# [CORRECT]: Store conversation state in session metadata
+# Passe metadados para runner.run_async(session_id="s1", metadata={"user_id": "user_123"})
+```
+
+### 3. Registro de Transferência para Si Mesmo (Self-Handoff)
+Um agente não pode registrar uma transferência para si mesmo. Fazer isso lança um erro imediato:
+```python
+# [INCORRECT]: Causes ValueError("Agent 'Bot' cannot register a handoff to itself.")
+bot = Agent(name="Bot", instructions="...")
+# bot.add_handoff(bot)
+```
+
+---
+
+## Boas Práticas
+
+1. **Responsabilidade Única:** Projete cada agente com foco em um domínio específico (ex.: `SalesAgent`, `RefundAgent`, `TechSupportAgent`), em vez de construir um prompt de sistema monolítico com milhares de linhas.
+2. **Instruções Explícitas:** Mantenha as instruções focadas no que o agente *pode* fazer, quais ferramentas ele deve invocar e quando transferir o controle para agentes parceiros.
+3. **Utilize Nomes Descritivos:** Atribua aos agentes nomes claros em PascalCase ou snake_case (`CustomerOnboarding`, `BillingSpecialist`). Esses nomes formam a base das ferramentas sintéticas de handoff que os LLMs utilizam para rotear conversas.

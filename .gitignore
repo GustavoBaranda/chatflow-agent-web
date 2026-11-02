@@ -18,6 +18,7 @@ blob-report/
 .nyc_output/
 .cache/
 .sdk-cache/
+scratch/
 
 # Environment files (Strict security: never commit secrets)
 .env

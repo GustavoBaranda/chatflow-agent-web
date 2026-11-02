@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { routing } from '@/i18n/routing';
+import { Link } from '@/i18n/navigation';
 import { GitHubIcon } from '@/components/ui/icons';
 import {
   Code2,
@@ -11,6 +12,7 @@ import {
   Radio,
   Database,
   ArrowRight,
+  BookOpen,
 } from 'lucide-react';
 import type { Metadata } from 'next';
 
@@ -98,12 +100,14 @@ export default async function AboutPage({
 
         {/* Origin & Purpose Section */}
         <section aria-labelledby="origin-heading" className="mt-16 rounded-2xl border border-border bg-card p-8 sm:p-10 shadow-xs">
-          <h2 id="origin-heading" className="text-2xl font-bold tracking-tight text-foreground">
-            {t('originTitle')}
-          </h2>
-          <div className="mt-4 space-y-4 text-base leading-relaxed text-muted-foreground">
-            <p>{t('originP1')}</p>
-            <p>{t('originP2')}</p>
+          <div className="max-w-3xl">
+            <h2 id="origin-heading" className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              {t('originTitle')}
+            </h2>
+            <div className="mt-4 space-y-4 text-base leading-relaxed text-muted-foreground">
+              <p>{t('originP1')}</p>
+              <p>{t('originP2')}</p>
+            </div>
           </div>
         </section>
 
@@ -211,6 +215,37 @@ export default async function AboutPage({
                 </a>
               </div>
             </article>
+          </div>
+        </section>
+
+        {/* Closing Navigation / Next Steps Section */}
+        <section
+          aria-labelledby="about-closing-heading"
+          className="mt-16 rounded-2xl border border-border bg-gradient-to-b from-card to-card/50 p-8 sm:p-10 shadow-xs text-center"
+        >
+          <div className="max-w-2xl mx-auto">
+            <h2 id="about-closing-heading" className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              {t('closingTitle')}
+            </h2>
+            <p className="mt-3 text-sm sm:text-base leading-relaxed text-muted-foreground">
+              {t('closingSubtitle')}
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+              <Link
+                href="/docs"
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-xs transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                <BookOpen className="h-4 w-4" aria-hidden="true" />
+                <span>{t('closingDocsAction')}</span>
+              </Link>
+              <Link
+                href="/community"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-5 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                <span>{t('closingCommunityAction')}</span>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              </Link>
+            </div>
           </div>
         </section>
       </div>

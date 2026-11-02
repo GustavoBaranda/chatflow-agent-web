@@ -84,6 +84,12 @@ test.describe('Home and Community Navigation Suite', () => {
     await expect(docsCard).toBeVisible();
     const docsLink = docsCard.locator('a[href="/en/docs"]');
     await expect(docsLink).toBeVisible();
+    const quickstartBannerLink = docsCard.locator('a[href="/en/docs/v0.3/getting-started/quickstart"]');
+    await expect(quickstartBannerLink).toBeVisible();
+
+    // Balanced 3x2 External Resource Grid (6 external cards)
+    const externalCards = page.locator('section[aria-labelledby="resources-heading"] article');
+    await expect(externalCards).toHaveCount(6);
 
     // How to Contribute Section (4 steps)
     const contributeHeading = page.locator('h2:has-text("How to Contribute")');

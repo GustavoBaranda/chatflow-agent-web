@@ -50,17 +50,36 @@ test.describe('Navigation, Home, and About Suite', () => {
     const getStartedBtn = page.locator('a[href="#quickstart"]').first();
     await expect(getStartedBtn).toBeVisible();
 
-    const docsBtn = page.locator('a[href="https://github.com/GustavoBaranda/chatflow-agent#readme"]');
+    const docsBtn = page.locator('section[aria-labelledby="hero-title"] a[href="/en/docs"]');
     await expect(docsBtn).toBeVisible();
 
-    // Installation command block
+    // Package manager tabs and command box (pip and uv)
+    const pipTab = page.locator('button:has-text("pip")').first();
+    const uvTab = page.locator('button:has-text("uv")').first();
+    await expect(pipTab).toBeVisible();
+    await expect(uvTab).toBeVisible();
     await expect(page.locator('code:has-text("pip install chatflow-agent")')).toBeVisible();
+
+    await uvTab.click();
+    await expect(page.locator('code:has-text("uv add chatflow-agent")')).toBeVisible();
 
     // Python Code Showcase
     const codeShowcase = page.locator('#quickstart');
     await expect(codeShowcase).toBeVisible();
     await expect(codeShowcase).toContainText('from chatflow_agent import Agent, Runner, SQLiteSessionStore');
     await expect(codeShowcase).toContainText('chatflow-agent v0.3.4');
+
+    // Quickstart deep-link
+    const quickstartLink = codeShowcase.locator('a[href="/en/docs/v0.3/getting-started/quickstart"]');
+    await expect(quickstartLink).toBeVisible();
+
+    // Documentation Discovery Section (3 cards)
+    const docsDiscovery = page.locator('section[aria-labelledby="docs-discovery-title"]');
+    await expect(docsDiscovery).toBeVisible();
+    await expect(docsDiscovery.locator('article')).toHaveCount(3);
+    await expect(docsDiscovery.locator('a[href="/en/docs/v0.3/getting-started/installation"]')).toBeVisible();
+    await expect(docsDiscovery.locator('a[href="/en/docs/v0.3/guides/agents"]')).toBeVisible();
+    await expect(docsDiscovery.locator('a[href="/en/docs/v0.3/integrations/webhook"]')).toBeVisible();
 
     // Features Section (6 verified capabilities)
     const featuresSection = page.locator('section[aria-labelledby="features-title"]');
@@ -72,11 +91,18 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(communityTeaser).toBeVisible();
     await expect(communityTeaser.locator('a[href="/en/about"]')).toBeVisible();
 
-    // Footer
+    // Enriched Multi-column Footer
     const footer = page.locator('footer');
     await expect(footer).toBeVisible();
     await expect(footer).toContainText('chatflow-agent');
     await expect(footer).toContainText('MIT License');
+
+    // Verify creator signature and link
+    const signatureLink = footer.locator('a[href="https://gustavobaranda.com/"]');
+    await expect(signatureLink).toBeVisible();
+    await expect(signatureLink).toContainText('Gustavo Baranda · © 2026');
+    const signatureImg = signatureLink.locator('img[src="/brand/gustavo-baranda.svg"]');
+    await expect(signatureImg).toBeVisible();
   });
 
   test('should navigate to dedicated multilingual About page and verify Creator attribution in English', async ({ page }) => {

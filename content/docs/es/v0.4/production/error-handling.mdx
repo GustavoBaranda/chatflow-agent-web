@@ -1,0 +1,178 @@
+---
+title: "Manejo de Errores y Recuperación"
+description: "Estrategias de tolerancia a fallos en producción para chatflow-agent, jerarquía de excepciones del SDK, autocorrección autónoma de herramientas y reversión transaccional de turnos."
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+Construir sistemas multi-agente robustos requiere tolerancia a fallos estructurada. Caídas de proveedores de LLM, tiempos de espera de red, argumentos inválidos de herramientas y excepciones imprevistas deben manejarse ordenadamente sin corromper el estado de la conversación.
+
+`chatflow-agent` implementa un modelo de recuperación por capas: los errores no fatales de herramientas se retroalimentan al LLM para autocorrección autónoma, mientras que las fallas fatales del turno activan reversiones atómicas de estado (*rollbacks*).
+
+## Jerarquía de Excepciones del SDK
+
+Todas las excepciones en `chatflow-agent` heredan de `ChatFlowError`. Esto permite a tu aplicación distinguir entre errores propios del framework y excepciones generales de Python.
+
+```text
+ChatFlowError (Base)
+├── DependencyError (Dependencias opcionales de extras ausentes)
+├── ToolExecutionError (Error no capturado durante la ejecución de una herramienta)
+├── ToolSchemaError (Anotación de tipo de parámetro inválida) [v0.4.0rc1]
+├── AgentHandoffError (Destino de transferencia desconocido o bucle)
+├── ProviderError (Error de estado HTTP de API de LLM, fallo de red o tiempo de espera)
+├── ReentrantTurnError (Invocación concurrente sobre una sesión bloqueada) [v0.4.0rc1]
+└── SessionDeletedError (Mensaje despachado a una sesión eliminada) [v0.4.0rc1]
+```
+
+### Tabla de Referencia de Excepciones
+
+| Clase de Excepción | Hereda de | Lanzada Cuando | Estrategia de Recuperación |
+| :--- | :--- | :--- | :--- |
+| `ChatFlowError` | `Exception` | Clase base para todas las excepciones del SDK. | Capturar en las fronteras de petición de nivel superior. |
+| `DependencyError` | `ChatFlowError` | Falta instalar un extra opcional de canal (ej. `[telegram]`, `[whatsapp]`). | Instalar el extra requerido vía `pip install "chatflow-agent[extra]"`. |
+| `ToolExecutionError` | `ChatFlowError` | Una función de herramienta lanza una excepción no capturada durante la ejecución. | Se encapsula en `ToolResult(is_error=True)` para que el agente se autoccorrija. |
+| `ToolSchemaError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Los argumentos de la función carecen de anotaciones de tipos de Python válidas. | Corregir las firmas de tipos de la función en tiempo de desarrollo. |
+| `AgentHandoffError` | `ChatFlowError` | El agente destino no existe en el registro del `Runner` o el turno supera `max_handoffs_per_turn`. | Verificar los destinos de transferencia y comprobar condiciones de bucles. |
+| `ProviderError` | `ChatFlowError` | El proveedor de modelos retorna un código de error HTTP (ej. 429, 500, 503). | Implementar retroceso exponencial o alternar a un motor de respaldo. |
+| `ReentrantTurnError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError`, `RuntimeError` | Código ejecutado dentro de un turno inicia otro turno para la misma sesión. | Utilizar colas de trabajo en segundo plano o despachadores de seguimiento. |
+| `SessionDeletedError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Se procesa un mensaje para una sesión que fue eliminada durante la ejecución. | Recrear la sesión o notificar al usuario para reiniciar el flujo. |
+
+## Autocorrección Autónoma de Herramientas
+
+Cuando una herramienta registrada lanza una excepción o recibe argumentos que no superan la validación de esquema, `Runner` captura la falla y retorna un error estructurado al modelo en lugar de abortar el turno:
+
+```python
+import logging
+from chatflow_agent import Agent, Runner, tool
+
+logger = logging.getLogger("app.tools")
+
+@tool
+def process_refund(order_id: str, amount: float) -> str:
+    """Issue a refund for an order.
+
+    Args:
+        order_id: Order identifier formatted as ORD-XXXX.
+        amount: Positive monetary value to refund.
+    """
+    if not order_id.startswith("ORD-"):
+        raise ValueError("Invalid order format. Order ID must begin with 'ORD-'.")
+    if amount <= 0:
+        raise ValueError("Refund amount must be strictly greater than 0.")
+    return f"Refund of ${amount:.2f} processed for order {order_id}."
+
+agent = Agent(
+    name="RefundBot",
+    model="gpt-4o",
+    tools=[process_refund],
+    instructions="Process refunds accurately. If an order ID format is invalid, clarify with the user.",
+)
+
+runner = Runner(starting_agent=agent)
+```
+
+### Qué Sucede Durante la Ejecución
+
+1. El modelo invoca `process_refund(order_id="12345", amount=50.0)`.
+2. `process_refund` lanza `ValueError: Invalid order format. Order ID must begin with 'ORD-'.`.
+3. `Runner` asigna un `trace_id` único (UUID4) y añade un `ToolResult`:
+   ```json
+   {
+     "tool_call_id": "call_abc123",
+     "name": "process_refund",
+     "content": "Tool execution failed [trace_id: a8c2...]. Invalid order format. Order ID must begin with 'ORD-'.",
+     "is_error": true
+   }
+   ```
+4. El modelo recibe `is_error=True` en la siguiente iteración e informa al usuario: *"Al identificador de orden '12345' le falta el prefijo 'ORD-'. ¿Podrías confirmar el número completo de orden?"*
+
+<Callout type="info" title="Protección de Límite de Bucles">
+Para evitar bucles infinitos de reintento donde un agente falla repetidamente una llamada a herramienta, `Runner` aplica `max_tool_iterations` (por defecto: `10`). Si se alcanza el límite sin una respuesta final de texto, el runner retorna un mensaje de respaldo controlado sin colgarse.
+</Callout>
+
+## Reversión Transaccional de Turnos (Checkpoint Rollback)
+
+Los turnos multi-agente modifican con frecuencia el historial de conversación, delegan a especialistas y actualizan metadatos de sesión. Si ocurre un fallo irrecuperable a mitad del turno (como una desconexión de red o un límite de tasa del proveedor), dejar la sesión a medio ejecutar corrompería las interacciones posteriores.
+
+`Runner` garantiza semánticas de **reversión por punto de control (checkpoint rollback)**:
+
+```text
+Inicio del Turno
+    ├── Capturar Checkpoint: (history, active_agent, metadata)
+    ├── Agregar Mensaje Entrante del Usuario
+    ├── Ejecutar Turnos de LLM y Herramientas
+    │     ├── Éxito: Confirmar respuesta final del asistente en SessionStore
+    │     └── Fallo / CancelledError: Restaurar (history, active_agent, metadata)
+    └── Liberar Bloqueo de Sesión
+```
+
+### Ejemplo de Reversión en Código
+
+```python
+import asyncio
+from chatflow_agent import Agent, Runner
+from chatflow_agent.exceptions import ProviderError
+
+def build_resilient_runner(agent: Agent) -> Runner:
+    """Configure a runner with bounded handoffs and tool iterations."""
+    return Runner(
+        starting_agent=agent,
+        max_tool_iterations=6,
+        max_handoffs_per_turn=3,
+    )
+
+async def execute_turn_with_recovery(
+    runner: Runner,
+    session_id: str,
+    user_message: str,
+) -> str:
+    """Execute a turn with explicit exception handling and graceful fallback."""
+    try:
+        response = await runner.run_async(
+            session_id=session_id,
+            user_message=user_message,
+        )
+        return response.content
+    except ProviderError as err:
+        # El estado fue revertido automáticamente al estado previo al turno
+        return "Our AI inference service is temporarily degraded. Please retry in a few moments."
+    except TimeoutError:
+        # Límite de tiempo del turno superado; checkpoint restaurado
+        return "The request took too long to complete. Please try a simpler question."
+    except Exception as err:
+        return "An unexpected system error occurred. Our operations team has been notified."
+```
+
+## Tiempos Límite de Turno y Fronteras de Recursos
+
+<VersionBadge version="0.4.0rc1" status="prerelease" />
+
+A partir de `v0.4.0rc1`, `run_async` admite un parámetro explícito `turn_timeout` (en segundos). A diferencia de los tiempos límite genéricos de petición, `turn_timeout` comienza a contabilizarse únicamente **después** de que la llamada adquiere el bloqueo de sesión, garantizando que los turnos en cola no expiren prematuramente mientras esperan a turnos anteriores:
+
+```python
+# [min-version: 0.4.0rc1]
+# [no-exec: illustrative turn timeout call]
+# Limita la ejecución del turno a 45 segundos una vez adquirido el bloqueo
+response = await runner.run_async(
+    session_id="customer-1029",
+    user_message="Analyze this quarterly financial audit report...",
+    turn_timeout=45.0,
+)
+```
+
+Si `turn_timeout` expira:
+1. Todas las tareas asíncronas secundarias en ejecución se cancelan de inmediato.
+2. Las ejecuciones síncronas de herramientas se esperan en hilos de trabajo para evitar interbloqueos en SQLite.
+3. El historial y metadatos de la conversación se revierten al punto de control previo al turno.
+4. Se lanza `asyncio.TimeoutError` hacia el llamador.
+
+## Lista de Buenas Prácticas
+
+- **Capturar `ChatFlowError`:** Intercepta las excepciones del framework antes de propagarlas a los manejadores HTTP.
+- **Configurar Iteraciones Acotadas:** Nunca configures `max_tool_iterations` o `max_handoffs_per_turn` en valores ilimitados.
+- **Retornar Errores Descriptivos en Herramientas:** Lanza mensajes descriptivos en `ValueError` o `KeyError` dentro de las herramientas para que el agente pueda interpretar el error y autocorregirse.
+- **Registrar IDs de Correlación:** Captura el `trace_id` generado en los registros de `Runner` para correlacionar reportes de clientes con trazas internas.

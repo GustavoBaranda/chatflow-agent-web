@@ -1,23 +1,66 @@
 ---
 title: "Visão Geral da Documentação"
-description: "Documentação oficial do chatflow-agent: um framework reativo de IA conversacional em Python."
-sourceRevision: "7f6e5f9"
-sourceHash: "797cc6c572afc1d29d65d98879451f316d816cc2ea2bdfdfdf52e8934fcb4d6a"
+description: "Documentação oficial estável do chatflow-agent v0.3.4: um framework leve e assíncrono para múltiplos agentes com handoffs nativos em Python."
 ---
 
-Bem-vindo à documentação oficial do **chatflow-agent**, um framework leve e reativo em Python desenvolvido para criar agentes de IA conversacionais robustos e com controle de estado.
+import { VersionBadge } from '@/components/docs/VersionBadge';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { Callout } from 'fumadocs-ui/components/callout';
 
-## Recursos Principais
+<Callout type="info" title="Linha de Versão Estável (v0.3.4)">
+Você está visualizando a documentação oficial estável do <strong>chatflow-agent v0.3.4</strong>, recomendada para implantações em produção.
+</Callout>
 
-- **Máquina de Estados Reativa**: Gerencie diálogos complexos de múltiplos turnos com transições de estado limpas.
-- **Validação Estrita de Esquemas**: Tratamento fortemente tipado de cargas úteis e ações com tipagem padrão.
-- **Arquitetura Plugável**: Integre ferramentas customizadas, provedores de LLM e armazenamento de memória com facilidade.
-- **Pronto para Produção**: Projetado para implementações de baixa latência em nuvem e borda.
+Bem-vindo à documentação oficial do **chatflow-agent**, um framework assíncrono e leve em Python projetado para construir agentes conversacionais modulares e enxames multiagente com transferências (*handoffs*) nativas e fortemente tipadas.
 
-## Instalação Rápida
+Criado e liderado por **Gustavo Baranda** junto a uma comunidade internacional de código aberto, o `chatflow-agent` foi concebido para eliminar o excesso de complexidade de frameworks monolíticos e a dependência de fornecedores (*vendor lock-in*), oferecendo concorrência de nível empresarial, memória resiliente e conectividade multicanal.
+
+---
+
+## Destaques da Arquitetura
+
+<Cards>
+  <Card title="Zero Bloqueio de SDKs (Vendor Lock-In)">
+    Conecta-se a modelos LLM através de REST HTTP assíncrono puro usando `httpx`. Sem necessidade de SDKs pesados ou dependências desnecessárias em tempo de execução.
+  </Card>
+  <Card title="Handoffs Multiagente Nativos">
+    Declare enxames colaborativos. Os agentes delegam tarefas dinamicamente usando ferramentas sintetizadas `transfer_to_*` com prevenção automática de ciclos.
+  </Card>
+  <Card title="Memória Transacional e Resiliente">
+    Cada turno realiza uma captura atômica de estado. Em caso de erro ou estouro de tempo limite, o estado é revertido automaticamente. As operações SQLite rodam em pools de threads dedicados.
+  </Card>
+  <Card title="Pronto para Múltiplos Canais">
+    Implante seus agentes facilmente em terminais REPL, bots do Telegram ou na API do WhatsApp Business Cloud com verificação de assinatura HMAC SHA-256.
+  </Card>
+</Cards>
+
+---
+
+## Estratégia de Lançamentos e Versionamento
+
+O `chatflow-agent` segue rigorosamente o Versionamento Semântico (SemVer). A documentação é organizada por faixas de versão:
+
+* <VersionBadge version="0.3.4" status="stable" /> **Versão Estável Atual (Padrão):** Recomendada para todas as implantações em produção. Publicada no PyPI em 23 de outubro de 2026.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Versão Candidata 1 (Pré-lançamento):** Disponível no PyPI para testes de novos aprimoramentos arquiteturais, incluindo execução nativa do Gemini via REST e validação de nomes duplicados em enxames.
 
 ```bash
+# Instalar a versão estável atual (padrão)
 pip install chatflow-agent
+
+# Instalar a versão candidata de pré-lançamento
+pip install "chatflow-agent==0.4.0rc1"
 ```
 
-> **Nota**: O lançamento estável atual é `v0.3.4`. A versão candidata `v0.4.0rc1` está disponível para testes de novos recursos.
+<Callout type="info" title="Documentação Orientada à Versão Estável">
+Todos os trechos de código e assinaturas de API nesta documentação correspondem por padrão à versão estável <code>v0.3.4</code>. Aprimoramentos ou mudanças disruptivas introduzidas na versão <code>v0.4.0rc1</code> são explicitamente destacados com a insígnia <VersionBadge version="0.4.0rc1" status="prerelease" />.
+</Callout>
+
+---
+
+## Trilha de Primeiros Passos
+
+Siga nosso guia passo a passo estruturado para ir da instalação a um agente rodando em produção em poucos minutos:
+
+1. **[Instalação](/pt-BR/docs/v0.3/getting-started/installation):** Verifique seu ambiente Python (`>=3.10`), instale os pacotes principais e configure dependências extras opcionais para canais.
+2. **[Início Rápido](/pt-BR/docs/v0.3/getting-started/quickstart):** Construa seu primeiro agente em menos de 5 minutos, registre ferramentas com `@tool` e explore a execução assíncrona.
+3. **[Conceitos Fundamentais](/pt-BR/docs/v0.3/getting-started/core-concepts):** Conheça os pilares da arquitetura: `Agent`, `Runner`, `Engines`, `Tools`, `Memory` e `Handoffs`.

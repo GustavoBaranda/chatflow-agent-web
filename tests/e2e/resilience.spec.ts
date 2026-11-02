@@ -133,5 +133,16 @@ test.describe('Resilience, Error Boundaries & Maintenance Suite', () => {
     expect(content).not.toMatch(/<link[^>]+rel=["']stylesheet["'][^>]+href=["']https?:\/\//);
     expect(content).not.toMatch(/<script[^>]+src=["']https?:\/\//);
   });
+
+  test('should deliver HTTP security headers and CSP on public responses', async ({ request }) => {
+    const res = await request.get('/en');
+    expect(res.status()).toBe(200);
+    const headers = res.headers();
+    expect(headers['x-content-type-options']).toBe('nosniff');
+    expect(headers['x-frame-options']).toBe('SAMEORIGIN');
+    expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
+    expect(headers['permissions-policy']).toContain('camera=()');
+    expect(headers['content-security-policy']).toContain("default-src 'self'");
+  });
 });
 

@@ -110,14 +110,6 @@ export default async function CommunityPage({
       isExternal: true,
       icon: Package,
     },
-    {
-      title: t('docsCardTitle'),
-      description: t('docsCardDesc'),
-      action: t('docsCardAction'),
-      href: '/docs',
-      isExternal: false,
-      icon: BookOpen,
-    },
   ];
 
   const steps = [
@@ -160,8 +152,51 @@ export default async function CommunityPage({
           </p>
         </header>
 
-        {/* Community Resource Cards */}
-        <section aria-labelledby="resources-heading" className="mt-16">
+        {/* Featured Documentation Hub Banner */}
+        <section aria-labelledby="featured-docs-heading" className="mt-12">
+          <article
+            aria-labelledby="featured-docs-heading"
+            className="rounded-2xl border border-primary/30 bg-gradient-to-br from-card via-card to-primary/5 p-6 sm:p-8 shadow-xs"
+          >
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+              <div className="max-w-2xl">
+                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>{t('featuredDocsBadge')}</span>
+                  <span className="text-primary/60">•</span>
+                  <span>{t('docsCardTitle')}</span>
+                </div>
+                <h2
+                  id="featured-docs-heading"
+                  className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl"
+                >
+                  {t('featuredDocsTitle')}
+                </h2>
+                <p className="mt-2 text-sm sm:text-base leading-relaxed text-muted-foreground">
+                  {t('featuredDocsDesc')}
+                </p>
+              </div>
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0">
+                <Link
+                  href="/docs"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-xs transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  <span>{t('featuredDocsAction')}</span>
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+                <Link
+                  href="/docs/v0.3/getting-started/quickstart"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  <span>{t('featuredDocsQuickstart')}</span>
+                </Link>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        {/* Community Resource Cards (3x2 Grid) */}
+        <section aria-labelledby="resources-heading" className="mt-10">
           <h2 id="resources-heading" className="sr-only">
             {t('badge')}
           </h2>
@@ -226,14 +261,20 @@ export default async function CommunityPage({
           <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {steps.map((step, idx) => {
               const StepIcon = step.icon;
+              const stepNumber = String(idx + 1).padStart(2, '0');
               return (
                 <div
                   key={idx}
-                  className="rounded-xl border border-border bg-card p-6 shadow-xs flex flex-col justify-between"
+                  className="rounded-xl border border-border bg-card p-6 shadow-xs flex flex-col justify-between transition-shadow hover:shadow-xs"
                 >
                   <div>
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-foreground">
-                      <StepIcon className="h-5 w-5" aria-hidden="true" />
+                    <div className="flex items-center justify-between">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <StepIcon className="h-5 w-5" aria-hidden="true" />
+                      </div>
+                      <span className="font-mono text-xs font-bold text-muted-foreground/60 select-none">
+                        {stepNumber}
+                      </span>
                     </div>
                     <h3 className="mt-4 text-base font-bold text-foreground">
                       {step.title}

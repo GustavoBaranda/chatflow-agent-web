@@ -9,7 +9,7 @@ const nextConfig = {
   reactStrictMode: true,
   agentRules: false,
   experimental: {
-    cpus: 2,
+    cpus: 1,
   },
   webpack: (config) => {
     // Disable Webpack filesystem cache to prevent Windows EPERM mkdir file-lock races in sandbox

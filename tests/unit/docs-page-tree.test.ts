@@ -15,7 +15,7 @@ describe('Version-Aware Page Tree & Locale Fallback Suite', () => {
 
         // Find subfolders or pages in children
         const names = tree.children.map((c) => (typeof c.name === 'string' ? c.name : ''));
-        if (track === 'v0.3' && locale === 'es') {
+        if (locale === 'es') {
           expect(names).toContain('Primeros Pasos');
           expect(names).toContain('Arquitectura Central');
           expect(names).toContain('Proveedores de LLM');

@@ -66,13 +66,19 @@ describe('Documentation Engine & Source Loader', () => {
     expect(v04Tree.children.length).toBeGreaterThan(0);
   });
 
-  it('should return undefined for non-existent pages', () => {
+  it('should return undefined for non-existent pages and handle locale fallback correctly', () => {
     const page = source.getPage(['v0.3', 'non-existent-slug-test'], 'en');
     expect(page).toBeUndefined();
 
-    const fallbackRes = resolveDocPage(['v0.4', 'guides', 'agents'], 'es');
+    // Portuguese v0.4 is untranslated and falls back to authoritative English
+    const fallbackRes = resolveDocPage(['v0.4', 'guides', 'agents'], 'pt-BR');
     expect(fallbackRes.isFallback).toBe(true);
     expect(fallbackRes.page).toBeDefined();
+
+    // Spanish v0.4 is genuinely translated
+    const translatedV04Res = resolveDocPage(['v0.4', 'guides', 'agents'], 'es');
+    expect(translatedV04Res.isFallback).toBe(false);
+    expect(translatedV04Res.page).toBeDefined();
 
     const translatedRes = resolveDocPage(['v0.3'], 'es');
     expect(translatedRes.isFallback).toBe(false);

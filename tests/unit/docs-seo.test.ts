@@ -47,9 +47,9 @@ describe('Centralized Documentation SEO Policy', () => {
       }
     });
 
-    it('rejects English fallback pages from masquerading as translated Spanish or Portuguese in v0.4', () => {
+    it('identifies genuine Spanish translations in v0.4 while rejecting Portuguese fallback', () => {
+      expect(isGenuineTranslation(DEFAULT_PRERELEASE_TRACK, ['guides', 'agents'], 'es')).toBe(true);
       expect(isGenuineTranslation(DEFAULT_PRERELEASE_TRACK, ['guides', 'agents'], 'pt-BR')).toBe(false);
-      expect(isGenuineTranslation(DEFAULT_PRERELEASE_TRACK, ['guides', 'agents'], 'es')).toBe(false);
     });
 
     it('returns false for nonexistent topics or invalid locales', () => {
@@ -80,7 +80,7 @@ describe('Centralized Documentation SEO Policy', () => {
       expect(seo.languages['pt-BR']).toBe('https://chatflowagent.org/pt-BR/docs/v0.3/guides/agents');
     });
 
-    it('omits untranslated locales from hreflang alternates in v0.4', () => {
+    it('includes genuine Spanish alternate while omitting untranslated Portuguese from hreflang in v0.4', () => {
       const seo = resolveDocSeo({
         track: DEFAULT_PRERELEASE_TRACK,
         cleanSlug: ['guides', 'agents'],
@@ -90,7 +90,7 @@ describe('Centralized Documentation SEO Policy', () => {
       });
 
       expect(seo.languages['en']).toBe('https://chatflowagent.org/en/docs/v0.4/guides/agents');
-      expect(seo.languages['es']).toBeUndefined();
+      expect(seo.languages['es']).toBe('https://chatflowagent.org/es/docs/v0.4/guides/agents');
       expect(seo.languages['pt-BR']).toBeUndefined();
     });
 

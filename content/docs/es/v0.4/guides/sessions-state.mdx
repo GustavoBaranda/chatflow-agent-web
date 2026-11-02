@@ -1,0 +1,238 @@
+---
+title: "Sesiones y Estado de Conversación"
+description: "Guía completa de memoria de sesión, poda de turnos por ventana deslizante, persistencia en memoria y SQLite, y deduplicación de mensajes en chatflow-agent."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+En sistemas multi-agente conversacionales, la gestión del estado abarca mucho más que un simple registro de mensajes. Una sesión debe rastrear el agente activo en cada momento, sincronizar turnos concurrentes, podar el historial sin separar pares de llamadas y respuestas a herramientas, y persistir el contexto de forma fiable entre reinicios del servicio.
+
+**chatflow-agent** desacopla la memoria y el estado de la definición de `Agent`, delegándolos en `SessionContext` y `SessionStore`.
+
+---
+
+## La Arquitectura de `SessionContext`
+
+Cada sesión conversacional se encuentra encapsulada en un objeto `SessionContext`:
+
+```python
+from chatflow_agent import Agent
+from chatflow_agent.core.memory import SessionContext
+
+agent = Agent(name="Assistant", instructions="Helpful bot", model="gpt-4o")
+
+session = SessionContext(
+    session_id="user-session-1001",
+    initial_agent=agent,
+    max_turns=40,
+    metadata={"user_id": "cust_882", "channel": "whatsapp"},
+)
+
+assert session.active_agent.name == "Assistant"
+assert session.metadata["channel"] == "whatsapp"
+```
+
+### Propiedades y Métodos Principales
+
+| Propiedad / Método | Descripción |
+| :--- | :--- |
+| `session_id` | Cadena única que identifica la sesión de diálogo a través de canales y bases de datos. |
+| `active_agent` | Puntero a la instancia actual de `Agent` encargada de gestionar la conversación. |
+| `max_turns` | Número máximo de turnos conversacionales completos retenidos en memoria antes de la poda. |
+| `history` | Lista de objetos tipados `Message` (`Role.SYSTEM`, `Role.USER`, `Role.MODEL`, `Role.TOOL`). |
+| `metadata` | Diccionario libre para contexto de usuario, tokens de autenticación, cabeceras y feature flags. |
+| `lock` | Instancia asíncrona de `asyncio.Lock` que serializa el procesamiento de mensajes por sesión. |
+| `rollback_to(len)` | Trunca atómicamente el historial a un punto de control previo en caso de fallo. |
+
+---
+
+## Poda de Turnos por Ventana Deslizante
+
+El truncamiento ingenuo de historiales (como conservar los últimos $N$ mensajes individuales) es una causa recurrente de fallos en llamadas a APIs de LLMs. Cortar mensajes en bruto puede:
+1. Desvincular un resultado `Role.TOOL` de su llamada a herramienta `Role.MODEL` original, provocando errores de validación en el proveedor.
+2. Descartar los prompts del sistema situados al comienzo del historial.
+3. Iniciar un prompt con un mensaje de asistente o herramienta en lugar de un turno del usuario.
+
+### El Algoritmo de Poda por Turnos Completos
+`chatflow-agent` implementa un robusto **algoritmo de agrupación por turnos** en `session._prune_history()`:
+
+1. **Preservación del Prompt del Sistema:** Todos los mensajes `Role.SYSTEM` se segregan y conservan permanentemente al inicio del contexto.
+2. **Agrupación de Turnos:** Los mensajes que no pertenecen al sistema se estructuran en turnos conversacionales discretos. Cada turno comienza estrictamente con un mensaje `Role.USER` y abarca todos los pensamientos posteriores del modelo, llamadas a herramientas y respuestas de las mismas.
+3. **Ventana de Turnos:** Solo se conservan los `max_turns` turnos completos más recientes.
+4. **Garantía de Fronteras Limpias:** Los turnos más antiguos se descartan hacia adelante hasta alcanzar el siguiente mensaje `Role.USER`. Esto garantiza que los pares de llamada y resultado de herramientas nunca queden divididos.
+
+---
+
+## Backends de Almacenamiento de Sesiones
+
+`chatflow-agent` incluye dos backends de almacenamiento integrados que heredan de `BaseSessionStore`:
+
+### 1. Almacenamiento en Memoria (`SessionStore`)
+Un backend basado en diccionarios en memoria rápido y thread-safe. Óptimo para pruebas unitarias, utilidades CLI y microservicios sin estado donde el ciclo de vida de la sesión es breve:
+
+```python
+from chatflow_agent import Agent, Runner, SessionStore
+
+store = SessionStore(default_max_turns=40)
+agent = Agent(name="Bot", instructions="Assistant", model="gpt-4o")
+runner = Runner(starting_agent=agent, session_store=store)
+
+# Las sesiones se crean bajo demanda
+session = store.get_or_create(session_id="session-alpha", default_agent=agent)
+assert session.session_id == "session-alpha"
+```
+
+### 2. Almacenamiento Persistente en SQLite (`SQLiteSessionStore`)
+Un almacenamiento respaldado en archivos locales sin dependencias externas que mantiene el historial entre reinicios de la aplicación:
+
+```python
+from chatflow_agent import SQLiteSessionStore
+
+# Almacenamiento persistente en base de datos local SQLite
+sqlite_store = SQLiteSessionStore(
+    db_path="conversations.db",
+    default_max_turns=40,
+)
+```
+
+<Callout type="info" title="Parámetros Exactos de SQLiteSessionStore">
+<code>SQLiteSessionStore</code> acepta <code>db_path</code> y <code>default_max_turns</code>. No admite parámetros como <code>busy_timeout</code>; la concurrencia de conexiones y el modo de diario WAL son administrados internamente por el framework.
+</Callout>
+
+### Esquema Relacional de la Base de Datos
+Al inicializarse, `SQLiteSessionStore` crea e indexa automáticamente tres tablas relacionales:
+
+* `chatflow_sessions`: Almacena `session_id`, `active_agent_name`, `metadata_json` y marcas temporales.
+* `chatflow_messages`: Almacena mensajes serializados en JSON con eliminación en cascada por clave foránea (`ON DELETE CASCADE`).
+* `chatflow_processed_messages`: Registra identificadores de mensajes procesados y marcas de tiempo para garantizar deduplicación idempotente en webhooks.
+
+---
+
+## El Patrón de Resolución de Agentes (Agent Resolver)
+
+Al cargar una sesión desde SQLite tras reiniciar la aplicación, la base de datos únicamente almacena el nombre del agente (`active_agent_name: "BillingSpecialist"`).
+
+Para revincular la sesión persistida a la instancia real de `Agent` en Python (con sus herramientas, motores y handoffs), el `Runner` registra automáticamente un **resolvedor de agentes**:
+
+```python
+from chatflow_agent import Agent, Runner, SQLiteSessionStore
+
+billing = Agent(name="Billing", instructions="Billing specialist", model="gpt-4o")
+support = Agent(name="Support", instructions="Support", handoffs=[billing], model="gpt-4o")
+
+store = SQLiteSessionStore(db_path="agents.db")
+
+# El Runner vincula automáticamente su resolvedor del registro interno
+runner = Runner(starting_agent=support, session_store=store)
+
+# Si se cargan sesiones de forma independiente fuera del Runner:
+store.set_agent_resolver(lambda name: billing if name == "Billing" else support)
+session = store.get("session-101")
+assert session.active_agent.name in ["Billing", "Support"]
+```
+
+---
+
+## Deduplicación de Mensajes para Webhooks
+
+Las plataformas de mensajería (como la API Cloud de WhatsApp y los Webhooks de Telegram) reenvían con frecuencia webhooks de mensajes entrantes si el endpoint no responde con un código de confirmación dentro de un plazo estricto.
+
+`chatflow-agent` incorpora un mecanismo nativo de deduplicación:
+
+```python
+from chatflow_agent.core.memory import DEFAULT_DEDUP_TTL_HOURS, SessionStore
+
+# El TTL predeterminado es de 192 horas (8 días), superando la ventana de reintento de 7 días de WhatsApp
+assert DEFAULT_DEDUP_TTL_HOURS == 192
+
+store = SessionStore()
+
+msg_id = "wamid.HBgLMjAyNjEwMzAA"
+if not store.is_message_processed(msg_id):
+    store.mark_message_processed(msg_id)
+    # Procesar el turno de forma segura sin ejecuciones duplicadas
+```
+
+---
+
+## Diferencias de Versión y Funciones Preliminares
+
+La gestión de sesiones introduce optimizaciones avanzadas de concurrencia en versiones recientes:
+
+### Versión Estable (`v0.3.4`)
+* <VersionBadge version="0.3.4" status="stable" /> `SessionContext` con poda por agrupación de turnos y reversión atómica.
+* `SessionStore` en memoria y persistente con `SQLiteSessionStore`.
+* TTL de deduplicación de mensajes de 8 días (`DEFAULT_DEDUP_TTL_HOURS = 192`).
+
+### Mejoras de la Versión Preliminar (`v0.4.0rc1`)
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Grupo Dedicado de Hilos para E/S Bloqueante:** Para bases de datos en archivo de `SQLiteSessionStore`, las lecturas y escrituras en disco se delegan a un pool privado de 4 hilos (`_BLOCKING_IO_WORKERS = 4`) vía `_run_blocking`. Esto previene que la latencia del disco o bloqueos de archivos congelen el bucle de eventos asíncrono.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`SessionDeletedError`:** Si una tarea en ejecución intenta confirmar o leer datos de una sesión eliminada mediante `store.delete(session_id)`, `chatflow-agent` lanza un error explícito `SessionDeletedError`.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Validación Estricta de Parámetros:** Pasar `max_turns <= 0` o `default_max_turns <= 0` genera inmediatamente un `ValueError`.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Detección de SQLite Efímero:** El almacenamiento detecta automáticamente URIs `:memory:` y en memoria compartida, manteniéndolas directamente en el bucle de eventos para maximizar el rendimiento sin sobrecarga de hilos.
+
+---
+
+## Ejemplo Completo: Sesión Persistente de Webhook
+
+```python
+# [min-version: 0.4.0rc1]
+# [no-exec: illustrative async webhook handler]
+import asyncio
+from chatflow_agent import Agent, Runner, SQLiteSessionStore, tool
+
+@tool
+def check_order_status(order_id: str) -> dict:
+    """Check shipment tracking for an order ID."""
+    return {"order_id": order_id, "status": "IN_TRANSIT", "eta": "Tomorrow"}
+
+agent = Agent(
+    name="OrderTrackingAgent",
+    instructions="Assist customers with order queries. Use check_order_status.",
+    tools=[check_order_status],
+    model="gemini-2.5-flash",
+)
+
+store = SQLiteSessionStore(db_path=":memory:", default_max_turns=30)
+runner = Runner(starting_agent=agent, session_store=store)
+
+async def handle_inbound_webhook(user_phone: str, message_text: str, webhook_msg_id: str):
+    # 1. Protección contra duplicados
+    if store.is_message_processed(webhook_msg_id):
+        print(f"Skipping duplicate webhook: {webhook_msg_id}")
+        return None
+
+    store.mark_message_processed(webhook_msg_id)
+
+    # 2. Ejecutar turno con sesión persistente
+    response = await runner.run_async(
+        session_id=user_phone,
+        user_message=message_text,
+        metadata={"channel": "whatsapp", "phone": user_phone},
+    )
+    return response.content
+
+# Ejecutar turno de prueba
+res = asyncio.run(handle_inbound_webhook("+15550199", "Where is order 404?", "msg_id_001"))
+print("Webhook Response:", res)
+```
+
+---
+
+## Errores Comunes y Buenas Prácticas
+
+### 1. Pasar Argumentos No Soportados a `SQLiteSessionStore`
+```python
+# [INCORRECTO]: "busy_timeout" no es un parámetro aceptado
+# store = SQLiteSessionStore(db_path="app.db", busy_timeout=5000)  # TypeError!
+
+# [CORRECTO]: Pasa exclusivamente db_path y default_max_turns
+store = SQLiteSessionStore(db_path="app.db", default_max_turns=50)
+```
+
+### 2. Recortar el Historial de la Conversación Manualmente
+No elimines elementos de `session.history` de forma manual. Hacerlo puede romper la alternancia entre mensajes de usuario y modelo, o desvincular llamadas y respuestas a herramientas. Confía siempre en `session._prune_history()` o `session.rollback_to()`.
+
+### 3. Olvidar el Resolvedor de Agentes al Reconectar
+Al cargar una sesión persistida desde una base de datos SQLite en disco, asegúrate siempre de que el `Runner` esté inicializado o invoca `store.set_agent_resolver()`. De lo contrario, la sesión instanciará un agente de reserva sin tus herramientas de dominio.

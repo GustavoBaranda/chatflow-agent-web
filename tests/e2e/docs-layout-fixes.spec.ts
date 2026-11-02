@@ -41,12 +41,18 @@ test.describe('Phase 6F.1 Documentation Layout and Navigation Fixes Suite', () =
     const translationNotice = page.locator('aside[role="alert"]');
     await expect(translationNotice).toHaveCount(0);
 
-    // 6. Verify fallback notice is displayed when visiting an untranslated locale (e.g. Portuguese)
+    // 6. Genuine Portuguese documentation on v0.3 must NOT display translation fallback banner
     await page.goto('/pt-BR/docs/v0.3/getting-started/installation');
     await page.waitForLoadState('networkidle');
-    const ptNotice = page.locator('aside[role="alert"]');
-    await expect(ptNotice).toBeVisible();
-    await expect(ptNotice).toContainText('Portuguese');
+    const ptV03Notice = page.locator('aside[role="alert"]');
+    await expect(ptV03Notice).toHaveCount(0);
+
+    // 7. Verify fallback notice is displayed when visiting an untranslated track (e.g. Portuguese on v0.4)
+    await page.goto('/pt-BR/docs/v0.4/getting-started/installation');
+    await page.waitForLoadState('networkidle');
+    const ptV04Notice = page.locator('aside[role="alert"]');
+    await expect(ptV04Notice).toBeVisible();
+    await expect(ptV04Notice).toContainText('Portuguese');
   });
 
   test('should preserve version and topic when switching language from es to en', async ({ page }) => {

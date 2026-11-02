@@ -21,6 +21,12 @@ describe('Version-Aware Page Tree & Locale Fallback Suite', () => {
           expect(names).toContain('Proveedores de LLM');
           expect(names).toContain('Canales e Integraciones');
           expect(names).toContain('Patrones de Producción');
+        } else if (track === 'v0.3' && locale === 'pt-BR') {
+          expect(names).toContain('Primeiros Passos');
+          expect(names).toContain('Arquitetura Central');
+          expect(names).toContain('Provedores de LLM');
+          expect(names).toContain('Canais e Integrações');
+          expect(names).toContain('Padrões de Produção');
         } else {
           expect(names).toContain('Getting Started');
           expect(names).toContain('Core Architecture');
@@ -54,6 +60,15 @@ describe('Version-Aware Page Tree & Locale Fallback Suite', () => {
     expect(overviewPage).toBeDefined();
     expect(overviewPage?.name).toBe('Visión General de la Documentación');
     expect(overviewPage?.url).toBe('/es/docs/v0.3');
+  });
+
+  it('preserves Portuguese localized overview title while including fallback topics', () => {
+    const ptTree = getVersionPageTree('v0.3', 'pt-BR');
+    const overviewPage = ptTree.children.find((c) => c.type === 'page');
+
+    expect(overviewPage).toBeDefined();
+    expect(overviewPage?.name).toBe('Visão Geral da Documentação');
+    expect(overviewPage?.url).toBe('/pt-BR/docs/v0.3');
   });
 
   it('unversioned page tree strips track prefix while preserving all categories and topics', () => {

@@ -40,9 +40,15 @@ describe('Centralized Documentation SEO Policy', () => {
       }
     });
 
-    it('rejects English fallback pages from masquerading as translated Spanish or Portuguese', () => {
-      // Untranslated guides/agents page in pt-BR (v0.3) or es (v0.4) is served via English fallback
-      expect(isGenuineTranslation(DEFAULT_STABLE_TRACK, ['guides', 'agents'], 'pt-BR')).toBe(false);
+    it('identifies all 21 genuine Portuguese translations in v0.3', () => {
+      for (const topic of TRACK_AVAILABLE_TOPICS['v0.3']) {
+        const cleanSlug = topic ? topic.split('/') : [];
+        expect(isGenuineTranslation(DEFAULT_STABLE_TRACK, cleanSlug, 'pt-BR')).toBe(true);
+      }
+    });
+
+    it('rejects English fallback pages from masquerading as translated Spanish or Portuguese in v0.4', () => {
+      expect(isGenuineTranslation(DEFAULT_PRERELEASE_TRACK, ['guides', 'agents'], 'pt-BR')).toBe(false);
       expect(isGenuineTranslation(DEFAULT_PRERELEASE_TRACK, ['guides', 'agents'], 'es')).toBe(false);
     });
 
@@ -70,7 +76,21 @@ describe('Centralized Documentation SEO Policy', () => {
       expect(seo.languages['x-default']).toBe('https://chatflowagent.org/en/docs/v0.3/guides/agents');
       // Spanish translation exists in v0.3
       expect(seo.languages['es']).toBe('https://chatflowagent.org/es/docs/v0.3/guides/agents');
-      // Portuguese translation does not exist yet
+      // Portuguese translation exists in v0.3
+      expect(seo.languages['pt-BR']).toBe('https://chatflowagent.org/pt-BR/docs/v0.3/guides/agents');
+    });
+
+    it('omits untranslated locales from hreflang alternates in v0.4', () => {
+      const seo = resolveDocSeo({
+        track: DEFAULT_PRERELEASE_TRACK,
+        cleanSlug: ['guides', 'agents'],
+        locale: 'en',
+        isExplicitTrack: true,
+        isFallback: false,
+      });
+
+      expect(seo.languages['en']).toBe('https://chatflowagent.org/en/docs/v0.4/guides/agents');
+      expect(seo.languages['es']).toBeUndefined();
       expect(seo.languages['pt-BR']).toBeUndefined();
     });
 
@@ -141,8 +161,8 @@ describe('Centralized Documentation SEO Policy', () => {
   describe('Sitemap Generator', () => {
     const entries = sitemap();
 
-    it('generates exactly 52 indexable canonical entries', () => {
-      expect(entries.length).toBe(52);
+    it('generates exactly 72 indexable canonical entries', () => {
+      expect(entries.length).toBe(72);
     });
 
     it('ensures all entries use the absolute SITE_ORIGIN', () => {
@@ -183,10 +203,14 @@ describe('Centralized Documentation SEO Policy', () => {
       }
     });
 
-    it('includes only genuine root overview for Portuguese in v0.3', () => {
+    it('includes all 21 genuine v0.3 Portuguese documentation pages', () => {
       const ptDocs = entries.filter((e) => e.url.startsWith(`${SITE_ORIGIN}/pt-BR/docs/`));
-      expect(ptDocs.length).toBe(1);
-      expect(ptDocs[0].url).toBe(`${SITE_ORIGIN}/pt-BR/docs/v0.3`);
+      expect(ptDocs.length).toBe(21);
+      for (const topic of TRACK_AVAILABLE_TOPICS['v0.3']) {
+        const subpath = topic ? `/${topic}` : '';
+        const expectedUrl = `${SITE_ORIGIN}/pt-BR/docs/v0.3${subpath}`;
+        expect(ptDocs.some((d) => d.url === expectedUrl)).toBe(true);
+      }
     });
 
     it('strictly excludes prerelease v0.4 from the sitemap', () => {
@@ -203,8 +227,8 @@ describe('Centralized Documentation SEO Policy', () => {
     });
 
     it('strictly excludes untranslated fallback pages from the sitemap', () => {
-      const ptGuides = entries.filter((e) => e.url.includes('/pt-BR/docs/v0.3/guides'));
-      expect(ptGuides.length).toBe(0);
+      const v04Guides = entries.filter((e) => e.url.includes('/docs/v0.4/guides'));
+      expect(v04Guides.length).toBe(0);
     });
   });
 

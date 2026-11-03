@@ -68,7 +68,7 @@ test.describe('Comprehensive Visual and Accessibility Validation', () => {
 
     const drawer = page.locator('div[role="dialog"]');
     await expect(drawer).toBeVisible();
-    await page.waitForTimeout(600); // Allow entry animations to settle
+    await page.waitForTimeout(700); // Allow entry animations to settle completely
 
     // Screenshot of drawer open in Dark Mode
     await page.screenshot({
@@ -96,6 +96,7 @@ test.describe('Comprehensive Visual and Accessibility Validation', () => {
     const hamburgerLight = page.locator('header button[aria-label="Toggle navigation menu"]');
     await hamburgerLight.click();
     await expect(drawer).toBeVisible();
+    await page.waitForTimeout(700); // Allow entry animations to settle completely
 
     // Verify duplicated controls are removed from drawer
     await expect(drawer.locator('button[aria-pressed]')).toHaveCount(0);

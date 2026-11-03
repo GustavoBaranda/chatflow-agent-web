@@ -192,7 +192,7 @@ export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps)
             >
               {/* Navigation Items with comfortable >=44px touch targets and generous spacing */}
               <nav
-                className="flex flex-1 flex-col space-y-2 overflow-y-auto px-5 py-6 sm:px-6"
+                className="flex flex-1 flex-col space-y-2.5 overflow-y-auto px-5 py-6 sm:px-6"
                 aria-label="Mobile navigation"
               >
                 {navItems.map((item, index) => {
@@ -231,10 +231,22 @@ export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps)
                   );
                 })}
 
-                {/* GitHub link in nav */}
+                {/* Subtle visual separator before external GitHub link */}
                 <motion.div
                   variants={slide}
                   custom={navItems.length}
+                  initial="initial"
+                  animate="enter"
+                  exit="exit"
+                  className="py-1"
+                >
+                  <div className="h-px w-full bg-border/60" role="separator" />
+                </motion.div>
+
+                {/* GitHub link in nav */}
+                <motion.div
+                  variants={slide}
+                  custom={navItems.length + 1}
                   initial="initial"
                   animate="enter"
                   exit="exit"
@@ -254,7 +266,7 @@ export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps)
               {/* Compact Bottom Section: Language Selector, Python SDK Attribution, Creator Signature & Sponsor */}
               <motion.div
                 variants={slide}
-                custom={navItems.length + 1}
+                custom={navItems.length + 2}
                 initial="initial"
                 animate="enter"
                 exit="exit"

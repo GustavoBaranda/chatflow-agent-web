@@ -44,13 +44,14 @@ test.describe('Mobile Sidebar and Upward Language Selector Suite', () => {
       const closeBtn = page.locator('header button[aria-label="Close navigation menu"]');
       await expect(closeBtn).toBeVisible();
 
-      // 4. Verify all 5 navigation links are visible
+      // 4. Verify all 5 navigation links and subtle visual separator are visible
       const navLinks = drawer.locator('nav[aria-label="Mobile navigation"] a');
       await expect(navLinks).toHaveCount(5);
       await expect(drawer.locator('nav a[href="/en"]')).toBeVisible();
       await expect(drawer.locator('nav a[href="/en/docs"]')).toBeVisible();
       await expect(drawer.locator('nav a[href="/en/community"]')).toBeVisible();
       await expect(drawer.locator('nav a[href="/en/about"]')).toBeVisible();
+      await expect(drawer.locator('nav [role="separator"]')).toBeVisible();
       await expect(drawer.locator('nav a[href="https://github.com/GustavoBaranda/chatflow-agent"]')).toBeVisible();
 
       // 5. Verify compact bottom section: attribution, creator signature, sponsor
@@ -115,6 +116,7 @@ test.describe('Mobile Sidebar and Upward Language Selector Suite', () => {
       const topMenuToggle = page.locator('header button[aria-label="Toggle navigation menu"]');
       await topMenuToggle.click();
       await expect(drawer).toBeVisible();
+      await page.waitForTimeout(600); // Allow entry animations to settle completely
 
       // Verify header is visible and fixed at y = 0
       const headerBoxTop = await header.boundingBox();
@@ -168,6 +170,7 @@ test.describe('Mobile Sidebar and Upward Language Selector Suite', () => {
       const midMenuToggle = page.locator('header button[aria-label="Toggle navigation menu"]');
       await midMenuToggle.click();
       await expect(drawer).toBeVisible();
+      await page.waitForTimeout(600); // Allow entry animations to settle completely
 
       // Verify header remains visible and fixed at y = 0 even after scrolling
       const headerBoxMid = await header.boundingBox();
@@ -222,6 +225,7 @@ test.describe('Mobile Sidebar and Upward Language Selector Suite', () => {
       const bottomMenuToggle = page.locator('header button[aria-label="Toggle navigation menu"]');
       await bottomMenuToggle.click();
       await expect(drawer).toBeVisible();
+      await page.waitForTimeout(600); // Allow entry animations to settle completely
 
       // Verify header remains visible and fixed at y = 0 at the bottom of the page
       const headerBoxBottom = await header.boundingBox();

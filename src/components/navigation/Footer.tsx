@@ -1,6 +1,6 @@
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Heart } from 'lucide-react';
 
 export function Footer() {
   const t = useTranslations('footer');
@@ -126,6 +126,18 @@ export function Footer() {
                   <ExternalLink className="h-3 w-3 opacity-60" aria-hidden="true" />
                 </a>
               </li>
+              <li>
+                <a
+                  href="https://github.com/sponsors/GustavoBaranda"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 transition-colors hover:text-pink-500 focus-visible:outline-2 focus-visible:outline-pink-500"
+                >
+                  <Heart className="h-3 w-3 fill-pink-500 text-pink-500" aria-hidden="true" />
+                  <span>{t('links.sponsor')}</span>
+                  <ExternalLink className="h-3 w-3 opacity-60" aria-hidden="true" />
+                </a>
+              </li>
             </ul>
           </div>
         </div>
@@ -154,6 +166,17 @@ export function Footer() {
                 className="h-7 w-7 object-contain dark:invert transition-opacity hover:opacity-80"
               />
               <span>Gustavo Baranda · © 2026</span>
+            </a>
+            <span className="text-muted-foreground/60 select-none">•</span>
+            <a
+              href="https://github.com/sponsors/GustavoBaranda"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 font-medium text-pink-700 dark:text-pink-300 transition-colors hover:text-pink-600 dark:hover:text-pink-200 focus-visible:outline-2 focus-visible:outline-pink-500"
+              aria-label="GitHub Sponsors Gustavo Baranda"
+            >
+              <Heart className="h-3 w-3 fill-pink-500 text-pink-500" aria-hidden="true" />
+              <span>{t('links.sponsor')}</span>
             </a>
             <span className="text-muted-foreground/60 select-none">•</span>
             <span className="text-muted-foreground">chatflow-agent contributors</span>

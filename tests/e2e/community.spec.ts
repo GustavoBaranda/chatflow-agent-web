@@ -80,7 +80,7 @@ test.describe('Home and Community Navigation Suite', () => {
     const pypiLink = pypiCard.locator('a[href="https://pypi.org/project/chatflow-agent/"]');
     await expect(pypiLink).toBeVisible();
 
-    const docsCard = page.locator('article', { hasText: 'Official Documentation' });
+    const docsCard = page.locator('section[aria-labelledby="featured-docs-heading"] article');
     await expect(docsCard).toBeVisible();
     const docsLink = docsCard.locator('a[href="/en/docs"]');
     await expect(docsLink).toBeVisible();

@@ -17,6 +17,7 @@ import {
   Terminal,
   Code2,
   CheckCircle2,
+  Heart,
 } from 'lucide-react';
 import type { Metadata } from 'next';
 
@@ -301,7 +302,7 @@ export default async function CommunityPage({
             <p className="mt-3 text-sm sm:text-base leading-relaxed text-muted-foreground">
               {t('guidelinesNoticeDesc')}
             </p>
-            <div className="mt-6 flex flex-wrap items-center gap-4">
+            <div className="mt-6 flex flex-wrap items-center gap-3 sm:gap-4">
               <a
                 href="https://github.com/GustavoBaranda/chatflow-agent"
                 target="_blank"
@@ -310,6 +311,15 @@ export default async function CommunityPage({
               >
                 <GitHubIcon className="h-4 w-4" />
                 <span>{t('repoCardAction')}</span>
+              </a>
+              <a
+                href="https://github.com/sponsors/GustavoBaranda"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg border border-pink-500/30 bg-pink-500/10 px-4 py-2 text-sm font-semibold text-pink-700 dark:text-pink-300 shadow-xs transition-colors hover:bg-pink-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-500"
+              >
+                <Heart className="h-4 w-4 fill-pink-500 text-pink-500" aria-hidden="true" />
+                <span>{t('sponsorAction')}</span>
               </a>
               <Link
                 href="/about"

@@ -171,7 +171,7 @@ export default async function CommunityPage({
         <section aria-labelledby="featured-docs-heading" className="mt-12">
           <article
             aria-labelledby="featured-docs-heading"
-            className="rounded-2xl border border-primary/30 bg-gradient-to-br from-card via-card to-primary/5 p-6 sm:p-8 shadow-xs"
+            className="rounded-2xl border border-primary/30 bg-linear-to-br from-card via-card to-primary/5 p-6 sm:p-8 shadow-xs"
           >
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
               <div className="max-w-2xl">
@@ -305,7 +305,7 @@ export default async function CommunityPage({
         {/* Open Source Collaboration Notice */}
         <section
           aria-labelledby="governance-heading"
-          className="mt-16 rounded-2xl border border-border bg-gradient-to-b from-card to-card/50 p-8 sm:p-10 shadow-xs"
+          className="mt-16 rounded-2xl border border-border bg-linear-to-b from-card to-card/50 p-8 sm:p-10 shadow-xs"
         >
           <div className="max-w-3xl">
             <h2 id="governance-heading" className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">

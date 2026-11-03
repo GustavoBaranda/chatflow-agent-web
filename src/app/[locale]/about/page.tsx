@@ -235,7 +235,7 @@ export default async function AboutPage({
         {/* Closing Navigation / Next Steps Section */}
         <section
           aria-labelledby="about-closing-heading"
-          className="mt-16 rounded-2xl border border-border bg-gradient-to-b from-card to-card/50 p-8 sm:p-10 shadow-xs text-center"
+          className="mt-16 rounded-2xl border border-border bg-linear-to-b from-card to-card/50 p-8 sm:p-10 shadow-xs text-center"
         >
           <div className="max-w-2xl mx-auto">
             <h2 id="about-closing-heading" className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">

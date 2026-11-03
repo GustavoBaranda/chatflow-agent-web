@@ -511,4 +511,64 @@ test.describe('Navigation, Home, and About Suite', () => {
       'https://chatflowagent.org/brand/social-preview.png'
     );
   });
+
+  test('should present mobile Quickstart code cleanly without horizontal page overflow or intrusive scrollbar', async ({ page }) => {
+    const mobileViewports = [
+      { width: 320, height: 600 },
+      { width: 375, height: 667 },
+      { width: 390, height: 844 },
+      { width: 430, height: 932 },
+    ];
+
+    for (const vp of mobileViewports) {
+      await page.setViewportSize(vp);
+      await page.goto('/en');
+      await page.waitForLoadState('domcontentloaded');
+
+      // 1. Confirm no horizontal page overflow
+      const pageOverflow = await page.evaluate(() => {
+        return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+      });
+      expect(pageOverflow, `Horizontal page overflow at ${vp.width}px`).toBe(false);
+
+      // 2. Code container scroll capability & non-intrusive scrollbar
+      const codeContainer = page.locator('#quickstart div.code-scroll-container[tabindex="0"]');
+      await expect(codeContainer).toBeVisible();
+
+      const scrollMetrics = await codeContainer.evaluate((el) => {
+        const canScroll = el.scrollWidth > el.clientWidth;
+        const initialScrollLeft = el.scrollLeft;
+        el.scrollLeft = 50;
+        const scrolled = el.scrollLeft > 0;
+        el.scrollLeft = initialScrollLeft;
+
+        const style = window.getComputedStyle(el);
+        return {
+          canScroll,
+          scrolled,
+          scrollbarWidth: style.scrollbarWidth,
+        };
+      });
+
+      // Code line is long so on mobile widths it should be scrollable
+      expect(scrollMetrics.canScroll).toBe(true);
+      expect(scrollMetrics.scrolled).toBe(true);
+      // scrollbar-width should be 'none' on <=640px to eliminate intrusive native scrollbars
+      expect(scrollMetrics.scrollbarWidth).toBe('none');
+
+      // 3. Package manager tabs and copy functionality work
+      const pipTab = page.locator('button:has-text("pip")').first();
+      const uvTab = page.locator('button:has-text("uv")').first();
+      await uvTab.click();
+      await expect(page.locator('code:has-text("uv add chatflow-agent")')).toBeVisible();
+      await pipTab.click();
+      await expect(page.locator('code:has-text("pip install chatflow-agent")')).toBeVisible();
+
+      // 4. Code copy button
+      const copyCodeBtn = page.locator('#quickstart button[aria-label="Copy command"], #quickstart button[aria-label="Copied!"]').nth(1);
+      await expect(copyCodeBtn).toBeVisible();
+      await copyCodeBtn.click();
+      await expect(copyCodeBtn).toContainText(/Copied!|Copy command/);
+    }
+  });
 });

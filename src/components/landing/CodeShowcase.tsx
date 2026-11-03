@@ -97,7 +97,7 @@ export function CodeShowcase() {
             </button>
           </div>
 
-          <div className="flex items-center gap-3 overflow-x-auto text-left font-mono text-sm text-foreground flex-1 min-w-0 px-1">
+          <div className="flex items-center gap-3 code-scroll-container text-left font-mono text-sm text-foreground flex-1 min-w-0 px-1">
             <Terminal className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
             <span className="text-muted-foreground select-none">$</span>
             <code className="font-semibold text-primary truncate">{activeCommand}</code>
@@ -125,17 +125,17 @@ export function CodeShowcase() {
       </div>
 
       {/* Code Editor Window Showcase */}
-      <div className="mt-10 mx-auto max-w-4xl rounded-2xl border border-border bg-slate-950 text-slate-100 shadow-2xl overflow-hidden">
+      <div className="mt-10 mx-auto max-w-4xl min-w-0 w-full rounded-2xl border border-border bg-slate-950 text-slate-100 shadow-2xl overflow-hidden">
         {/* Editor Window Top Bar */}
-        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/90 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded-full bg-rose-500/80" aria-hidden="true" />
-            <span className="h-3 w-3 rounded-full bg-amber-500/80" aria-hidden="true" />
-            <span className="h-3 w-3 rounded-full bg-emerald-500/80" aria-hidden="true" />
-            <span className="ml-3 font-mono text-xs text-slate-400">quickstart.py</span>
+        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/90 px-3.5 sm:px-4 py-2.5 sm:py-3 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="h-3 w-3 rounded-full bg-rose-500/80 shrink-0" aria-hidden="true" />
+            <span className="h-3 w-3 rounded-full bg-amber-500/80 shrink-0" aria-hidden="true" />
+            <span className="h-3 w-3 rounded-full bg-emerald-500/80 shrink-0" aria-hidden="true" />
+            <span className="ml-2 sm:ml-3 font-mono text-xs text-slate-400 truncate">quickstart.py</span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <span className="hidden sm:inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
               <ShieldCheck className="h-3 w-3" />
               <span>{t('verifiedBadge')}</span>
@@ -162,8 +162,13 @@ export function CodeShowcase() {
         </div>
 
         {/* Code Content */}
-        <div className="p-4 sm:p-6 overflow-x-auto font-mono text-xs sm:text-sm leading-relaxed text-slate-200">
-          <pre>
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label="Quickstart Python code"
+          className="code-scroll-container relative min-w-0 max-w-full p-4 sm:p-6 font-mono text-[13px] sm:text-sm leading-relaxed sm:leading-6 text-slate-200 overscroll-x-contain focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+        >
+          <pre className="w-fit min-w-full pr-6 sm:pr-8">
             <code>
               <span className="text-purple-400">import</span> asyncio{'\n'}
               <span className="text-purple-400">from</span> chatflow_agent <span className="text-purple-400">import</span> Agent, Runner, SQLiteSessionStore{'\n\n'}
@@ -192,18 +197,18 @@ export function CodeShowcase() {
         </div>
 
         {/* Technical Highlights Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 bg-slate-900/60 px-4 py-2.5 text-xs text-slate-400">
-          <div className="flex items-center gap-4">
-            <span className="inline-flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 bg-slate-900/60 px-3.5 sm:px-4 py-2.5 text-xs text-slate-400 min-w-0">
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 shrink-0">
               <Zap className="h-3.5 w-3.5 text-amber-400" />
               <span>Native asyncio</span>
             </span>
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1.5 shrink-0">
               <Database className="h-3.5 w-3.5 text-blue-400" />
               <span>SQLite State & Rollback</span>
             </span>
           </div>
-          <span className="font-mono text-slate-500">Python &gt;= 3.10</span>
+          <span className="font-mono text-slate-500 shrink-0">Python &gt;= 3.10</span>
         </div>
       </div>
 

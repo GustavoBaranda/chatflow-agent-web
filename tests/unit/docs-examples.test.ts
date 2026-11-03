@@ -14,15 +14,11 @@ const SDK_DIR =
   process.env.CHATFLOW_SDK_PATH ||
   (fs.existsSync(CACHED_RELEASE_PATH)
     ? CACHED_RELEASE_PATH
-    : fs.existsSync(path.resolve(process.cwd(), '../chatflow-agent'))
-      ? path.resolve(process.cwd(), '../chatflow-agent')
-      : 'C:\\Users\\Gustavo\\Desktop\\chatflow-agent');
+    : path.resolve(process.cwd(), '../chatflow-agent'));
 
 const SDK_REPO_DIR =
   process.env.CHATFLOW_SDK_REPO ||
-  (fs.existsSync(path.resolve(process.cwd(), '../chatflow-agent/.git'))
-    ? path.resolve(process.cwd(), '../chatflow-agent')
-    : 'C:\\Users\\Gustavo\\Desktop\\chatflow-agent');
+  path.resolve(process.cwd(), '../chatflow-agent');
 
 // Resolve Python interpreter portably across OS platforms and virtual environments
 function resolvePythonPath(sdkDir: string): string {

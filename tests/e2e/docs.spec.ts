@@ -178,7 +178,9 @@ test.describe('Documentation Engine E2E Suite', () => {
   test('should capture visual screenshots of documentation on desktop and mobile in both themes', async ({ page }) => {
     const fs = await import('node:fs');
     const path = await import('node:path');
-    const artifactDir = 'C:\\Users\\Gustavo\\.gemini\\antigravity\\brain\\971ced2e-8c02-46ea-8a15-f5bf2a0adf68\\screenshots-docs';
+    const artifactDir =
+      process.env.DOCS_SCREENSHOTS_DIR ||
+      path.resolve(process.cwd(), 'test-results', 'screenshots-docs');
     if (!fs.existsSync(artifactDir)) {
       fs.mkdirSync(artifactDir, { recursive: true });
     }

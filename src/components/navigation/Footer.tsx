@@ -7,9 +7,9 @@ export function Footer() {
 
   return (
     <footer className="w-full border-t border-border bg-card text-muted-foreground">
-      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
         {/* Top Multi-column Section */}
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-2 lg:grid-cols-5">
           {/* Brand & Mission (2 cols on lg) */}
           <div className="lg:col-span-2">
             <span className="text-base font-bold text-foreground">chatflow-agent</span>
@@ -126,60 +126,52 @@ export function Footer() {
                   <ExternalLink className="h-3 w-3 opacity-60" aria-hidden="true" />
                 </a>
               </li>
-              <li>
-                <a
-                  href="https://github.com/sponsors/GustavoBaranda"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 transition-colors hover:text-pink-500 focus-visible:outline-2 focus-visible:outline-pink-500"
-                >
-                  <Heart className="h-3 w-3 fill-pink-500 text-pink-500" aria-hidden="true" />
-                  <span>{t('links.sponsor')}</span>
-                  <ExternalLink className="h-3 w-3 opacity-60" aria-hidden="true" />
-                </a>
-              </li>
             </ul>
           </div>
         </div>
 
-        {/* Bottom Section: Licenses, Creator Signature & Community Attribution */}
-        <div className="mt-10 flex flex-col gap-4 border-t border-border/60 pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
+        {/* Bottom Section: SDK License, Creator Signature, Sponsor & Community Attribution */}
+        <div className="mt-8 flex flex-col gap-4 border-t border-border/60 pt-6 text-xs text-muted-foreground sm:mt-10 md:flex-row md:items-center md:justify-between">
+          <div>
             <p>{t('sdkLicense')}</p>
-            <p>{t('webLicense')}</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <a
-              href="https://gustavobaranda.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
-              aria-label="Gustavo Baranda Personal Website"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/brand/gustavo-baranda.svg"
-                alt="Gustavo Baranda"
-                width={28}
-                height={28}
-                className="h-7 w-7 object-contain dark:invert transition-opacity hover:opacity-80"
-              />
-              <span>Gustavo Baranda · © 2026</span>
-            </a>
-            <span className="text-muted-foreground/60 select-none">•</span>
-            <a
-              href="https://github.com/sponsors/GustavoBaranda"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 font-medium text-pink-700 dark:text-pink-300 transition-colors hover:text-pink-600 dark:hover:text-pink-200 focus-visible:outline-2 focus-visible:outline-pink-500"
-              aria-label="GitHub Sponsors Gustavo Baranda"
-            >
-              <Heart className="h-3 w-3 fill-pink-500 text-pink-500" aria-hidden="true" />
-              <span>{t('links.sponsor')}</span>
-            </a>
-            <span className="text-muted-foreground/60 select-none">•</span>
-            <span className="text-muted-foreground">chatflow-agent contributors</span>
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4 text-xs">
+            <div className="flex items-center gap-2">
+              <a
+                href="https://gustavobaranda.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
+                aria-label="Gustavo Baranda Personal Website"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/brand/gustavo-baranda.svg"
+                  alt="Gustavo Baranda"
+                  width={28}
+                  height={28}
+                  className="h-7 w-7 object-contain dark:invert transition-opacity hover:opacity-80"
+                />
+                <span>Gustavo Baranda · © 2026</span>
+              </a>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <span className="hidden sm:inline text-muted-foreground/60 select-none">•</span>
+              <a
+                href="https://github.com/sponsors/GustavoBaranda"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 font-medium text-pink-700 dark:text-pink-300 transition-colors hover:text-pink-600 dark:hover:text-pink-200 focus-visible:outline-2 focus-visible:outline-pink-500"
+                aria-label="GitHub Sponsors Gustavo Baranda"
+              >
+                <Heart className="h-3.5 w-3.5 fill-pink-500 text-pink-500" aria-hidden="true" />
+                <span>{t('links.sponsor')}</span>
+              </a>
+              <span className="text-muted-foreground/60 select-none">•</span>
+              <span className="text-muted-foreground">chatflow-agent contributors</span>
+            </div>
           </div>
         </div>
       </div>

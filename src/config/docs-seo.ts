@@ -14,8 +14,63 @@ import type { Metadata } from 'next';
 
 export const SITE_ORIGIN = 'https://chatflowagent.org';
 
+export const SOCIAL_PREVIEW_IMAGE = {
+  url: '/brand/social-preview.png',
+  width: 1200,
+  height: 630,
+  alt: 'chatflow-agent — Conversational AI Agents in Python',
+} as const;
+
 export const SUPPORTED_LOCALES = ['en', 'es', 'pt-BR'] as const;
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
+
+export interface SocialMetadataOptions {
+  title: string;
+  description: string;
+  url: string;
+  locale: string;
+  image?: string;
+}
+
+/**
+ * Creates standardized, localized Open Graph and Twitter Card social metadata.
+ */
+export function createSocialMetadata({
+  title,
+  description,
+  url,
+  locale,
+  image = SOCIAL_PREVIEW_IMAGE.url,
+}: SocialMetadataOptions): {
+  openGraph: NonNullable<Metadata['openGraph']>;
+  twitter: NonNullable<Metadata['twitter']>;
+} {
+  const ogLocale = locale === 'pt-BR' ? 'pt_BR' : locale === 'es' ? 'es_ES' : 'en_US';
+  return {
+    openGraph: {
+      title,
+      description,
+      url,
+      siteName: 'chatflow-agent',
+      locale: ogLocale,
+      type: 'website',
+      images: [
+        {
+          url: image,
+          width: SOCIAL_PREVIEW_IMAGE.width,
+          height: SOCIAL_PREVIEW_IMAGE.height,
+          alt: SOCIAL_PREVIEW_IMAGE.alt,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [image],
+    },
+  };
+}
 
 export interface DocSeoResolution {
   canonicalPath: string;

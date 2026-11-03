@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { routing } from '@/i18n/routing';
 import { Link } from '@/i18n/navigation';
 import { GitHubIcon } from '@/components/ui/icons';
+import { SITE_ORIGIN, createSocialMetadata } from '@/config/docs-seo';
 import {
   Users,
   Bug,
@@ -38,6 +39,13 @@ export async function generateMetadata({
   );
   languages['x-default'] = `/${routing.defaultLocale}/community`;
 
+  const social = createSocialMetadata({
+    title: `${t('metaTitle')} | chatflow-agent`,
+    description: t('metaDescription'),
+    url: `${SITE_ORIGIN}/${locale}/community`,
+    locale,
+  });
+
   return {
     title: t('metaTitle'),
     description: t('metaDescription'),
@@ -45,6 +53,8 @@ export async function generateMetadata({
       canonical: `/${locale}/community`,
       languages,
     },
+    openGraph: social.openGraph,
+    twitter: social.twitter,
   };
 }
 

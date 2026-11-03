@@ -12,7 +12,7 @@ import { OutdatedNotice } from '@/components/docs/OutdatedNotice';
 import { VersionBadge } from '@/components/docs/VersionBadge';
 import { PrereleaseBanner } from '@/components/docs/PrereleaseBanner';
 import { DEFAULT_STABLE_TRACK } from '@/config/docs-versions';
-import { resolveDocSeo } from '@/config/docs-seo';
+import { resolveDocSeo, createSocialMetadata } from '@/config/docs-seo';
 import type { Metadata } from 'next';
 
 const customMdxComponents = {
@@ -70,6 +70,13 @@ export async function generateMetadata({
     isFallback,
   });
 
+  const social = createSocialMetadata({
+    title: `${page.data.title} | chatflow-agent`,
+    description: page.data.description ?? '',
+    url: seo.canonicalUrl,
+    locale,
+  });
+
   return {
     title: page.data.title,
     description: page.data.description,
@@ -78,6 +85,8 @@ export async function generateMetadata({
       languages: seo.languages,
     },
     robots: seo.robots,
+    openGraph: social.openGraph,
+    twitter: social.twitter,
   };
 }
 

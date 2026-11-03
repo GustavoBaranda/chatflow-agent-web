@@ -3,6 +3,7 @@ import { getMessages, setRequestLocale } from 'next-intl/server';
 import { NextIntlClientProvider } from 'next-intl';
 import { routing } from '@/i18n/routing';
 import { getLanguage } from '@/config/languages';
+import { SITE_ORIGIN, createSocialMetadata } from '@/config/docs-seo';
 import { Navbar } from '@/components/navigation/Navbar';
 import { Footer } from '@/components/navigation/Footer';
 import { LocaleHtmlUpdater } from '@/components/navigation/LocaleHtmlUpdater';
@@ -19,12 +20,15 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
 
+  let title = 'chatflow-agent — Conversational AI Agents in Python';
   let description =
     'Official documentation and website for chatflow-agent, an open-source Python library for conversational AI agents, tools, sessions, and channels.';
   if (locale === 'es') {
+    title = 'chatflow-agent — Agentes de IA Conversacional en Python';
     description =
       'Plataforma oficial de documentación para chatflow-agent, la librería Python para agentes conversacionales, herramientas, sesiones y canales.';
   } else if (locale === 'pt-BR') {
+    title = 'chatflow-agent — Agentes de IA Conversacional em Python';
     description =
       'Plataforma oficial de documentação para chatflow-agent, a biblioteca Python para agentes de IA conversacional, ferramentas, sessões e canais.';
   }
@@ -34,16 +38,25 @@ export async function generateMetadata({
   );
   languages['x-default'] = `/${routing.defaultLocale}`;
 
+  const social = createSocialMetadata({
+    title,
+    description,
+    url: `${SITE_ORIGIN}/${locale}`,
+    locale,
+  });
+
   return {
     title: {
       template: '%s | chatflow-agent',
-      default: 'chatflow-agent — Conversational AI Agents in Python',
+      default: title,
     },
     description,
     alternates: {
       canonical: `/${locale}`,
       languages,
     },
+    openGraph: social.openGraph,
+    twitter: social.twitter,
   };
 }
 

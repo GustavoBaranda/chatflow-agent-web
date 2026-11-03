@@ -10,6 +10,32 @@ export const metadata: Metadata = {
     template: '%s | chatflow-agent',
     default: 'chatflow-agent — Conversational AI Agents in Python',
   },
+  description:
+    'Official documentation and website for chatflow-agent, an open-source Python library for conversational AI agents, tools, sessions, and channels.',
+  openGraph: {
+    title: 'chatflow-agent — Conversational AI Agents in Python',
+    description:
+      'Official documentation and website for chatflow-agent, an open-source Python library for conversational AI agents, tools, sessions, and channels.',
+    url: 'https://chatflowagent.org',
+    siteName: 'chatflow-agent',
+    locale: 'en_US',
+    type: 'website',
+    images: [
+      {
+        url: '/brand/social-preview.png',
+        width: 1200,
+        height: 630,
+        alt: 'chatflow-agent — Conversational AI Agents in Python',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'chatflow-agent — Conversational AI Agents in Python',
+    description:
+      'Official documentation and website for chatflow-agent, an open-source Python library for conversational AI agents, tools, sessions, and channels.',
+    images: ['/brand/social-preview.png'],
+  },
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },

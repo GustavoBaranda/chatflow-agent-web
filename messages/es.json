@@ -14,7 +14,8 @@
     "about": "Acerca de",
     "github": "GitHub",
     "menu": "Alternar menú de navegación",
-    "closeMenu": "Cerrar menú de navegación"
+    "closeMenu": "Cerrar menú de navegación",
+    "sidebarHeading": "Navegación"
   },
   "languageSelector": {
     "label": "Idioma",

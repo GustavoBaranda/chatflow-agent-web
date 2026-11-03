@@ -82,10 +82,14 @@ test.describe('Comprehensive Visual and Accessibility Validation', () => {
       path: path.join(SCREENSHOT_DIR, 'mobile-morph-x.png'),
     });
 
-    // Switch to Light mode inside drawer
-    const drawerThemeBtn = drawer.locator('button[aria-pressed]').first();
-    await drawerThemeBtn.click();
+    // Switch to Light mode via navbar theme toggle (retained in navbar)
+    const headerThemeBtn = page.locator('header button[aria-pressed]').first();
+    await headerThemeBtn.click();
     await page.waitForTimeout(400);
+
+    // Verify duplicated controls are removed from drawer
+    await expect(drawer.locator('button[aria-pressed]')).toHaveCount(0);
+    await expect(drawer.locator('img[src="/brand/logo-symbol.svg"]')).toHaveCount(0);
 
     // Screenshot of drawer open in Light Mode
     await page.screenshot({

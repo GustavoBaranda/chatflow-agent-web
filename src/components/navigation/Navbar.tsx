@@ -33,11 +33,19 @@ export function Navbar() {
         {tCommon('skipToContent')}
       </a>
 
-      <header className="sticky top-0 z-50 w-full border-b border-border/80 bg-background/80 backdrop-blur-md">
+      <header
+        className={cn(
+          'sticky top-0 z-50 w-full border-b border-border/80 transition-colors',
+          isMobileOpen
+            ? 'bg-background md:bg-background/80 md:backdrop-blur-md'
+            : 'bg-background/80 backdrop-blur-md'
+        )}
+      >
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Brand Logo & Title */}
           <Link
             href="/"
+            onClick={() => setIsMobileOpen(false)}
             className="group flex items-center gap-2.5 font-bold tracking-tight text-foreground transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-primary"
             aria-label="chatflow-agent home"
           >

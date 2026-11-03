@@ -16,7 +16,8 @@
   --color-card-foreground: var(--card-foreground);
 }
 
-:root {
+:root,
+[data-theme="light"] {
   --background: #ffffff;
   --foreground: #090e1a;
   --primary: #2563eb;
@@ -50,7 +51,8 @@
   --color-fd-ring: var(--primary);
 }
 
-.dark {
+.dark,
+[data-theme="dark"] {
   --background: #060b18;
   --foreground: #f8fafc;
   --primary: #3b82f6;

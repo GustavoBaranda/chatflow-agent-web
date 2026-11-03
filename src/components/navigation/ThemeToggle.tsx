@@ -1,6 +1,7 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
+import { flushSync } from 'react-dom';
 import { useTheme } from 'next-themes';
 import { useTranslations } from 'next-intl';
 import { Sun, Moon } from 'lucide-react';
@@ -31,10 +32,16 @@ export function ThemeToggle() {
     const reduceMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     if (!reduceMotion && typeof document !== 'undefined' && typeof document.startViewTransition === 'function') {
-      document.startViewTransition(() => {
-        setTheme(next);
-      });
-      return;
+      try {
+        document.startViewTransition(() => {
+          flushSync(() => {
+            setTheme(next);
+          });
+        });
+        return;
+      } catch {
+        // Fall back to direct setTheme if startViewTransition throws or is aborted
+      }
     }
 
     setTheme(next);

@@ -151,7 +151,7 @@ export function Footer() {
                   alt="Gustavo Baranda"
                   width={28}
                   height={28}
-                  className="h-7 w-7 object-contain dark:brightness-0 dark:invert transition-opacity hover:opacity-80"
+                  className="h-7 w-7 object-contain dark:brightness-0 dark:invert dark:opacity-65 transition-opacity hover:opacity-80"
                 />
                 <span>Gustavo Baranda · © 2026</span>
               </a>

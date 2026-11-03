@@ -1,14 +1,36 @@
 import { AlertTriangle, History } from 'lucide-react';
+import {
+  DEFAULT_DOCS_REPO_URL,
+  DEFAULT_DOCS_BRANCH,
+  resolveDocMdxPath,
+} from './TranslationNotice';
 
-interface OutdatedNoticeProps {
+export function getOutdatedHistoryUrl(
+  slug?: string,
+  branch: string = DEFAULT_DOCS_BRANCH,
+  repoUrl: string = DEFAULT_DOCS_REPO_URL
+): string {
+  const mdxPath = resolveDocMdxPath(slug);
+  return mdxPath
+    ? `${repoUrl}/commits/${branch}/content/docs/en/${mdxPath}`
+    : `${repoUrl}/commits/${branch}/content/docs/en`;
+}
+
+export interface OutdatedNoticeProps {
   sourceRevision?: string;
   slug?: string;
+  branch?: string;
+  repoUrl?: string;
 }
 
 export function OutdatedNotice({
   sourceRevision,
   slug,
+  branch = DEFAULT_DOCS_BRANCH,
+  repoUrl = DEFAULT_DOCS_REPO_URL,
 }: OutdatedNoticeProps) {
+  const historyUrl = getOutdatedHistoryUrl(slug, branch, repoUrl);
+
   return (
     <aside
       role="alert"
@@ -26,7 +48,7 @@ export function OutdatedNotice({
           {sourceRevision && (
             <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
               <a
-                href={`https://github.com/GustavoBaranda/chatflow-agent/commits/main/content/docs/en/${slug ? `${slug}.mdx` : ''}`}
+                href={historyUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"

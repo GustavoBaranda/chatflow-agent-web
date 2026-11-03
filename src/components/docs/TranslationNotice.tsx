@@ -1,17 +1,45 @@
 import { AlertCircle, GitFork } from 'lucide-react';
 import { getLanguage } from '@/config/languages';
 
-interface TranslationNoticeProps {
+export const DEFAULT_DOCS_REPO_URL = 'https://github.com/GustavoBaranda/chatflow-agent-web';
+export const DEFAULT_DOCS_BRANCH = 'main';
+
+export function resolveDocMdxPath(slug?: string): string {
+  if (!slug) return '';
+  if (slug === 'v0.3' || slug === 'v0.4') {
+    return `${slug}/index.mdx`;
+  }
+  return slug.endsWith('.mdx') ? slug : `${slug}.mdx`;
+}
+
+export function getTranslationContributeUrl(
+  targetLocale: string,
+  slug?: string,
+  branch: string = DEFAULT_DOCS_BRANCH,
+  repoUrl: string = DEFAULT_DOCS_REPO_URL
+): string {
+  const mdxPath = resolveDocMdxPath(slug);
+  return mdxPath
+    ? `${repoUrl}/blob/${branch}/content/docs/en/${mdxPath}`
+    : `${repoUrl}/tree/${branch}/content/docs/${targetLocale}`;
+}
+
+export interface TranslationNoticeProps {
   targetLocale: string;
   slug?: string;
+  branch?: string;
+  repoUrl?: string;
 }
 
 export function TranslationNotice({
   targetLocale,
   slug,
+  branch = DEFAULT_DOCS_BRANCH,
+  repoUrl = DEFAULT_DOCS_REPO_URL,
 }: TranslationNoticeProps) {
   const lang = getLanguage(targetLocale);
   const langName = lang?.name ?? targetLocale;
+  const contributeUrl = getTranslationContributeUrl(targetLocale, slug, branch, repoUrl);
 
   return (
     <aside
@@ -29,7 +57,7 @@ export function TranslationNotice({
           </p>
           <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
             <a
-              href={`https://github.com/GustavoBaranda/chatflow-agent${slug ? `/tree/main/content/docs/${slug}` : ''}`}
+              href={contributeUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"

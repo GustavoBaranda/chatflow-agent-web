@@ -82,22 +82,34 @@ test.describe('Comprehensive Visual and Accessibility Validation', () => {
       path: path.join(SCREENSHOT_DIR, 'mobile-morph-x.png'),
     });
 
+    // Close mobile menu via morphed X button
+    await morphX.click();
+    await expect(drawer).not.toBeVisible();
+    await page.waitForTimeout(400);
+
     // Switch to Light mode via navbar theme toggle (retained in navbar)
     const headerThemeBtn = page.locator('header button[aria-pressed]').first();
     await headerThemeBtn.click();
     await page.waitForTimeout(400);
 
+    // Open drawer in light mode
+    const hamburgerLight = page.locator('header button[aria-label="Toggle navigation menu"]');
+    await hamburgerLight.click();
+    await expect(drawer).toBeVisible();
+
     // Verify duplicated controls are removed from drawer
     await expect(drawer.locator('button[aria-pressed]')).toHaveCount(0);
     await expect(drawer.locator('img[src="/brand/logo-symbol.svg"]')).toHaveCount(0);
+    await expect(drawer.locator('button[aria-label="Close navigation menu"]')).toHaveCount(0);
 
     // Screenshot of drawer open in Light Mode
     await page.screenshot({
       path: path.join(SCREENSHOT_DIR, 'mobile-drawer-light.png'),
     });
 
-    // Close mobile menu via morphed X button
-    await morphX.click();
+    // Close mobile menu via morphed X button in light mode
+    const morphXLight = page.locator('header button[aria-label="Close navigation menu"]');
+    await morphXLight.click();
     await expect(drawer).not.toBeVisible();
     await page.waitForTimeout(400);
 

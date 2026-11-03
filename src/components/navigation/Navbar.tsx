@@ -28,6 +28,8 @@ export function Navbar() {
       {/* Skip to Content Accessible Link */}
       <a
         href="#main-content"
+        tabIndex={isMobileOpen ? -1 : undefined}
+        aria-hidden={isMobileOpen ? 'true' : undefined}
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:shadow-lg focus:outline-hidden"
       >
         {tCommon('skipToContent')}
@@ -35,10 +37,10 @@ export function Navbar() {
 
       <header
         className={cn(
-          'sticky top-0 z-50 w-full border-b border-border/80 transition-colors',
+          'top-0 w-full border-b border-border/80 transition-colors',
           isMobileOpen
-            ? 'bg-background md:bg-background/80 md:backdrop-blur-md'
-            : 'bg-background/80 backdrop-blur-md'
+            ? 'fixed left-0 right-0 z-50 bg-background/95 backdrop-blur-md shadow-xs'
+            : 'sticky z-40 bg-background/80 backdrop-blur-md'
         )}
       >
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -58,7 +60,7 @@ export function Navbar() {
               priority
             />
             <span className="text-base sm:text-lg font-bold">
-              chatflow<span className="bg-gradient-to-r from-blue-500 to-violet-500 bg-clip-text text-transparent">-agent</span>
+              chatflow<span className="bg-linear-to-r from-blue-500 to-violet-500 bg-clip-text text-transparent">-agent</span>
             </span>
           </Link>
 
@@ -141,6 +143,11 @@ export function Navbar() {
           </div>
         </div>
       </header>
+
+      {/* Spacer to preserve document flow and scrollHeight when header is fixed */}
+      {isMobileOpen && (
+        <div className="h-14 border-b border-transparent md:hidden" aria-hidden="true" />
+      )}
 
       {/* Mobile Drawer */}
       <MobileDrawer

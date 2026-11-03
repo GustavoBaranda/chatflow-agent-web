@@ -297,7 +297,7 @@ test.describe('Navigation, Home, and About Suite', () => {
     await morphX.click();
 
     await expect(drawer).not.toBeVisible();
-    // After closing, label returns to Toggle navigation menu
+    // After closing, hamburger button is visible
     await expect(hamburger).toBeVisible();
   });
 
@@ -312,7 +312,7 @@ test.describe('Navigation, Home, and About Suite', () => {
     const drawer = page.locator('div[role="dialog"]');
     await expect(drawer).toBeVisible();
 
-    await expect(drawer.locator('a[href="/pt-BR"]')).toContainText('Início');
+    await expect(drawer.locator('nav a[href="/pt-BR"]')).toContainText('Início');
     await expect(drawer.locator('a[href="/pt-BR/docs"]')).toContainText('Documentação');
     await expect(drawer.locator('a[href="/pt-BR/community"]')).toContainText('Comunidade');
     await expect(drawer.locator('a[href="/pt-BR/about"]')).toContainText('Sobre');

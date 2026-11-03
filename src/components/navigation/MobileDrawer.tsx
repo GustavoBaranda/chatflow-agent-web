@@ -184,11 +184,12 @@ export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps)
             {/* Drawer panel anchored below the persistent navbar */}
             <motion.div
               ref={drawerRef}
+              data-drawer-panel
               variants={menuSlide}
               initial="initial"
               animate="enter"
               exit="exit"
-              className="fixed top-14 right-0 bottom-0 z-40 flex h-[calc(100vh-3.5rem)] h-[calc(100dvh-3.5rem)] w-full max-w-xs flex-col border-l border-border bg-card shadow-2xl"
+              className="fixed top-14 right-0 bottom-0 z-40 flex h-[calc(100dvh-3.5rem)] w-full max-w-xs flex-col border-l border-border bg-card shadow-2xl"
             >
               {/* Navigation Items with comfortable >=44px touch targets and generous spacing */}
               <nav
@@ -215,7 +216,7 @@ export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps)
                         onClick={onClose}
                         aria-current={isActive ? 'page' : undefined}
                         className={cn(
-                          'flex min-h-[44px] items-center gap-3.5 rounded-lg px-3.5 py-2.5 text-[15px] transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                          'flex min-h-11 items-center gap-3.5 rounded-lg px-3.5 py-2.5 text-[15px] transition-colors focus-visible:outline-2 focus-visible:outline-primary',
                           isActive
                             ? 'bg-muted font-semibold text-foreground'
                             : 'font-medium text-foreground hover:bg-muted'
@@ -255,7 +256,7 @@ export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps)
                     href="https://github.com/GustavoBaranda/chatflow-agent"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex min-h-[44px] items-center gap-3.5 rounded-lg px-3.5 py-2.5 text-[15px] font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
+                    className="flex min-h-11 items-center gap-3.5 rounded-lg px-3.5 py-2.5 text-[15px] font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
                   >
                     <GitHubIcon className="h-5 w-5 text-muted-foreground" />
                     <span>{t('github')}</span>

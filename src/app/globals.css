@@ -97,6 +97,13 @@ body {
   z-index: 40 !important;
 }
 
+/* Fallback for mobile drawer dynamic viewport height on browsers without dvh support */
+@supports not (height: 100dvh) {
+  [data-drawer-panel] {
+    height: calc(100vh - 3.5rem);
+  }
+}
+
 /* Soft scroll lock when mobile drawer is open */
 html.menu-open,
 html.menu-open body {

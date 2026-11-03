@@ -1,7 +1,11 @@
 import { test, expect } from '@playwright/test';
 import * as path from 'path';
+import * as fs from 'fs';
 
-const SCREENSHOT_DIR = 'test-results';
+const SCREENSHOT_DIR = path.resolve(process.cwd(), 'scratch/visual-audit');
+if (!fs.existsSync(SCREENSHOT_DIR)) {
+  fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+}
 
 test.describe('Comprehensive Visual and Accessibility Validation', () => {
   test('Audit 1: Desktop Navigation & Visuals in Light and Dark Modes', async ({ page }) => {
@@ -9,11 +13,14 @@ test.describe('Comprehensive Visual and Accessibility Validation', () => {
 
     // 1. Light mode
     await page.goto('/en');
-    await page.locator('html').evaluate((el) => {
-      el.classList.remove('dark');
-      el.classList.add('light');
-    });
-    await page.waitForTimeout(300);
+    await page.waitForLoadState('networkidle');
+
+    const themeBtn = page.locator('header button[aria-pressed]').first();
+    const isDark = await page.evaluate(() => document.documentElement.className.includes('dark'));
+    if (isDark) {
+      await themeBtn.click();
+      await page.waitForTimeout(300);
+    }
 
     await page.screenshot({
       path: path.join(SCREENSHOT_DIR, 'desktop-light.png'),
@@ -21,7 +28,6 @@ test.describe('Comprehensive Visual and Accessibility Validation', () => {
     });
 
     // 2. Dark mode
-    const themeBtn = page.locator('header button[aria-pressed]').first();
     await themeBtn.click();
     await page.waitForTimeout(300);
 
@@ -42,11 +48,14 @@ test.describe('Comprehensive Visual and Accessibility Validation', () => {
 
     // Dark mode mobile closed
     await page.goto('/en');
-    await page.locator('html').evaluate((el) => {
-      el.classList.remove('light');
-      el.classList.add('dark');
-    });
-    await page.waitForTimeout(200);
+    await page.waitForLoadState('networkidle');
+
+    const themeBtn = page.locator('header button[aria-pressed]').first();
+    const isDark = await page.evaluate(() => document.documentElement.className.includes('dark'));
+    if (!isDark) {
+      await themeBtn.click();
+      await page.waitForTimeout(300);
+    }
 
     await page.screenshot({
       path: path.join(SCREENSHOT_DIR, 'mobile-dark-closed.png'),
@@ -195,104 +204,75 @@ test.describe('Comprehensive Visual and Accessibility Validation', () => {
     expect(htmlLang).toBe('es');
   });
 
-  test('Audit 6: Phase 2 Deliverables - Home and About Visuals across Themes and Devices', async ({ page }) => {
+  test('Audit 6: Phase 2 Deliverables - Home, Community, About, and Footer Visuals across Themes and Devices', async ({ page }) => {
+    async function setTargetTheme(target: 'light' | 'dark') {
+      const isDark = await page.evaluate(() => document.documentElement.className.includes('dark'));
+      if ((target === 'dark' && !isDark) || (target === 'light' && isDark)) {
+        const btn = page.locator('header button[aria-pressed]').first();
+        await btn.click();
+        await page.waitForTimeout(300);
+      }
+    }
+
     // 1. Desktop captures (1280 x 800)
     await page.setViewportSize({ width: 1280, height: 800 });
 
-    // Home - Desktop Light
+    // Home - Desktop
     await page.goto('/en');
-    await page.locator('html').evaluate((el) => {
-      el.classList.remove('dark');
-      el.classList.add('light');
-    });
-    await page.waitForTimeout(300);
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, 'home-desktop-light.png'),
-      fullPage: true,
-    });
+    await page.waitForLoadState('networkidle');
+    await setTargetTheme('light');
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'home-desktop-light.png'), fullPage: true });
+    await page.locator('footer').screenshot({ path: path.join(SCREENSHOT_DIR, 'footer-desktop-light.png') });
 
-    // Home - Desktop Dark
-    await page.locator('html').evaluate((el) => {
-      el.classList.remove('light');
-      el.classList.add('dark');
-    });
-    await page.waitForTimeout(300);
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, 'home-desktop-dark.png'),
-      fullPage: true,
-    });
+    await setTargetTheme('dark');
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'home-desktop-dark.png'), fullPage: true });
+    await page.locator('footer').screenshot({ path: path.join(SCREENSHOT_DIR, 'footer-desktop-dark.png') });
 
-    // About - Desktop Dark
+    // Community - Desktop
+    await page.goto('/en/community');
+    await page.waitForLoadState('networkidle');
+    await setTargetTheme('light');
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'community-desktop-light.png'), fullPage: true });
+    await setTargetTheme('dark');
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'community-desktop-dark.png'), fullPage: true });
+
+    // About - Desktop
     await page.goto('/en/about');
-    await page.locator('html').evaluate((el) => {
-      el.classList.remove('light');
-      el.classList.add('dark');
-    });
-    await page.waitForTimeout(300);
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, 'about-desktop-dark.png'),
-      fullPage: true,
-    });
-
-    // About - Desktop Light
-    await page.locator('html').evaluate((el) => {
-      el.classList.remove('dark');
-      el.classList.add('light');
-    });
-    await page.waitForTimeout(300);
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, 'about-desktop-light.png'),
-      fullPage: true,
-    });
+    await page.waitForLoadState('networkidle');
+    await setTargetTheme('light');
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'about-desktop-light.png'), fullPage: true });
+    await setTargetTheme('dark');
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'about-desktop-dark.png'), fullPage: true });
 
     // 2. Mobile captures (390 x 844)
     await page.setViewportSize({ width: 390, height: 844 });
 
-    // Home - Mobile Light
+    // Home - Mobile
     await page.goto('/en');
-    await page.locator('html').evaluate((el) => {
-      el.classList.remove('dark');
-      el.classList.add('light');
-    });
-    await page.waitForTimeout(300);
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, 'home-mobile-light.png'),
-      fullPage: false,
-    });
+    await page.waitForLoadState('networkidle');
+    await setTargetTheme('light');
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'home-mobile-light.png'), fullPage: false });
+    await page.locator('footer').screenshot({ path: path.join(SCREENSHOT_DIR, 'footer-mobile-light.png') });
 
-    // Home - Mobile Dark
-    await page.locator('html').evaluate((el) => {
-      el.classList.remove('light');
-      el.classList.add('dark');
-    });
-    await page.waitForTimeout(300);
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, 'home-mobile-dark.png'),
-      fullPage: false,
-    });
+    await setTargetTheme('dark');
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'home-mobile-dark.png'), fullPage: false });
+    await page.locator('footer').screenshot({ path: path.join(SCREENSHOT_DIR, 'footer-mobile-dark.png') });
 
-    // About - Mobile Dark
+    // Community - Mobile
+    await page.goto('/en/community');
+    await page.waitForLoadState('networkidle');
+    await setTargetTheme('light');
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'community-mobile-light.png'), fullPage: false });
+    await setTargetTheme('dark');
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'community-mobile-dark.png'), fullPage: false });
+
+    // About - Mobile
     await page.goto('/en/about');
-    await page.locator('html').evaluate((el) => {
-      el.classList.remove('light');
-      el.classList.add('dark');
-    });
-    await page.waitForTimeout(300);
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, 'about-mobile-dark.png'),
-      fullPage: false,
-    });
-
-    // About - Mobile Light
-    await page.locator('html').evaluate((el) => {
-      el.classList.remove('dark');
-      el.classList.add('light');
-    });
-    await page.waitForTimeout(300);
-    await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, 'about-mobile-light.png'),
-      fullPage: false,
-    });
+    await page.waitForLoadState('networkidle');
+    await setTargetTheme('light');
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'about-mobile-light.png'), fullPage: false });
+    await setTargetTheme('dark');
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'about-mobile-dark.png'), fullPage: false });
   });
 });
 

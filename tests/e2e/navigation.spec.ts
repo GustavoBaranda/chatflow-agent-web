@@ -104,12 +104,13 @@ test.describe('Navigation, Home, and About Suite', () => {
     const signatureImg = signatureLink.locator('img[src="/brand/gustavo-baranda.svg"]');
     await expect(signatureImg).toBeVisible();
 
-    // Verify GitHub Sponsors link with pink heart in footer
+    // Verify GitHub Sponsors link with pink heart in footer (exactly one in bottom attribution, no duplicates in nav columns)
     const footerSponsorLinks = footer.locator('a[href="https://github.com/sponsors/GustavoBaranda"]');
-    await expect(footerSponsorLinks.first()).toBeVisible();
-    await expect(footerSponsorLinks.first()).toHaveAttribute('target', '_blank');
-    await expect(footerSponsorLinks.first()).toHaveAttribute('rel', 'noopener noreferrer');
-    await expect(footerSponsorLinks.first()).toContainText('Sponsor');
+    await expect(footerSponsorLinks).toHaveCount(1);
+    await expect(footerSponsorLinks).toBeVisible();
+    await expect(footerSponsorLinks).toHaveAttribute('target', '_blank');
+    await expect(footerSponsorLinks).toHaveAttribute('rel', 'noopener noreferrer');
+    await expect(footerSponsorLinks).toContainText('Sponsor');
   });
 
   test('should navigate to dedicated multilingual About page and verify Creator attribution in English', async ({ page }) => {
@@ -353,5 +354,74 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(page.locator('h1')).toContainText('O fluxo conversacional atingiu uma rota não mapeada');
     await expect(page.locator('a:has-text("Voltar ao início")')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
+  });
+
+  test('should toggle theme from Light to Dark to Light and update computed styles across Home, Community, and About', async ({ page }) => {
+    const routes = ['/en', '/en/community', '/en/about'];
+
+    for (const route of routes) {
+      await page.goto(route);
+      await page.waitForLoadState('networkidle');
+
+      const themeBtn = page.locator('header button[aria-pressed]').first();
+      await expect(themeBtn).toBeVisible();
+
+      // Ensure start state is light
+      const initialHtmlClass = await page.evaluate(() => document.documentElement.className);
+      if (initialHtmlClass.includes('dark')) {
+        await themeBtn.click();
+        await page.waitForTimeout(300);
+      }
+
+      const lightBg = await page.evaluate(() => window.getComputedStyle(document.body).backgroundColor);
+      expect(lightBg).toBe('rgb(255, 255, 255)');
+
+      // Toggle to dark
+      await themeBtn.click();
+      await page.waitForTimeout(300);
+
+      const darkBg = await page.evaluate(() => window.getComputedStyle(document.body).backgroundColor);
+      expect(darkBg).toBe('rgb(6, 11, 24)');
+      await expect(page.locator('html')).toHaveClass(/dark/);
+
+      // Toggle back to light
+      await themeBtn.click();
+      await page.waitForTimeout(300);
+
+      const revertedBg = await page.evaluate(() => window.getComputedStyle(document.body).backgroundColor);
+      expect(revertedBg).toBe('rgb(255, 255, 255)');
+      await expect(page.locator('html')).toHaveClass(/light/);
+    }
+  });
+
+  test('should prevent horizontal overflow across 320px, 375px, 390px, 430px, 768px, and 1280px viewports', async ({ page }) => {
+    const viewports = [
+      { width: 320, height: 600 },
+      { width: 375, height: 667 },
+      { width: 390, height: 844 },
+      { width: 430, height: 932 },
+      { width: 768, height: 1024 },
+      { width: 1280, height: 800 },
+    ];
+
+    const testPages = ['/en', '/en/community', '/en/about'];
+
+    for (const vp of viewports) {
+      await page.setViewportSize(vp);
+
+      for (const route of testPages) {
+        await page.goto(route);
+        await page.waitForLoadState('domcontentloaded');
+
+        const isOverflowing = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+        });
+
+        expect(
+          isOverflowing,
+          `Horizontal overflow detected on ${route} at viewport ${vp.width}x${vp.height}`
+        ).toBe(false);
+      }
+    }
   });
 });

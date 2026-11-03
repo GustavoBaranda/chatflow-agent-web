@@ -1,7 +1,17 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import nextConfigModule from '../../next.config.mjs';
+import {
+  applySecurityHeaders,
+  getSecurityHeaders,
+  getCspDirectives,
+  getContentSecurityPolicy,
+} from '../../src/config/security-headers';
 
-describe('HTTP Security Headers Suite (Phase 7B)', () => {
+describe('HTTP Security Headers Suite (Phase 7B / 7C)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('defines a headers function in next.config.mjs', () => {
     expect(typeof nextConfigModule).toBe('object');
     expect(typeof nextConfigModule?.headers).toBe('function');
@@ -54,7 +64,7 @@ describe('HTTP Security Headers Suite (Phase 7B)', () => {
     expect(refHeader?.value).toBe('strict-origin-when-cross-origin');
   });
 
-  it('includes Permissions-Policy restricting sensitive browser features', async () => {
+  it('includes Permissions-Policy restricting sensitive browser features without unrecognized browsing-topics', async () => {
     const headerConfigs = (await nextConfigModule.headers!()) as Array<{
       source: string;
       headers: Array<{ key: string; value: string }>;
@@ -65,9 +75,13 @@ describe('HTTP Security Headers Suite (Phase 7B)', () => {
     expect(permHeader?.value).toContain('camera=()');
     expect(permHeader?.value).toContain('microphone=()');
     expect(permHeader?.value).toContain('geolocation=()');
+    // Ensure unsupported / non-standard browsing-topics directive is removed to prevent browser console warnings
+    expect(permHeader?.value).not.toContain('browsing-topics');
+    expect(permHeader?.value).toBe('camera=(), microphone=(), geolocation=()');
   });
 
-  it('configures a comprehensive, non-breaking Content-Security-Policy (CSP)', async () => {
+  it('configures strict Content-Security-Policy (CSP) in production without unsafe-eval', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
     const headerConfigs = (await nextConfigModule.headers!()) as Array<{
       source: string;
       headers: Array<{ key: string; value: string }>;
@@ -91,6 +105,59 @@ describe('HTTP Security Headers Suite (Phase 7B)', () => {
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("base-uri 'self'");
     expect(csp).toContain("form-action 'self'");
+
+    // HSTS header in production
+    const hstsHeader = headers.find((h) => h.key === 'Strict-Transport-Security');
+    expect(hstsHeader).toBeDefined();
+    expect(hstsHeader?.value).toBe('max-age=31536000');
+  });
+
+  it('allows unsafe-eval in development CSP to support Next.js Fast Refresh and HMR runtime', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    const headerConfigs = (await nextConfigModule.headers!()) as Array<{
+      source: string;
+      headers: Array<{ key: string; value: string }>;
+    }>;
+    const headers = headerConfigs[0]?.headers ?? [];
+    const cspHeader = headers.find((h) => h.key === 'Content-Security-Policy');
+    expect(cspHeader).toBeDefined();
+
+    const csp = cspHeader?.value ?? '';
+    // Must contain unsafe-eval in development for React Refresh eval()
+    expect(csp).toContain("script-src 'self' 'unsafe-inline' 'unsafe-eval'");
+
+    // Must NOT weaken other core security directives
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("frame-ancestors 'self'");
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("base-uri 'self'");
+    expect(csp).toContain("form-action 'self'");
+
+    // HSTS should NOT be present in development
+    const hstsHeader = headers.find((h) => h.key === 'Strict-Transport-Security');
+    expect(hstsHeader).toBeUndefined();
+  });
+
+  it('validates security-headers module helper functions and application logic', () => {
+    // Production directives
+    const prodCsp = getContentSecurityPolicy(true);
+    expect(prodCsp).toContain("script-src 'self' 'unsafe-inline'");
+    expect(prodCsp).not.toContain("'unsafe-eval'");
+
+    // Development directives
+    const devCsp = getContentSecurityPolicy(false);
+    expect(devCsp).toContain("script-src 'self' 'unsafe-inline' 'unsafe-eval'");
+
+    // Header application
+    const mockHeaders = new Headers();
+    applySecurityHeaders(mockHeaders, true);
+    expect(mockHeaders.get('Permissions-Policy')).toBe('camera=(), microphone=(), geolocation=()');
+    expect(mockHeaders.get('Content-Security-Policy')).toBe(prodCsp);
+
+    const devHeaders = new Headers();
+    applySecurityHeaders(devHeaders, false);
+    expect(devHeaders.get('Permissions-Policy')).toBe('camera=(), microphone=(), geolocation=()');
+    expect(devHeaders.get('Content-Security-Policy')).toBe(devCsp);
   });
 
   it('disables the poweredByHeader to prevent Next.js framework fingerprinting', () => {

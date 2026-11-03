@@ -424,4 +424,91 @@ test.describe('Navigation, Home, and About Suite', () => {
       }
     }
   });
+
+  test('should render localized Open Graph and Twitter Card metadata across routes', async ({ page }) => {
+    // 1. Home EN
+    await page.goto('/en');
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+      'content',
+      'chatflow-agent — Conversational AI Agents in Python'
+    );
+    await expect(page.locator('meta[property="og:locale"]')).toHaveAttribute('content', 'en_US');
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/en'
+    );
+    await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute(
+      'content',
+      'chatflow-agent'
+    );
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/brand/social-preview.png'
+    );
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
+      'content',
+      'summary_large_image'
+    );
+    await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/brand/social-preview.png'
+    );
+
+    // 2. Home ES
+    await page.goto('/es');
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+      'content',
+      'chatflow-agent — Agentes de IA Conversacional en Python'
+    );
+    await expect(page.locator('meta[property="og:locale"]')).toHaveAttribute('content', 'es_ES');
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/es'
+    );
+
+    // 3. Home PT-BR
+    await page.goto('/pt-BR');
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+      'content',
+      'chatflow-agent — Agentes de IA Conversacional em Python'
+    );
+    await expect(page.locator('meta[property="og:locale"]')).toHaveAttribute('content', 'pt_BR');
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/pt-BR'
+    );
+
+    // 4. About page
+    await page.goto('/en/about');
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/en/about'
+    );
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/brand/social-preview.png'
+    );
+
+    // 5. Community page
+    await page.goto('/en/community');
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/en/community'
+    );
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/brand/social-preview.png'
+    );
+
+    // 6. Docs page
+    await page.goto('/en/docs');
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/en/docs/v0.3'
+    );
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/brand/social-preview.png'
+    );
+  });
 });

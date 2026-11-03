@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   SITE_ORIGIN,
   SUPPORTED_LOCALES,
+  SOCIAL_PREVIEW_IMAGE,
+  createSocialMetadata,
   isGenuineTranslation,
   resolveDocSeo,
 } from '@/config/docs-seo';
@@ -247,6 +249,101 @@ describe('Centralized Documentation SEO Policy', () => {
 
     it('points to the canonical sitemap XML', () => {
       expect(config.sitemap).toBe('https://chatflowagent.org/sitemap.xml');
+    });
+  });
+
+  describe('createSocialMetadata', () => {
+    it('creates standardized social metadata for English', () => {
+      const social = createSocialMetadata({
+        title: 'chatflow-agent — Conversational AI Agents in Python',
+        description: 'Official documentation and website for chatflow-agent.',
+        url: 'https://chatflowagent.org/en',
+        locale: 'en',
+      });
+
+      expect(social.openGraph).toEqual({
+        title: 'chatflow-agent — Conversational AI Agents in Python',
+        description: 'Official documentation and website for chatflow-agent.',
+        url: 'https://chatflowagent.org/en',
+        siteName: 'chatflow-agent',
+        locale: 'en_US',
+        type: 'website',
+        images: [
+          {
+            url: '/brand/social-preview.png',
+            width: 1200,
+            height: 630,
+            alt: 'chatflow-agent — Conversational AI Agents in Python',
+          },
+        ],
+      });
+
+      expect(social.twitter).toEqual({
+        card: 'summary_large_image',
+        title: 'chatflow-agent — Conversational AI Agents in Python',
+        description: 'Official documentation and website for chatflow-agent.',
+        images: ['/brand/social-preview.png'],
+      });
+
+      // Strict enforcement: zero invented Twitter handles
+      expect((social.twitter as Record<string, unknown>).creator).toBeUndefined();
+      expect((social.twitter as Record<string, unknown>).site).toBeUndefined();
+    });
+
+    it('maps Spanish locale to es_ES for Open Graph', () => {
+      const social = createSocialMetadata({
+        title: 'chatflow-agent — Agentes de IA Conversacional en Python',
+        description: 'Plataforma oficial de documentación para chatflow-agent.',
+        url: 'https://chatflowagent.org/es',
+        locale: 'es',
+      });
+
+      expect(social.openGraph.locale).toBe('es_ES');
+      expect(social.openGraph.title).toBe('chatflow-agent — Agentes de IA Conversacional en Python');
+      expect(social.twitter).toHaveProperty('card', 'summary_large_image');
+    });
+
+    it('maps Portuguese (Brasil) locale to pt_BR for Open Graph', () => {
+      const social = createSocialMetadata({
+        title: 'chatflow-agent — Agentes de IA Conversacional em Python',
+        description: 'Plataforma oficial de documentação para chatflow-agent.',
+        url: 'https://chatflowagent.org/pt-BR',
+        locale: 'pt-BR',
+      });
+
+      expect(social.openGraph.locale).toBe('pt_BR');
+      expect(social.openGraph.title).toBe('chatflow-agent — Agentes de IA Conversacional em Python');
+      expect(social.twitter).toHaveProperty('card', 'summary_large_image');
+    });
+
+    it('supports custom social preview image override', () => {
+      const customImage = 'https://chatflowagent.org/custom-image.png';
+      const social = createSocialMetadata({
+        title: 'Custom Title',
+        description: 'Custom Description',
+        url: 'https://chatflowagent.org/en/custom',
+        locale: 'en',
+        image: customImage,
+      });
+
+      expect(social.openGraph.images).toEqual([
+        {
+          url: customImage,
+          width: 1200,
+          height: 630,
+          alt: 'chatflow-agent — Conversational AI Agents in Python',
+        },
+      ]);
+      expect(social.twitter.images).toEqual([customImage]);
+    });
+
+    it('verifies standard social image dimensions and properties', () => {
+      expect(SOCIAL_PREVIEW_IMAGE).toEqual({
+        url: '/brand/social-preview.png',
+        width: 1200,
+        height: 630,
+        alt: 'chatflow-agent — Conversational AI Agents in Python',
+      });
     });
   });
 });

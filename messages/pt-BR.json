@@ -58,7 +58,8 @@
       "github": "Repositório no GitHub",
       "pypi": "Pacote no PyPI",
       "releases": "Versões e Histórico",
-      "contributing": "Como Contribuir"
+      "contributing": "Como Contribuir",
+      "sponsor": "Patrocinar"
     }
   },
   "about": {
@@ -213,6 +214,7 @@
     "step4Desc": "Abra um Pull Request detalhado vinculando issues relacionadas e seguindo a especificação do Conventional Commits.",
     "guidelinesNoticeTitle": "Colaboração em Código Aberto",
     "guidelinesNoticeDesc": "O chatflow-agent é um projeto de código aberto distribuído sob a Licença MIT e liderado por Gustavo Baranda. Toda a colaboração, acompanhamento de issues e discussões técnicas acontecem de forma transparente no GitHub.",
+    "sponsorAction": "Patrocinar no GitHub",
     "aboutAction": "Sobre o chatflow-agent"
   }
 }

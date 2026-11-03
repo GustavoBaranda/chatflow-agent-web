@@ -161,11 +161,9 @@ export default async function CommunityPage({
           >
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
               <div className="max-w-2xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                  <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>{t('featuredDocsBadge')}</span>
-                  <span className="text-primary/60">•</span>
-                  <span>{t('docsCardTitle')}</span>
+                <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  <BookOpen className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{t('featuredDocsBadge')}</span>
                 </div>
                 <h2
                   id="featured-docs-heading"
@@ -177,17 +175,17 @@ export default async function CommunityPage({
                   {t('featuredDocsDesc')}
                 </p>
               </div>
-              <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0 w-full sm:w-auto">
                 <Link
                   href="/docs"
-                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-xs transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-primary"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-xs transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-primary w-full sm:w-auto"
                 >
                   <span>{t('featuredDocsAction')}</span>
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
                 <Link
                   href="/docs/v0.3/getting-started/quickstart"
-                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary w-full sm:w-auto"
                 >
                   <span>{t('featuredDocsQuickstart')}</span>
                 </Link>
@@ -302,12 +300,12 @@ export default async function CommunityPage({
             <p className="mt-3 text-sm sm:text-base leading-relaxed text-muted-foreground">
               {t('guidelinesNoticeDesc')}
             </p>
-            <div className="mt-6 flex flex-wrap items-center gap-3 sm:gap-4">
+            <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
               <a
                 href="https://github.com/GustavoBaranda/chatflow-agent"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-xs transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-xs transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary w-full sm:w-auto"
               >
                 <GitHubIcon className="h-4 w-4" />
                 <span>{t('repoCardAction')}</span>
@@ -316,14 +314,14 @@ export default async function CommunityPage({
                 href="https://github.com/sponsors/GustavoBaranda"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg border border-pink-500/30 bg-pink-500/10 px-4 py-2 text-sm font-semibold text-pink-700 dark:text-pink-300 shadow-xs transition-colors hover:bg-pink-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-500"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-pink-500/30 bg-pink-500/10 px-4 py-2.5 text-sm font-semibold text-pink-700 dark:text-pink-300 shadow-xs transition-colors hover:bg-pink-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-500 w-full sm:w-auto"
               >
                 <Heart className="h-4 w-4 fill-pink-500 text-pink-500" aria-hidden="true" />
                 <span>{t('sponsorAction')}</span>
               </a>
               <Link
                 href="/about"
-                className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary w-full sm:w-auto"
               >
                 <span>{t('aboutAction')}</span>
                 <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />

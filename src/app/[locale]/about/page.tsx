@@ -82,7 +82,7 @@ export default async function AboutPage({
 
   return (
     <main id="main-content" className="flex-1">
-      <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
         {/* Page Hero */}
         <header className="text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1 text-xs font-semibold text-primary">
@@ -145,9 +145,9 @@ export default async function AboutPage({
             {t('leadershipTitle')}
           </h2>
 
-          <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
+          <div className="mt-8 grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-2">
             {/* Creator & Lead Maintainer Card */}
-            <article className="flex flex-col justify-between rounded-xl border border-border bg-card p-6 sm:p-8 shadow-xs transition-shadow hover:shadow-md">
+            <article className="flex flex-col justify-between rounded-xl border border-border bg-card p-5 sm:p-8 shadow-xs transition-shadow hover:shadow-md">
               <div>
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -182,7 +182,7 @@ export default async function AboutPage({
             </article>
 
             {/* Global Community Card */}
-            <article className="flex flex-col justify-between rounded-xl border border-border bg-card p-6 sm:p-8 shadow-xs transition-shadow hover:shadow-md">
+            <article className="flex flex-col justify-between rounded-xl border border-border bg-card p-5 sm:p-8 shadow-xs transition-shadow hover:shadow-md">
               <div>
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
@@ -230,17 +230,17 @@ export default async function AboutPage({
             <p className="mt-3 text-sm sm:text-base leading-relaxed text-muted-foreground">
               {t('closingSubtitle')}
             </p>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+            <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 max-w-xs sm:max-w-none mx-auto w-full">
               <Link
                 href="/docs"
-                className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-xs transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-primary"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-xs transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-primary w-full sm:w-auto"
               >
                 <BookOpen className="h-4 w-4" aria-hidden="true" />
                 <span>{t('closingDocsAction')}</span>
               </Link>
               <Link
                 href="/community"
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-5 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-5 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary w-full sm:w-auto"
               >
                 <span>{t('closingCommunityAction')}</span>
                 <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />

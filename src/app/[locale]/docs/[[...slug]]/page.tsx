@@ -13,6 +13,8 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 import { PrereleaseBanner } from '@/components/docs/PrereleaseBanner';
 import { DEFAULT_STABLE_TRACK } from '@/config/docs-versions';
 import { resolveDocSeo, createSocialMetadata } from '@/config/docs-seo';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { getDocStructuredData } from '@/lib/structured-data';
 import type { Metadata } from 'next';
 
 const customMdxComponents = {
@@ -94,31 +96,51 @@ export default async function Page({ params }: PageProps) {
   const { locale, slug = [] } = await params;
   setRequestLocale(locale);
 
-  const { page, targetSlug, isFallback, track, cleanSlug } = resolveDocPage(slug, locale);
+  const { page, targetSlug, isFallback, track, cleanSlug, isExplicitTrack } = resolveDocPage(slug, locale);
 
   if (!page) {
     notFound();
   }
 
+  const seo = resolveDocSeo({
+    track,
+    cleanSlug,
+    locale,
+    isExplicitTrack,
+    isFallback,
+  });
+
+  const structuredData = getDocStructuredData({
+    title: page.data.title,
+    description: page.data.description ?? '',
+    canonicalUrl: seo.canonicalUrl,
+    locale,
+    track,
+    cleanSlug,
+  });
+
   const MDX = page.data.body;
   const cleanNoticeSlug = targetSlug.join('/');
 
   return (
-    <DocsPage toc={page.data.toc} full={page.data.full}>
-      <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription>{page.data.description}</DocsDescription>
+    <>
+      <JsonLd data={structuredData} />
+      <DocsPage toc={page.data.toc} full={page.data.full}>
+        <DocsTitle>{page.data.title}</DocsTitle>
+        <DocsDescription>{page.data.description}</DocsDescription>
 
-      {isFallback && (
-        <TranslationNotice targetLocale={locale} slug={cleanNoticeSlug} />
-      )}
+        {isFallback && (
+          <TranslationNotice targetLocale={locale} slug={cleanNoticeSlug} />
+        )}
 
-      {track === 'v0.4' && (
-        <PrereleaseBanner locale={locale} currentSlug={cleanSlug} />
-      )}
+        {track === 'v0.4' && (
+          <PrereleaseBanner locale={locale} currentSlug={cleanSlug} />
+        )}
 
-      <DocsBody>
-        <MDX components={customMdxComponents} />
-      </DocsBody>
-    </DocsPage>
+        <DocsBody>
+          <MDX components={customMdxComponents} />
+        </DocsBody>
+      </DocsPage>
+    </>
   );
 }

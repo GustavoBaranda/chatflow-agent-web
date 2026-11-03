@@ -4,6 +4,8 @@ import { routing } from '@/i18n/routing';
 import { Link } from '@/i18n/navigation';
 import { GitHubIcon } from '@/components/ui/icons';
 import { SITE_ORIGIN, createSocialMetadata } from '@/config/docs-seo';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { getAboutStructuredData } from '@/lib/structured-data';
 import {
   Code2,
   Users,
@@ -91,8 +93,10 @@ export default async function AboutPage({
   ];
 
   return (
-    <main id="main-content" className="flex-1">
-      <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
+    <>
+      <JsonLd data={getAboutStructuredData(locale)} />
+      <main id="main-content" className="flex-1">
+        <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
         {/* Page Hero */}
         <header className="text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1 text-xs font-semibold text-primary">
@@ -260,5 +264,6 @@ export default async function AboutPage({
         </section>
       </div>
     </main>
+    </>
   );
 }

@@ -4,8 +4,6 @@ import { createMDX } from 'fumadocs-mdx/next';
 const withNextIntl = createNextIntlPlugin();
 const withMDX = createMDX();
 
-const isProduction = process.env.NODE_ENV === 'production';
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -20,6 +18,7 @@ const nextConfig = {
     return config;
   },
   async headers() {
+    const isProduction = process.env.NODE_ENV === 'production';
     return [
       {
         source: '/:path*',
@@ -42,13 +41,15 @@ const nextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()',
+            value: 'camera=(), microphone=(), geolocation=()',
           },
           {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline'",
+              isProduction
+                ? "script-src 'self' 'unsafe-inline'"
+                : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",

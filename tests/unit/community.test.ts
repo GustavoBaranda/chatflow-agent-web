@@ -97,9 +97,21 @@ describe('Community Page Unit Tests', () => {
   it('strictly adheres to public Python SDK repository and official destinations', () => {
     const authoritativeRepo = 'https://github.com/GustavoBaranda/chatflow-agent';
     const authoritativePyPI = 'https://pypi.org/project/chatflow-agent/';
+    const authoritativeSponsors = 'https://github.com/sponsors/GustavoBaranda';
 
     // Validate that the community links reference verified public URLs
     expect(authoritativeRepo).toBe('https://github.com/GustavoBaranda/chatflow-agent');
     expect(authoritativePyPI).toBe('https://pypi.org/project/chatflow-agent/');
+    expect(authoritativeSponsors).toBe('https://github.com/sponsors/GustavoBaranda');
+
+    // Verify localized sponsor action strings exist and are non-empty
+    expect(enMessages.community.sponsorAction).toBe('Sponsor on GitHub');
+    expect(esMessages.community.sponsorAction).toBe('Patrocinar en GitHub');
+    expect(ptBRMessages.community.sponsorAction).toBe('Patrocinar no GitHub');
+
+    // Verify footer sponsor link strings exist
+    expect(enMessages.footer.links.sponsor).toBe('Sponsor');
+    expect(esMessages.footer.links.sponsor).toBe('Patrocinar');
+    expect(ptBRMessages.footer.links.sponsor).toBe('Patrocinar');
   });
 });

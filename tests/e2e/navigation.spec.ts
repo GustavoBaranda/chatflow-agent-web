@@ -103,6 +103,13 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(signatureLink).toContainText('Gustavo Baranda · © 2026');
     const signatureImg = signatureLink.locator('img[src="/brand/gustavo-baranda.svg"]');
     await expect(signatureImg).toBeVisible();
+
+    // Verify GitHub Sponsors link with pink heart in footer
+    const footerSponsorLinks = footer.locator('a[href="https://github.com/sponsors/GustavoBaranda"]');
+    await expect(footerSponsorLinks.first()).toBeVisible();
+    await expect(footerSponsorLinks.first()).toHaveAttribute('target', '_blank');
+    await expect(footerSponsorLinks.first()).toHaveAttribute('rel', 'noopener noreferrer');
+    await expect(footerSponsorLinks.first()).toContainText('Sponsor');
   });
 
   test('should navigate to dedicated multilingual About page and verify Creator attribution in English', async ({ page }) => {

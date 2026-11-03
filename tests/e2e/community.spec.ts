@@ -98,9 +98,15 @@ test.describe('Home and Community Navigation Suite', () => {
     const stepCards = page.locator('section[aria-labelledby="how-to-contribute-heading"] .rounded-xl');
     await expect(stepCards).toHaveCount(4);
 
-    // Open Source Collaboration Notice
+    // Open Source Collaboration Notice and Sponsor CTA
     const governanceHeading = page.locator('h2:has-text("Open Source Collaboration")');
     await expect(governanceHeading).toBeVisible();
+
+    const sponsorBtn = page.locator('a[href="https://github.com/sponsors/GustavoBaranda"]').first();
+    await expect(sponsorBtn).toBeVisible();
+    await expect(sponsorBtn).toContainText('Sponsor on GitHub');
+    await expect(sponsorBtn).toHaveAttribute('target', '_blank');
+    await expect(sponsorBtn).toHaveAttribute('rel', 'noopener noreferrer');
 
     // Canonical link tag in DOM
     const canonical = page.locator('link[rel="canonical"]');
@@ -116,6 +122,7 @@ test.describe('Home and Community Navigation Suite', () => {
 
     const esCanonical = page.locator('link[rel="canonical"]');
     await expect(esCanonical).toHaveAttribute('href', 'https://chatflowagent.org/es/community');
+    await expect(page.locator('a[href="https://github.com/sponsors/GustavoBaranda"]').first()).toContainText('Patrocinar en GitHub');
 
     // Test Brazilian Portuguese (pt-BR)
     await page.goto('/pt-BR/community');
@@ -125,6 +132,7 @@ test.describe('Home and Community Navigation Suite', () => {
 
     const ptCanonical = page.locator('link[rel="canonical"]');
     await expect(ptCanonical).toHaveAttribute('href', 'https://chatflowagent.org/pt-BR/community');
+    await expect(page.locator('a[href="https://github.com/sponsors/GustavoBaranda"]').first()).toContainText('Patrocinar no GitHub');
   });
 
   test('should display Home and Community links in mobile drawer with active states', async ({ page }) => {

@@ -53,3 +53,23 @@ export function getRouteRedirectMap(locale: string = 'en', targetTrack: string =
   return map;
 }
 
+/**
+ * Resolve a valid unversioned documentation path to its stable canonical path.
+ *
+ * Versioned paths and unknown paths return undefined so they continue through
+ * the regular Next.js and Fumadocs routing pipeline.
+ */
+export function getLegacyDocumentationRedirect(
+  pathname: string,
+  locales: readonly string[],
+  targetTrack: string = DEFAULT_STABLE_TRACK,
+): string | undefined {
+  for (const locale of locales) {
+    const targetPath = getRouteRedirectMap(locale, targetTrack)[pathname];
+    if (targetPath) {
+      return targetPath;
+    }
+  }
+
+  return undefined;
+}

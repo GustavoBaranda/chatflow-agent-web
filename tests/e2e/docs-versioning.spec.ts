@@ -356,7 +356,8 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
     expect(text).toContain('User-Agent: *');
     expect(text).toContain('Allow: /');
     expect(text).toContain('Disallow: /api/');
-    expect(text).toContain('Disallow: /_next/');
+    expect(text).not.toContain('Disallow: /_next/');
+    expect(text).not.toContain('Disallow: /_next/static/');
     expect(text).toContain('Sitemap: https://chatflowagent.org/sitemap.xml');
   });
 });

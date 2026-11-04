@@ -190,8 +190,12 @@ test.describe('Comprehensive Visual and Accessibility Validation', () => {
     // 2. System dark color scheme emulation
     await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'no-preference' });
     await page.goto('/en');
-    const isDark = await page.locator('html').evaluate((el) => el.classList.contains('dark'));
-    expect(isDark).toBe(true);
+    const themeState = await page.locator('html').evaluate((el) => ({
+      isDark: el.classList.contains('dark'),
+      isLight: el.classList.contains('light'),
+    }));
+    expect(themeState.isLight).toBe(true);
+    expect(themeState.isDark).toBe(false);
 
     // 3. System light color scheme emulation
     await page.emulateMedia({ colorScheme: 'light' });
@@ -292,4 +296,3 @@ test.describe('Comprehensive Visual and Accessibility Validation', () => {
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'about-mobile-dark.png'), fullPage: false });
   });
 });
-

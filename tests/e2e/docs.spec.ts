@@ -61,6 +61,7 @@ test.describe('Documentation Engine E2E Suite', () => {
 
     const langBtn = page.locator('header button[aria-label="Cambiar idioma"]');
     await expect(langBtn).toBeVisible();
+    await expect(langBtn).toHaveAttribute('aria-label', 'Cambiar idioma');
 
     const h1Elements = page.locator('article h1, main h1');
     await expect(h1Elements).toHaveCount(1);
@@ -83,6 +84,7 @@ test.describe('Documentation Engine E2E Suite', () => {
 
     const langBtn = page.locator('header button[aria-label="Alterar idioma"]');
     await expect(langBtn).toBeVisible();
+    await expect(langBtn).toHaveAttribute('aria-label', 'Alterar idioma');
 
     const ptH1Elements = page.locator('article h1, main h1');
     await expect(ptH1Elements).toHaveCount(1);

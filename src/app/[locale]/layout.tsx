@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { getMessages, setRequestLocale } from 'next-intl/server';
+import { setRequestLocale } from 'next-intl/server';
 import { NextIntlClientProvider } from 'next-intl';
 import { routing } from '@/i18n/routing';
 import { getLanguage } from '@/config/languages';
@@ -75,7 +75,7 @@ export default async function LocaleLayout({
 
   setRequestLocale(locale);
 
-  const messages = await getMessages();
+  const messages = (await import(`../../../messages/${locale}.json`)).default;
   const lang = getLanguage(locale);
 
   return (

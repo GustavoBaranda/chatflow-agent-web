@@ -331,7 +331,7 @@ test.describe('Mobile Sidebar and Upward Language Selector Suite', () => {
     // Click Docs link
     const docsLink = drawer.locator('nav a[href="/en/docs"]');
     await docsLink.click();
-    await page.waitForURL('**/en/docs');
+    await page.waitForURL('**/en/docs/v0.3');
 
     await expect(drawer).not.toBeVisible();
   });

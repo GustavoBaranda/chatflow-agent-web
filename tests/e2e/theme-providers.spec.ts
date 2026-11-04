@@ -26,7 +26,7 @@ test.describe('Theme System, Providers & Console Integrity Suite', () => {
     expect(isConsoleNative).toBe(true);
   });
 
-  test('should correctly apply dark mode on first load when system preference is dark', async ({ page }) => {
+  test('should default to light mode regardless of system preference', async ({ page }) => {
     const jsErrors: string[] = [];
     page.on('pageerror', (err) => jsErrors.push(err.message));
     page.on('console', (msg) => {
@@ -35,12 +35,15 @@ test.describe('Theme System, Providers & Console Integrity Suite', () => {
       }
     });
 
+    await page.addInitScript(() => {
+      localStorage.removeItem('theme');
+    });
     await page.emulateMedia({ colorScheme: 'dark' });
-    await page.goto('/en');
-    await page.waitForLoadState('networkidle');
-
-    const html = page.locator('html');
-    await expect(html).toHaveClass(/dark/);
+    for (const locale of ['en', 'es', 'pt-BR']) {
+      await page.goto(`/${locale}`);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('html')).toHaveClass(/light/);
+    }
     expect(jsErrors).toEqual([]);
   });
 
@@ -132,17 +135,17 @@ test.describe('Theme System, Providers & Console Integrity Suite', () => {
     expect(jsErrors).toEqual([]);
   });
 
-  test('should render theme script with async attribute arriving at DOM', async ({ page }) => {
+  test('should render a blocking theme script for flash-free initialization', async ({ page }) => {
     await page.goto('/en');
     await page.waitForLoadState('networkidle');
 
     // Locate the inline script rendered by next-themes
-    const hasAsyncThemeScript = await page.evaluate(() => {
+    const hasBlockingThemeScript = await page.evaluate(() => {
       const scripts = Array.from(document.querySelectorAll('script'));
-      return scripts.some((s) => s.hasAttribute('async') && (s.textContent?.includes('localStorage') || s.textContent?.includes('colorScheme')));
+      return scripts.some((s) => !s.hasAttribute('async') && (s.textContent?.includes('localStorage') || s.textContent?.includes('colorScheme')));
     });
 
-    expect(hasAsyncThemeScript).toBe(true);
+    expect(hasBlockingThemeScript).toBe(true);
   });
 
   test('should serve correct initial SSR html lang attribute directly in server response for each locale', async ({ request }) => {

@@ -3,8 +3,12 @@ import { spawnSync } from 'node:child_process';
 import { describe, it, expect } from 'vitest';
 
 const ROOT_DIR = process.cwd();
-const PYTHON_34 = path.resolve(ROOT_DIR, '.cache/sdk-venvs/0.3.4/Scripts/python.exe');
-const PYTHON_40 = path.resolve(ROOT_DIR, '.cache/sdk-venvs/0.4.0rc1/Scripts/python.exe');
+const PYTHON_BIN_DIR = process.platform === 'win32' ? 'Scripts' : 'bin';
+const PYTHON_BIN_NAME = process.platform === 'win32' ? 'python.exe' : 'python';
+const resolveSdkPython = (version: string) =>
+  path.resolve(ROOT_DIR, '.cache', 'sdk-venvs', version, PYTHON_BIN_DIR, PYTHON_BIN_NAME);
+const PYTHON_34 = resolveSdkPython('0.3.4');
+const PYTHON_40 = resolveSdkPython('0.4.0rc1');
 
 const LOADER_PRELUDE = `
 import sys, os, importlib.util
@@ -27,7 +31,7 @@ function runPythonTest(pyBin: string, testScript: string) {
     },
   });
   if (result.status !== 0) {
-    console.error('Python Error:', result.stderr || result.stdout);
+    console.error('Python Error:', result.error ?? result.stderr ?? result.stdout);
   }
   return result;
 }

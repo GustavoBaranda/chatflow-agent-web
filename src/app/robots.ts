@@ -8,7 +8,7 @@ import { SITE_ORIGIN } from '@/config/docs-seo';
  * and fallback pages) so search engines can read and respect the page-level
  * `<meta name="robots" content="noindex, follow" />` directives.
  *
- * Disallows private build assets and API endpoints.
+ * Disallows API endpoints while keeping Next.js rendering assets crawlable.
  */
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -16,7 +16,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/api/', '/_next/'],
+        disallow: ['/api/'],
       },
     ],
     sitemap: `${SITE_ORIGIN}/sitemap.xml`,

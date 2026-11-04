@@ -14,7 +14,7 @@ The platform is engineered with modern full-stack standards:
 - **Automated SDK Parity & AST Validation:** Every code snippet is validated against official published Python wheels from PyPI to prevent documentation rot and signature drift.
 - **Search & Navigation Architecture:** Version-scoped full-text search powered by Fumadocs and isolated sidebar navigation trees.
 
-> **Note on Deployment Status:** This repository is currently in local development and staging verification. The public production deployment and domain configuration are in progress.
+> **Note on Deployment Status:** This repository is prepared and verified for local development. No public production deployment is claimed or managed from this workspace.
 
 ---
 
@@ -45,8 +45,8 @@ The platform adheres to a strict flagless, native naming convention to ensure in
 - **Internationalization (i18n):** [next-intl 4.14.9](https://next-intl.dev/) (Request-based locale detection, compile-time message catalogs)
 - **Styling & Design System:** [Tailwind CSS v4.3.3](https://tailwindcss.com/) (CSS-first architecture via `@tailwindcss/postcss`)
 - **Animations & Icons:** [Framer Motion 14.7.1](https://www.framer.com/motion/), [Lucide React 1.63.0](https://lucide.dev/)
-- **Unit & Integration Testing:** [Vitest 5.0.5](https://vitest.dev/) (417 automated unit and regression tests)
-- **End-to-End Testing:** [Playwright 1.50.0](https://playwright.dev/) (105 browser integration tests)
+- **Unit & Integration Testing:** [Vitest 5.0.5](https://vitest.dev/) (462 automated unit and regression tests)
+- **End-to-End Testing:** [Playwright 1.50.0](https://playwright.dev/) (142 browser integration tests)
 - **Python AST Parity Validator:** Python 3.10+ isolated virtual environments validating syntax and execution against published PyPI wheels
 
 ---
@@ -57,7 +57,7 @@ Before running the project locally, verify the following dependencies:
 
 | Tool | Required Version | Purpose |
 | :--- | :--- | :--- |
-| **Node.js** | `>=20.18.0` (LTS) | Next.js server runtime and tooling |
+| **Node.js** | `>=20.19.0` (LTS) | Next.js server runtime and tooling |
 | **pnpm** | `>=9.15.0` | Strict package manager and dependency resolution |
 | **Python** | `>=3.10` | Python runtime for AST parity checks and SDK execution tests |
 
@@ -107,8 +107,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser. The root pa
 | `pnpm start` | Serve production build locally on port 3001 |
 | `pnpm run lint` | Run ESLint across all source files |
 | `pnpm run typecheck` | Run TypeScript type checking (`tsc --noEmit`) |
-| `pnpm test` | Run 417 Vitest unit and regression tests |
-| `pnpm run test:e2e` | Run 105 Playwright E2E browser tests (Chromium) |
+| `pnpm test` | Run 462 Vitest unit and regression tests |
+| `pnpm run test:e2e` | Run 142 Playwright E2E browser tests (Chromium) |
 | `pnpm run test:sdk:parity` | Validate documentation Python snippets against published SDK releases |
 | `pnpm run check:i18n` | Verify UI message key completeness across all supported locales |
 | `pnpm run check:links` | Audit internal documentation link and version consistency |
@@ -182,4 +182,3 @@ The `chatflow-agent-web` website source code and documentation are released unde
 - **Full License Text:** Available in the root [`LICENSE`](LICENSE) file.
 - **Python SDK Licensing:** The [`chatflow-agent`](https://github.com/GustavoBaranda/chatflow-agent) Python SDK is an independent project that is also released under the MIT License.
 - **Brand & Identifiers:** The MIT License applies to the software and documentation source code and does not grant rights to use the `chatflow-agent` name, logos, or other brand identifiers in a manner that suggests official endorsement or affiliation.
-

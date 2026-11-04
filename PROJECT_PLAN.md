@@ -45,7 +45,7 @@ flowchart LR
 * **Goal:** Initialize the local repository environment with modern stable dependencies, strict TypeScript, Tailwind v4, and testing harnesses.
 * **Deliverables:**
   - Local Git repository initialization with clean `.gitignore`.
-  - Pinned `package.json` (`"packageManager": "pnpm@9.15.0"`, `"engines": { "node": ">=20.18.0", "pnpm": ">=9.15.0" }`).
+  - Pinned `package.json` (`"packageManager": "pnpm@9.15.0"`, `"engines": { "node": ">=20.19.0", "pnpm": ">=9.15.0" }`).
   - Next.js 16, React 19, Fumadocs v16, and `next-intl` v4 dependencies configured in `package.json`.
   - Strict TypeScript configuration (`tsconfig.json`: `strict: true`, `noImplicitAny: true`, `strictNullChecks: true`).
   - Tailwind CSS v4 setup (`app/globals.css` with `@import "tailwindcss";`, `@theme`, `@source`).
@@ -65,7 +65,7 @@ flowchart LR
 ### Phase 2: Multilingual Infrastructure & Application Shell
 * **Goal:** Build the locale-aware application shell, middleware with explicit language prefixes, and navigation chrome supporting English (`en`), Spanish (`es`), and Brazilian Portuguese (`pt-BR`).
 * **Deliverables:**
-  - `src/middleware.ts` configured with `next-intl/middleware` and `localePrefix: 'always'` (`/en/...`, `/es/...`, `/pt-BR/...`).
+  - `src/proxy.ts` configured with `next-intl` routing and `localePrefix: 'always'` (`/en/...`, `/es/...`, `/pt-BR/...`).
   - Redirection logic from `/` to `/en/`, `/es/`, or `/pt-BR/` based on request header negotiation.
   - Extensible language configuration (`src/config/languages.ts`) and base catalogs: `messages/en.json`, `messages/es.json`, `messages/pt-BR.json`.
   - Root layout (`src/app/[locale]/layout.tsx`) with `setRequestLocale(locale)`, async `params` resolution, directional attributes (`dir="ltr"`), dynamic alternates and hreflang for all locales.
@@ -89,7 +89,7 @@ flowchart LR
 * **Goal:** Integrate Fumadocs, establish the MDX content compilation pipeline, and create the authoritative English documentation baseline.
 * **Deliverables:**
   - Fumadocs core and UI integration (`src/lib/source.ts`, `src/app/[locale]/docs/layout.tsx`).
-  - Dynamic catch-all MDX route (`src/app/[locale]/docs/[[...slug]]/page.tsx`) supporting Next.js 15 async `params`.
+  - Dynamic catch-all MDX route (`src/app/[locale]/docs/[[...slug]]/page.tsx`) supporting Next.js 16 async `params`.
   - Content frontmatter schema validation with Zod (`title`, `description`, `sourceRevision`, `sourceHash`).
   - Custom MDX components: `Callout`, `Card`, `Cards`, `CodeBlock`, `Tabs`, `Steps`.
   - Local search engine integration (Fumadocs Search / Orama route handler).
@@ -181,7 +181,7 @@ flowchart LR
 ---
 
 ### Phase 8: Deployment Readiness & Final Review
-* **Goal:** Prepare the local application for future remote publication and production deployment on Vercel.
+* **Goal:** Prepare the local application for a future, separately authorized public release and production deployment.
 * **Deliverables:**
   - Production build verification (`pnpm run build` succeeds locally with zero warnings).
   - Vercel configuration (`vercel.json`) with security headers (CSP, HSTS, X-Content-Type-Options).
@@ -254,7 +254,7 @@ To enable frictionless contributions from worldwide developers and technical wri
 1. **Toolchain Pinning:**
    ```json
    "engines": {
-     "node": ">=20.18.0",
+     "node": ">=20.19.0",
      "pnpm": ">=9.15.0"
    },
    "packageManager": "pnpm@9.15.0"

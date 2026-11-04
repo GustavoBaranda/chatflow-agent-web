@@ -31,7 +31,7 @@
 
 ### 2.1 Package Manager & Tooling
 * Always use **`pnpm`** as the package manager (`pnpm install`, `pnpm add`, `pnpm run <script>`).
-* Respect the pinned toolchain in `package.json` (`node >= 20.18.0`, `pnpm >= 9.15.0`).
+* Respect the pinned toolchain in `package.json` (`node >= 20.19.0`, `pnpm >= 9.15.0`).
 
 ### 2.2 TypeScript & Type Safety
 * All code must use strict TypeScript (`strict: true` in `tsconfig.json`).

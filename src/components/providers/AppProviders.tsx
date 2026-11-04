@@ -33,9 +33,8 @@ export function AppProviders({
       }}
       theme={{
         attribute: 'class',
-        defaultTheme: 'system',
-        enableSystem: true,
-        scriptProps: { async: true },
+        defaultTheme: 'light',
+        enableSystem: false,
       }}
     >
       {children}

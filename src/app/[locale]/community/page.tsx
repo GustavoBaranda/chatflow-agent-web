@@ -174,7 +174,7 @@ export default async function CommunityPage({
             className="rounded-2xl border border-primary/30 bg-linear-to-br from-card via-card to-primary/5 p-6 sm:p-8 shadow-xs"
           >
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-              <div className="max-w-2xl">
+              <div className="min-w-0 max-w-2xl">
                 <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                   <BookOpen className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   <span className="truncate">{t('featuredDocsBadge')}</span>

@@ -135,6 +135,32 @@ test.describe('Home and Community Navigation Suite', () => {
     await expect(page.locator('a[href="https://github.com/sponsors/GustavoBaranda"]').first()).toContainText('Patrocinar no GitHub');
   });
 
+  test('should prevent horizontal overflow across supported viewports and locales', async ({ page }) => {
+    const viewports = [
+      { width: 375, height: 812 },
+      { width: 768, height: 1024 },
+      { width: 1024, height: 768 },
+      { width: 1440, height: 900 },
+    ];
+    const locales = ['en', 'es', 'pt-BR'];
+
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport);
+
+      for (const locale of locales) {
+        await page.goto(`/${locale}/community`);
+        const isOverflowing = await page.evaluate(
+          () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+        );
+
+        expect(
+          isOverflowing,
+          `Horizontal overflow detected on /${locale}/community at ${viewport.width}x${viewport.height}`
+        ).toBe(false);
+      }
+    }
+  });
+
   test('should display Home and Community links in mobile drawer with active states', async ({ page }) => {
     // Set mobile viewport
     await page.setViewportSize({ width: 390, height: 844 });

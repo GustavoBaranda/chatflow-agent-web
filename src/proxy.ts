@@ -7,6 +7,7 @@ import {
   isStaticAsset,
 } from './lib/maintenance';
 import { applySecurityHeaders } from './config/security-headers';
+import { getLegacyDocumentationRedirect } from './config/docs-routes-inventory';
 
 const intlMiddleware = createMiddleware(routing);
 
@@ -56,6 +57,18 @@ export default function proxy(request: NextRequest) {
     });
   }
 
+  const legacyDocumentationRedirect = getLegacyDocumentationRedirect(
+    pathname,
+    routing.locales,
+  );
+  if (legacyDocumentationRedirect) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = legacyDocumentationRedirect;
+    const response = NextResponse.redirect(redirectUrl, 308);
+    applySecurityHeaders(response.headers);
+    return response;
+  }
+
   const response = intlMiddleware(request);
   applySecurityHeaders(response.headers);
   return response;
@@ -67,4 +80,3 @@ export const config = {
   // - … the ones containing a dot (e.g. `favicon.ico`)
   matcher: ['/((?!api|_next|_vercel|.*\\..*).*)'],
 };
-

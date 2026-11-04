@@ -242,9 +242,10 @@ describe('Centralized Documentation SEO Policy', () => {
       expect(rule?.allow).toBe('/');
     });
 
-    it('disallows internal build assets and APIs', () => {
+    it('allows Next.js rendering assets while disallowing APIs', () => {
       const rule = Array.isArray(config.rules) ? config.rules[0] : config.rules;
-      expect(rule?.disallow).toEqual(['/api/', '/_next/']);
+      expect(rule?.disallow).toEqual(['/api/']);
+      expect(rule?.disallow).not.toContain('/_next/');
     });
 
     it('points to the canonical sitemap XML', () => {

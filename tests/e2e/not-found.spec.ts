@@ -123,6 +123,7 @@ test.describe('Custom 404 Page Suite', () => {
   });
 
   test('visual capture: take screenshots across 3 locales, themes (light/dark) and viewports (desktop/mobile)', async ({ page }) => {
+    test.slow();
     const locales = ['en', 'es', 'pt-BR'];
 
     for (const locale of locales) {

@@ -1,0 +1,10 @@
+{
+  "title": "Padrões de Produção",
+  "pages": [
+    "error-handling",
+    "configuration",
+    "observability",
+    "security",
+    "deployment"
+  ]
+}

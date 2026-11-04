@@ -1,0 +1,220 @@
+---
+title: "Core Concepts"
+description: "Understand the core architecture of chatflow-agent: Agents, Engines, Tools, Runner, Memory, and Handoffs."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+`chatflow-agent` is built upon six foundational architectural primitives that together enable lightweight, modular, and fault-tolerant conversational AI systems:
+
+---
+
+## 1. The Agent (`Agent`)
+
+An `Agent` represents an autonomous actor with an explicit persona, system prompt instructions, a designated LLM model and engine, and access to tools or handoff peers.
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from chatflow_agent import Agent
+
+# Static prompt instructions with target model
+agent = Agent(
+    name="TriageBot",
+    instructions="You are the front desk concierge. Route questions to specialists.",
+    model="gpt-4o",
+)
+```
+
+### Dynamic Instructions
+
+Instructions can be a static string or a dynamic Python callable (`Callable[[], str]`). Dynamic instructions are evaluated at the beginning of each turn:
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from datetime import datetime
+from chatflow_agent import Agent
+
+def get_live_instructions() -> str:
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return f"You are a scheduling assistant. Current server time is {now}."
+
+agent = Agent(
+    name="ScheduleBot",
+    instructions=get_live_instructions,
+    model="gemini-2.5-flash",
+)
+```
+
+<Callout type="info" title="Swarm Identity Validation in v0.4.0rc1">
+In <VersionBadge version="0.4.0rc1" status="prerelease" />, the <code>Runner</code> strictly validates that all agents within a swarm possess distinct <code>name</code> attributes, raising a <code>ValueError</code> if duplicate names are detected to prevent tool generation collisions.
+</Callout>
+
+---
+
+## 2. The Execution Engine (`Runner`)
+
+The `Runner` orchestrates the conversation lifecycle. It handles:
+
+1. Loading session context and conversation history from the `SessionStore`.
+2. Taking an **atomic snapshot** of the session state prior to executing the turn.
+3. Invoking the model engine.
+4. Parsing tool calls, executing the corresponding functions, and feeding results back to the model until a final response is generated.
+5. Committing state changes, or rolling back automatically if an unhandled exception or timeout occurs.
+
+```python
+from chatflow_agent import Agent, Runner, SessionStore
+
+agent = Agent(
+    name="Assistant",
+    instructions="Concise scheduling assistant.",
+    model="gpt-4o",
+)
+
+store = SessionStore()
+
+runner = Runner(
+    starting_agent=agent,
+    session_store=store,
+)
+
+# Synchronous invocation
+response = runner.run(
+    session_id="user_123",
+    user_message="Book a meeting tomorrow at 3 PM",
+)
+
+# Asynchronous invocation
+response = await runner.run_async(
+    session_id="user_123",
+    user_message="Book a meeting tomorrow at 3 PM",
+)
+```
+
+<Callout type="info" title="turn_timeout in v0.4.0rc1">
+In <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>Runner.run_async</code> introduces an optional <code>turn_timeout: float | None = None</code> keyword parameter (e.g. <code>turn_timeout=30.0</code>). If a turn exceeds the deadline, it is cancelled and rolls back state atomically.
+</Callout>
+
+---
+
+## 3. Provider Engines (`Engines`)
+
+All model communication in `chatflow-agent` is decoupled behind the `BaseEngine` interface. Engines communicate over asynchronous HTTP REST using `httpx`, eliminating the need for monolithic vendor client libraries:
+
+* **`OpenAIEngine`**: Supports OpenAI models and any OpenAI-compatible API (Groq, DeepSeek, xAI Grok, Ollama, vLLM) via `base_url`.
+* **`AnthropicEngine`**: Direct REST integration with Anthropic Claude models.
+* **`GeminiEngine`**: Google Gemini integration. In <VersionBadge version="0.4.0rc1" status="prerelease" />, completely rewritten with native REST calls.
+
+```python
+from chatflow_agent import Agent, OpenAIEngine
+
+# Universal OpenAI-compatible engine for custom or local endpoints
+local_engine = OpenAIEngine(
+    base_url="http://localhost:11434/v1",
+    provider="ollama",
+    api_key="ollama",
+)
+
+local_agent = Agent(
+    name="LocalBot",
+    instructions="You run locally via Ollama.",
+    model="llama3.2:latest",
+    engine=local_engine,
+)
+```
+
+---
+
+## 4. Deterministic Tools (`Tool` & `@tool`)
+
+Tools give agents deterministic execution power. When decorated with `@tool`, `chatflow-agent` automatically parses Python type annotations and docstrings to generate standard JSON Schema specifications for the LLM:
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from chatflow_agent import tool
+
+@tool(name="fetch_user_profile", description="Fetch user metadata from internal database.")
+def fetch_user_profile(user_id: str) -> dict[str, str]:
+    """Retrieve user details.
+
+    Args:
+        user_id: Unique user identifier string.
+    """
+    return {"user_id": user_id, "tier": "enterprise", "status": "active"}
+```
+
+Both synchronous (`def`) and asynchronous (`async def`) tool functions are natively supported. Alternatively, you can use the `@agent.tool` decorator directly on an agent instance.
+
+---
+
+## 5. Resilient Memory & Concurrency (`SessionStore`)
+
+`chatflow-agent` treats state persistence and concurrency safety as first-class citizens:
+
+```python
+from chatflow_agent import SQLiteSessionStore
+
+# Persistent SQLite session store with configurable turn limit
+store = SQLiteSessionStore(
+    db_path="./chat_sessions.db",
+    default_max_turns=40,
+)
+```
+
+### The Transactional Rollback Guarantee
+
+Prior to processing a turn, `Runner` snapshots the active session. If a network outage occurs, a tool raises an unhandled exception, or `turn_timeout` triggers, the snapshot is restored immediately. This guarantees that corrupted or partial turns never poison the conversation history.
+
+### Event-Loop Protection & Concurrency Shields
+
+* **Thread-Pool Offloading:** SQLite disk I/O runs inside dedicated worker threads (`_run_blocking`), preventing file system locks from choking Python's asyncio event loop.
+* **Session Locking (`ReentrantTurnError`):** Each session ID has an internal lock. Simultaneous requests for the same session ID will raise `ReentrantTurnError` rather than allowing race conditions to corrupt state.
+
+---
+
+## 6. Multi-Agent Handoffs (`Handoffs`)
+
+Multi-agent swarms delegate tasks dynamically using declarative handoffs. When an agent defines `handoffs=[agent_b]`, `chatflow-agent` automatically synthesizes a tool named `transfer_to_agent_b`:
+
+```python
+from chatflow_agent import Agent, Runner
+
+# Specialist Agent
+billing_agent = Agent(
+    name="BillingAgent",
+    instructions="You specialize in invoices, receipts, and refund requests.",
+    model="gpt-4o",
+)
+
+# Frontline Triage Agent
+triage_agent = Agent(
+    name="TriageAgent",
+    instructions="Greet users. Transfer billing issues to BillingAgent.",
+    model="gpt-4o",
+    handoffs=[billing_agent],
+)
+
+runner = Runner(starting_agent=triage_agent)
+
+# Execute turn with handoff
+response = runner.run(
+    session_id="user_billing_query",
+    user_message="I need a copy of my invoice from last month.",
+)
+
+print(f"Responding agent: {response.active_agent_name}")
+print(f"Message content: {response.content}")
+```
+
+The `Runner` automatically traces delegations, and the final responding agent is always visible via `response.active_agent_name`.
+
+---
+
+## Next Steps
+
+Now that you understand the architectural foundations of `chatflow-agent`:
+
+* Check out [Installation](/en/docs/v0.4/getting-started/installation) to install the framework.
+* Explore the [Quickstart](/en/docs/v0.4/getting-started/quickstart) to build a hands-on project.

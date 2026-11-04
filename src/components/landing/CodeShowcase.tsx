@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Check, Copy, Terminal, ShieldCheck, Zap, Database } from 'lucide-react';
+import { Link } from '@/i18n/navigation';
+import { Check, Copy, Terminal, ShieldCheck, Zap, Database, ArrowRight } from 'lucide-react';
 
 const PYTHON_CODE = `import asyncio
 from chatflow_agent import Agent, Runner, SQLiteSessionStore
@@ -33,12 +34,15 @@ if __name__ == "__main__":
 
 export function CodeShowcase() {
   const t = useTranslations('home');
+  const [pm, setPm] = useState<'pip' | 'uv'>('pip');
   const [copiedPip, setCopiedPip] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
+  const activeCommand = pm === 'pip' ? 'pip install chatflow-agent' : 'uv add chatflow-agent';
+
   const handleCopyPip = async () => {
     try {
-      await navigator.clipboard.writeText('pip install chatflow-agent');
+      await navigator.clipboard.writeText(activeCommand);
       setCopiedPip(true);
       setTimeout(() => setCopiedPip(false), 2000);
     } catch {
@@ -66,17 +70,43 @@ export function CodeShowcase() {
           {t('installSubtitle')}
         </p>
 
-        {/* Pip Install Command Box */}
-        <div className="mt-8 flex items-center justify-between rounded-xl border border-border bg-card p-3 sm:p-4 shadow-xs max-w-xl mx-auto">
-          <div className="flex items-center gap-3 overflow-x-auto text-left font-mono text-sm text-foreground">
+        {/* Package Manager Tabs & Command Box */}
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-between rounded-xl border border-border bg-card p-3 sm:p-4 shadow-xs max-w-xl mx-auto gap-3">
+          <div className="flex items-center gap-2 border-b sm:border-b-0 sm:border-r border-border pb-2 sm:pb-0 sm:pr-3 w-full sm:w-auto shrink-0 justify-center sm:justify-start">
+            <button
+              type="button"
+              onClick={() => setPm('pip')}
+              className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                pm === 'pip'
+                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              {t('installPip')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPm('uv')}
+              className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                pm === 'uv'
+                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              {t('installUv')}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 code-scroll-container text-left font-mono text-sm text-foreground flex-1 min-w-0 px-1">
             <Terminal className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
             <span className="text-muted-foreground select-none">$</span>
-            <code className="font-semibold text-primary">pip install chatflow-agent</code>
+            <code className="font-semibold text-primary truncate">{activeCommand}</code>
           </div>
+
           <button
             type="button"
             onClick={handleCopyPip}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary cursor-pointer shrink-0 ml-3"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary cursor-pointer shrink-0"
             aria-label={copiedPip ? t('copied') : t('copyCommand')}
           >
             {copiedPip ? (
@@ -95,17 +125,17 @@ export function CodeShowcase() {
       </div>
 
       {/* Code Editor Window Showcase */}
-      <div className="mt-10 mx-auto max-w-4xl rounded-2xl border border-border bg-slate-950 text-slate-100 shadow-2xl overflow-hidden">
+      <div className="mt-10 mx-auto max-w-4xl min-w-0 w-full rounded-2xl border border-border bg-slate-950 text-slate-100 shadow-2xl overflow-hidden">
         {/* Editor Window Top Bar */}
-        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/90 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded-full bg-rose-500/80" aria-hidden="true" />
-            <span className="h-3 w-3 rounded-full bg-amber-500/80" aria-hidden="true" />
-            <span className="h-3 w-3 rounded-full bg-emerald-500/80" aria-hidden="true" />
-            <span className="ml-3 font-mono text-xs text-slate-400">quickstart.py</span>
+        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/90 px-3.5 sm:px-4 py-2.5 sm:py-3 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="h-3 w-3 rounded-full bg-rose-500/80 shrink-0" aria-hidden="true" />
+            <span className="h-3 w-3 rounded-full bg-amber-500/80 shrink-0" aria-hidden="true" />
+            <span className="h-3 w-3 rounded-full bg-emerald-500/80 shrink-0" aria-hidden="true" />
+            <span className="ml-2 sm:ml-3 font-mono text-xs text-slate-400 truncate">quickstart.py</span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <span className="hidden sm:inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
               <ShieldCheck className="h-3 w-3" />
               <span>{t('verifiedBadge')}</span>
@@ -132,8 +162,13 @@ export function CodeShowcase() {
         </div>
 
         {/* Code Content */}
-        <div className="p-4 sm:p-6 overflow-x-auto font-mono text-xs sm:text-sm leading-relaxed text-slate-200">
-          <pre>
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label="Quickstart Python code"
+          className="code-scroll-container relative min-w-0 max-w-full p-4 sm:p-6 font-mono text-[13px] sm:text-sm leading-relaxed sm:leading-6 text-slate-200 overscroll-x-contain focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+        >
+          <pre className="w-fit min-w-full pr-6 sm:pr-8">
             <code>
               <span className="text-purple-400">import</span> asyncio{'\n'}
               <span className="text-purple-400">from</span> chatflow_agent <span className="text-purple-400">import</span> Agent, Runner, SQLiteSessionStore{'\n\n'}
@@ -162,19 +197,30 @@ export function CodeShowcase() {
         </div>
 
         {/* Technical Highlights Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 bg-slate-900/60 px-4 py-2.5 text-xs text-slate-400">
-          <div className="flex items-center gap-4">
-            <span className="inline-flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 bg-slate-900/60 px-3.5 sm:px-4 py-2.5 text-xs text-slate-400 min-w-0">
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 shrink-0">
               <Zap className="h-3.5 w-3.5 text-amber-400" />
               <span>Native asyncio</span>
             </span>
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1.5 shrink-0">
               <Database className="h-3.5 w-3.5 text-blue-400" />
               <span>SQLite State & Rollback</span>
             </span>
           </div>
-          <span className="font-mono text-slate-500">Python &gt;= 3.10</span>
+          <span className="font-mono text-slate-500 shrink-0">Python &gt;= 3.10</span>
         </div>
+      </div>
+
+      {/* Deep-link to full quickstart guide */}
+      <div className="mt-4 mx-auto max-w-4xl flex items-center justify-end px-2">
+        <Link
+          href="/docs/v0.3/getting-started/quickstart"
+          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-primary transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-primary"
+        >
+          <span>{t('viewFullQuickstart')}</span>
+          <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
+        </Link>
       </div>
     </section>
   );

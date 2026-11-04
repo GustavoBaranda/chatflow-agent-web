@@ -1,0 +1,11 @@
+{
+  "title": "Production Patterns",
+  "pages": [
+    "error-handling",
+    "configuration",
+    "observability",
+    "security",
+    "deployment"
+  ]
+}
+

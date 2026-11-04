@@ -1,0 +1,188 @@
+---
+title: "OpenAI e Endpoints Compatíveis"
+description: "Configuração, predefinições, gateways customizados e políticas de segurança para OpenAI, Groq, DeepSeek e xAI Grok."
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+O `OpenAIEngine` alimenta modelos que implementam o protocolo padrão `/chat/completions` da OpenAI. Além dos modelos oficiais da OpenAI (como GPT-4o e o3-mini), este motor universal conecta-se diretamente ao xAI Grok, DeepSeek, Groq, servidores de inferência locais (vLLM, LM Studio) e gateways corporativos internos de API.
+
+## Predefinições Integradas de Provedores
+
+Para minimizar configurações manuais de endpoints, o `chatflow-agent` inclui predefinições verificadas para os principais provedores compatíveis com OpenAI:
+
+| Chave do Provedor | Endpoint Oficial (`base_url`) | Variável de Ambiente | Modelo Padrão |
+| :--- | :--- | :--- | :--- |
+| `"openai"` | `https://api.openai.com/v1` | `OPENAI_API_KEY` | `gpt-4o-mini` |
+| `"grok"` / `"xai"` | `https://api.x.ai/v1` | `XAI_API_KEY` | `grok-2` |
+| `"deepseek"` | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEY` | `deepseek-chat` |
+| `"groq"` | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` | `llama-3.3-70b-versatile` |
+| `"ollama"` | `http://localhost:11434/v1` | `OLLAMA_API_KEY` | `gemma2:9b` |
+
+## Configurando Modelos Oficiais da OpenAI
+
+Para utilizar modelos da OpenAI, forneça sua chave de API via variável de ambiente `OPENAI_API_KEY` ou diretamente no construtor do agente ou do motor:
+
+```python
+import os
+from chatflow_agent import Agent, Runner
+from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
+
+# Opção 1: Resolução implícita do motor via prefixo do nome do modelo
+analyst = Agent(
+    name="Analyst",
+    model="gpt-4o",
+    instructions="Analyze structured operational data.",
+)
+
+# Opção 2: Atribuição explícita do provedor
+writer = Agent(
+    name="Writer",
+    provider="openai",
+    model="gpt-4o-mini",
+    instructions="Draft concise summaries.",
+)
+
+# Opção 3: Instanciação explícita do motor com parâmetros customizados
+custom_engine = OpenAIEngine(
+    api_key=os.environ.get("OPENAI_API_KEY"),
+    provider="openai",
+    timeout=45.0,
+)
+senior_agent = Agent(
+    name="SeniorAgent",
+    model="gpt-4o",
+    engine=custom_engine,
+    instructions="Review critical business decisions.",
+)
+```
+
+## Provedores Terceirizados: Groq, DeepSeek e xAI Grok
+
+Conectar-se a provedores de inferência de ultra-baixa latência ou modelos especializados de raciocínio exige apenas especificar o atributo `provider` ou o prefixo padrão do modelo:
+
+<Tabs items={["Groq Cloud", "DeepSeek API", "xAI Grok"]}>
+  <Tab value="Groq Cloud">
+```python
+import os
+from chatflow_agent import Agent
+from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
+
+# Exige a variável de ambiente GROQ_API_KEY
+groq_engine = OpenAIEngine(
+    provider="groq",
+    api_key=os.environ.get("GROQ_API_KEY"),
+)
+
+speed_agent = Agent(
+    name="SpeedAgent",
+    model="llama-3.3-70b-versatile",
+    engine=groq_engine,
+    instructions="Provide real-time triage responses.",
+)
+```
+  </Tab>
+  <Tab value="DeepSeek API">
+```python
+import os
+from chatflow_agent import Agent
+from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
+
+# Exige a variável de ambiente DEEPSEEK_API_KEY
+deepseek_engine = OpenAIEngine(
+    provider="deepseek",
+    api_key=os.environ.get("DEEPSEEK_API_KEY"),
+)
+
+reasoning_agent = Agent(
+    name="ReasoningAgent",
+    model="deepseek-chat",
+    engine=deepseek_engine,
+    instructions="Perform deep technical root cause analysis.",
+)
+```
+  </Tab>
+  <Tab value="xAI Grok">
+```python
+import os
+from chatflow_agent import Agent
+
+# Mapeia implicitamente para o preset da xAI via prefixo 'grok'
+# Exige a variável de ambiente XAI_API_KEY
+grok_agent = Agent(
+    name="GrokAgent",
+    provider="grok",
+    model="grok-2",
+    instructions="Provide witty and technically precise answers.",
+)
+```
+  </Tab>
+</Tabs>
+
+## Endpoints Customizados e Gateways Privados
+
+Ao conectar-se a instâncias privadas (vLLM, LM Studio, proxies do Azure OpenAI ou LiteLLM), defina um `base_url` customizado:
+
+```python
+from chatflow_agent import Agent
+from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
+
+# Gateway de inferência corporativo customizado
+gateway_engine = OpenAIEngine(
+    base_url="https://ai-gateway.internal.corp/v1",
+    api_key="internal-gateway-token",
+    timeout=60.0,
+)
+
+internal_agent = Agent(
+    name="InternalAssistant",
+    model="custom-llama-3",
+    engine=gateway_engine,
+    instructions="Answer queries using internal compliance guidelines.",
+)
+```
+
+## Regra de Segurança: Prevenção de Vazamento de Credenciais
+
+<Callout type="warn" title="Credenciais Explícitas Obrigatórias em Hosts Customizados">
+O `chatflow-agent` verifica rigorosamente o host de destino antes de transmitir tokens de API:
+* A chave de ambiente (ex.: `OPENAI_API_KEY`) é **enviada exclusivamente para o endpoint oficial** (`https://api.openai.com/v1`).
+* Se um `base_url` customizado for informado sem uma `api_key` explícita, o `OpenAIEngine` levanta um `ValueError` em vez de encaminhar sua chave de nuvem para um host externo.
+* Se o seu proxy local ou interno não exigir autenticação, passe explicitamente `api_key=""`.
+</Callout>
+
+```python
+# [INCORRETO] Levanta ValueError para proteger sua OPENAI_API_KEY contra vazamento acidental:
+# engine = OpenAIEngine(base_url="https://untrusted-proxy.example.com/v1")
+
+# [CORRETO] Forneça credenciais explicitamente para hosts customizados:
+engine = OpenAIEngine(
+    base_url="https://proxy.example.com/v1",
+    api_key="proxy-secret-token",
+)
+
+# [CORRETO] Servidor interno sem autenticação:
+open_engine = OpenAIEngine(
+    base_url="http://192.168.1.100:8000/v1",
+    api_key="",
+)
+```
+
+## Restrições e Normalização de IDs de Chamadas de Ferramenta
+
+A OpenAI impõe um limite máximo rigoroso de 40 caracteres para o `tool_call_id` em respostas de chamada de funções. Em ambientes multiagente onde sessões são transferidas entre diferentes provedores (por exemplo, ferramentas do Anthropic Claude gerando IDs com mais de 40 caracteres), o `chatflow-agent` garante total conformidade com o protocolo:
+
+1. **Truncamento e Hashing:** Se uma mensagem histórica contiver um ID de chamada de ferramenta superior a 40 caracteres, o `OpenAIEngine` o substitui com segurança por um identificador determinístico derivado de SHA-256 (`call_` + 24 caracteres hexadecimais).
+2. **Normalização de Tipos de Esquema:** O motor normaliza automaticamente os tipos de parâmetros do JSON Schema (`_lowercase_schema_types`) mantendo esquemas de propriedades customizadas, garantindo compatibilidade entre diferentes versões dos modelos da OpenAI.
+
+## Resolução de Problemas
+
+| Erro | Causa | Resolução |
+| :--- | :--- | :--- |
+| `ValueError: A custom or unofficial base_url was provided ... without an explicit api_key` | O mecanismo de segurança detectou um `base_url` customizado sem uma `api_key` explícita. | Passe explicitamente `api_key="sua-chave"` ou `api_key=""` para validar o host de destino. |
+| `ProviderError: 401 Unauthorized` | Chave de API inválida ou expirada. | Verifique `OPENAI_API_KEY`, `GROQ_API_KEY` ou `DEEPSEEK_API_KEY` no seu ambiente. |
+| `ProviderError: 429 Too Many Requests` | Limite de taxa ou esgotamento de cota. | Aplique controle de taxa (*rate limiting*), aumente sua cota ou utilize uma predefinição de provedor alternativo. |

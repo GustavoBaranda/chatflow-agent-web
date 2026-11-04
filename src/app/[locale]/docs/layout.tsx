@@ -1,5 +1,5 @@
-import { DocsLayout } from 'fumadocs-ui/layouts/docs';
-import { source } from '@/lib/source';
+import { getVersionPageTree, createUnversionedPageTree } from '@/lib/source';
+import { DocsLayoutClient } from '@/components/docs/DocsLayoutClient';
 import type { ReactNode } from 'react';
 
 export default async function Layout({
@@ -10,17 +10,17 @@ export default async function Layout({
   children: ReactNode;
 }) {
   const { locale } = await params;
-  const tree = source.getPageTree(locale);
+  const v03Tree = getVersionPageTree('v0.3', locale);
+  const v04Tree = getVersionPageTree('v0.4', locale);
+  const v03UnversionedTree = createUnversionedPageTree(v03Tree, 'v0.3');
 
   return (
-    <DocsLayout
-      tree={tree}
-      sidebar={{
-        collapsible: true,
-        defaultOpenLevel: 2,
-      }}
+    <DocsLayoutClient
+      v03Tree={v03Tree}
+      v04Tree={v04Tree}
+      v03UnversionedTree={v03UnversionedTree}
     >
       {children}
-    </DocsLayout>
+    </DocsLayoutClient>
   );
 }

@@ -3,8 +3,9 @@
 import { useState, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
-import { Link } from '@/i18n/navigation';
+import { Link, usePathname } from '@/i18n/navigation';
 import { GitHubIcon } from '@/components/ui/icons';
+import { cn } from '@/lib/utils';
 import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
 import { MenuToggle } from './MenuToggle';
@@ -15,22 +16,38 @@ export function Navbar() {
   const tCommon = useTranslations('common');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
+  const pathname = usePathname();
+
+  const isHomeActive = pathname === '/';
+  const isDocsActive = pathname === '/docs' || pathname.startsWith('/docs/');
+  const isCommunityActive = pathname === '/community' || pathname.startsWith('/community/');
+  const isAboutActive = pathname === '/about' || pathname.startsWith('/about/');
 
   return (
     <>
       {/* Skip to Content Accessible Link */}
       <a
         href="#main-content"
+        tabIndex={isMobileOpen ? -1 : undefined}
+        aria-hidden={isMobileOpen ? 'true' : undefined}
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:shadow-lg focus:outline-hidden"
       >
         {tCommon('skipToContent')}
       </a>
 
-      <header className="sticky top-0 z-50 w-full border-b border-border/80 bg-background/80 backdrop-blur-md">
+      <header
+        className={cn(
+          'top-0 w-full border-b border-border/80 transition-colors',
+          isMobileOpen
+            ? 'fixed left-0 right-0 z-50 bg-background/95 backdrop-blur-md shadow-xs'
+            : 'sticky z-40 bg-background/80 backdrop-blur-md'
+        )}
+      >
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Brand Logo & Title */}
           <Link
             href="/"
+            onClick={() => setIsMobileOpen(false)}
             className="group flex items-center gap-2.5 font-bold tracking-tight text-foreground transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-primary"
             aria-label="chatflow-agent home"
           >
@@ -43,27 +60,57 @@ export function Navbar() {
               priority
             />
             <span className="text-base sm:text-lg font-bold">
-              chatflow<span className="bg-gradient-to-r from-blue-500 to-violet-500 bg-clip-text text-transparent">-agent</span>
+              chatflow<span className="bg-linear-to-r from-blue-500 to-violet-500 bg-clip-text text-transparent">-agent</span>
             </span>
           </Link>
 
           {/* Desktop Navigation Links */}
           <nav className="hidden items-center gap-6 md:flex" aria-label="Main navigation">
             <Link
+              href="/"
+              aria-current={isHomeActive ? 'page' : undefined}
+              className={cn(
+                'text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                isHomeActive
+                  ? 'font-semibold text-foreground'
+                  : 'font-medium text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {t('home')}
+            </Link>
+            <Link
               href="/docs"
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+              aria-current={isDocsActive ? 'page' : undefined}
+              className={cn(
+                'text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                isDocsActive
+                  ? 'font-semibold text-foreground'
+                  : 'font-medium text-muted-foreground hover:text-foreground'
+              )}
             >
               {t('docs')}
             </Link>
             <Link
               href="/community"
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+              aria-current={isCommunityActive ? 'page' : undefined}
+              className={cn(
+                'text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                isCommunityActive
+                  ? 'font-semibold text-foreground'
+                  : 'font-medium text-muted-foreground hover:text-foreground'
+              )}
             >
               {t('community')}
             </Link>
             <Link
               href="/about"
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+              aria-current={isAboutActive ? 'page' : undefined}
+              className={cn(
+                'text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                isAboutActive
+                  ? 'font-semibold text-foreground'
+                  : 'font-medium text-muted-foreground hover:text-foreground'
+              )}
             >
               {t('about')}
             </Link>
@@ -96,6 +143,11 @@ export function Navbar() {
           </div>
         </div>
       </header>
+
+      {/* Spacer to preserve document flow and scrollHeight when header is fixed */}
+      {isMobileOpen && (
+        <div className="h-14 border-b border-transparent md:hidden" aria-hidden="true" />
+      )}
 
       {/* Mobile Drawer */}
       <MobileDrawer

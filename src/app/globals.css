@@ -16,7 +16,8 @@
   --color-card-foreground: var(--card-foreground);
 }
 
-:root {
+:root,
+[data-theme="light"] {
   --background: #ffffff;
   --foreground: #090e1a;
   --primary: #2563eb;
@@ -28,6 +29,10 @@
   --card-foreground: #090e1a;
   --accent-cyan: #00d2f0;
   --accent-violet: #7c3aed;
+
+  /* Fumadocs Navbar Offset & Layout Harmonization (Navbar h-14 = 3.5rem = 56px) */
+  --fd-banner-height: 3.5rem;
+  --fd-header-height: 3.5rem;
 
   /* Fumadocs Theme Token Harmonization */
   --color-fd-background: var(--background);
@@ -46,7 +51,8 @@
   --color-fd-ring: var(--primary);
 }
 
-.dark {
+.dark,
+[data-theme="dark"] {
   --background: #060b18;
   --foreground: #f8fafc;
   --primary: #3b82f6;
@@ -85,6 +91,19 @@ body {
   flex-direction: column;
 }
 
+/* Ensure collapsed sidebar restore button panel remains accessible below sticky header */
+[data-sidebar-panel] {
+  top: calc(3.5rem + 1rem) !important;
+  z-index: 40 !important;
+}
+
+/* Fallback for mobile drawer dynamic viewport height on browsers without dvh support */
+@supports not (height: 100dvh) {
+  [data-drawer-panel] {
+    height: calc(100vh - 3.5rem);
+  }
+}
+
 /* Soft scroll lock when mobile drawer is open */
 html.menu-open,
 html.menu-open body {
@@ -103,5 +122,46 @@ html.menu-open body {
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation: none !important;
+  }
+}
+
+/* Sleek, non-intrusive code block horizontal scrollbar */
+.code-scroll-container {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* On mobile / narrow screens (<= 640px), visually hide intrusive native scrollbars while preserving touch/swipe scrolling */
+@media (max-width: 640px) {
+  .code-scroll-container {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .code-scroll-container::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
+
+/* On desktop (> 640px), show a thin, elegant, semi-transparent custom scrollbar */
+@media (min-width: 641px) {
+  .code-scroll-container {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+  }
+  .code-scroll-container::-webkit-scrollbar {
+    height: 5px;
+  }
+  .code-scroll-container::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .code-scroll-container::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.25);
+    border-radius: 9999px;
+  }
+  .code-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.45);
   }
 }

@@ -1,0 +1,179 @@
+---
+title: Error Handling & Recovery
+description: Production error handling strategies in chatflow-agent, SDK exception hierarchy, automatic tool self-correction, and transactional turn rollbacks.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+Building robust multi-agent systems requires structured fault tolerance. LLM provider outages, network timeouts, invalid tool arguments, and unexpected exceptions must be handled gracefully without corrupting conversation state.
+
+`chatflow-agent` implements a layered recovery model: non-fatal tool errors are fed back to the LLM for autonomous self-correction, while fatal turn failures trigger atomic state rollbacks.
+
+## SDK Exception Hierarchy
+
+All exceptions in `chatflow-agent` inherit from `ChatFlowError`. This allows your application to distinguish between framework-level errors and standard Python exceptions.
+
+```text
+ChatFlowError (Base)
+├── DependencyError (Missing optional extra dependencies)
+├── ToolExecutionError (Uncaught error during tool execution)
+├── ToolSchemaError (Invalid parameter type annotation) [v0.4.0rc1]
+├── AgentHandoffError (Unknown handoff target or transfer loop)
+├── ProviderError (LLM API status error, network failure, or timeout)
+├── ReentrantTurnError (Concurrent turn invocation on locked session) [v0.4.0rc1]
+└── SessionDeletedError (Message dispatched to a deleted session) [v0.4.0rc1]
+```
+
+### Exception Reference Table
+
+| Exception Class | Inherits From | Raised When | Recovery Strategy |
+| :--- | :--- | :--- | :--- |
+| `ChatFlowError` | `Exception` | Base class for all SDK exceptions. | Catch at top-level request boundaries. |
+| `DependencyError` | `ChatFlowError` | An optional channel extra (e.g. `[telegram]`, `[whatsapp]`) is not installed. | Install the required extra via `pip install "chatflow-agent[extra]"`. |
+| `ToolExecutionError` | `ChatFlowError` | A tool function raises an uncaught exception during execution. | Wrapped into `ToolResult(is_error=True)` so the agent can self-correct. |
+| `ToolSchemaError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Tool function arguments lack valid Python type annotations. | Fix function type signatures at development time. |
+| `AgentHandoffError` | `ChatFlowError` | Target agent does not exist in the `Runner` registry, or turn exceeds `max_handoffs_per_turn`. | Verify handoff targets and check transfer loop conditions. |
+| `ProviderError` | `ChatFlowError` | Upstream model provider returns an HTTP error code (e.g. 429, 500, 503). | Implement exponential backoff or failover to a fallback engine. |
+| `ReentrantTurnError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError`, `RuntimeError` | Code executing inside a turn starts another turn for the same session. | Use background job queues or follow-up turn dispatchers. |
+| `SessionDeletedError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | A message is processed for a session that was purged during execution. | Re-create session or notify the user to restart the workflow. |
+
+## Autonomous Tool Self-Correction
+
+When a registered tool raises an exception or receives arguments that fail schema validation, `Runner` catches the failure and returns a structured error to the model instead of crashing the turn:
+
+```python
+import logging
+from chatflow_agent import Agent, Runner, tool
+
+logger = logging.getLogger("app.tools")
+
+@tool
+def process_refund(order_id: str, amount: float) -> str:
+    """Issue a refund for an order.
+
+    Args:
+        order_id: Order identifier formatted as ORD-XXXX.
+        amount: Positive monetary value to refund.
+    """
+    if not order_id.startswith("ORD-"):
+        raise ValueError("Invalid order format. Order ID must begin with 'ORD-'.")
+    if amount <= 0:
+        raise ValueError("Refund amount must be strictly greater than 0.")
+    return f"Refund of ${amount:.2f} processed for order {order_id}."
+
+agent = Agent(
+    name="RefundBot",
+    model="gpt-4o",
+    tools=[process_refund],
+    instructions="Process refunds accurately. If an order ID format is invalid, clarify with the user.",
+)
+
+runner = Runner(starting_agent=agent)
+```
+
+### What Happens During Execution
+
+1. The model invokes `process_refund(order_id="12345", amount=50.0)`.
+2. `process_refund` raises `ValueError: Invalid order format. Order ID must begin with 'ORD-'.`.
+3. `Runner` assigns a unique `trace_id` (UUID4) and appends a `ToolResult`:
+   ```json
+   {
+     "tool_call_id": "call_abc123",
+     "name": "process_refund",
+     "content": "Tool execution failed [trace_id: a8c2...]. Invalid order format. Order ID must begin with 'ORD-'.",
+     "is_error": true
+   }
+   ```
+4. The model receives `is_error=True` on the next iteration and informs the user: *"The order ID '12345' is missing the 'ORD-' prefix. Could you please confirm the full order number?"*
+
+<Callout type="info" title="Loop Limit Protection">
+To prevent infinite retry loops where an agent repeatedly fails a tool call, `Runner` enforces `max_tool_iterations` (default: `10`). If the limit is reached without a final text response, the runner returns a controlled fallback message without hanging.
+</Callout>
+
+## Transactional Turn Rollback
+
+Multi-agent turns frequently modify conversation history, hand off to specialists, and update session metadata. If an unrecoverable failure occurs mid-turn (such as a network disconnect or provider rate limit), leaving the session in a half-executed state would corrupt subsequent interactions.
+
+`Runner` guarantees **checkpoint rollback** semantics:
+
+```text
+Turn Start
+    ├── Capture Checkpoint: (history, active_agent, metadata)
+    ├── Append Inbound User Message
+    ├── Execute LLM Turns & Tools
+    │     ├── Success: Commit final assistant response to SessionStore
+    │     └── Failure / CancelledError: Restore (history, active_agent, metadata)
+    └── Release Session Lock
+```
+
+### Rollback Example in Code
+
+```python
+import asyncio
+from chatflow_agent import Agent, Runner
+from chatflow_agent.exceptions import ProviderError
+
+def build_resilient_runner(agent: Agent) -> Runner:
+    """Configure a runner with bounded handoffs and tool iterations."""
+    return Runner(
+        starting_agent=agent,
+        max_tool_iterations=6,
+        max_handoffs_per_turn=3,
+    )
+
+async def execute_turn_with_recovery(
+    runner: Runner,
+    session_id: str,
+    user_message: str,
+) -> str:
+    """Execute a turn with explicit exception handling and graceful fallback."""
+    try:
+        response = await runner.run_async(
+            session_id=session_id,
+            user_message=user_message,
+        )
+        return response.content
+    except ProviderError as err:
+        # State was automatically rolled back to before the turn
+        return "Our AI inference service is temporarily degraded. Please retry in a few moments."
+    except TimeoutError:
+        # Turn timeout exceeded; checkpoint restored
+        return "The request took too long to complete. Please try a simpler question."
+    except Exception as err:
+        return "An unexpected system error occurred. Our operations team has been notified."
+```
+
+## Turn Timeouts & Resource Boundaries
+
+<VersionBadge version="0.4.0rc1" status="prerelease" />
+
+Starting in `v0.4.0rc1`, `run_async` supports an explicit `turn_timeout` parameter (in seconds). Unlike generic request timeouts, `turn_timeout` begins counting only **after** the call acquires the session lock, ensuring queued turns do not expire prematurely while waiting behind earlier turns:
+
+```python
+# [min-version: 0.4.0rc1]
+# [no-exec: illustrative turn timeout call]
+# Limits the turn execution to 45 seconds once lock is acquired
+response = await runner.run_async(
+    session_id="customer-1029",
+    user_message="Analyze this quarterly financial audit report...",
+    turn_timeout=45.0,
+)
+```
+
+If `turn_timeout` expires:
+1. All running child asynchronous tasks are cancelled immediately.
+2. Synchronous tool executions are awaited in worker threads to prevent SQLite deadlocks.
+3. The conversation history and metadata roll back to the pre-turn checkpoint.
+4. `asyncio.TimeoutError` is raised to the caller.
+
+## Best Practices Checklist
+
+- **Catch `ChatFlowError`:** Intercept framework exceptions before letting them propagate to HTTP handlers.
+- **Set Bounded Iterations:** Never set `max_tool_iterations` or `max_handoffs_per_turn` to unbounded values.
+- **Return Meaningful Tool Errors:** Raise descriptive `ValueError` or `KeyError` messages inside tools so the agent can interpret the error and self-correct.
+- **Log Correlation IDs:** Capture the `trace_id` generated in `Runner` logs to correlate customer error reports with internal trace logs.
+

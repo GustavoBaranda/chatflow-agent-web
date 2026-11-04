@@ -1,4 +1,7 @@
 {
   "title": "Documentation",
-  "pages": ["index"]
+  "pages": [
+    "v0.3",
+    "v0.4"
+  ]
 }

@@ -1,0 +1,193 @@
+---
+title: "Quickstart"
+description: "Build and run your first conversational AI agent with chatflow-agent in under 5 minutes."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+---
+
+## 1. Create a Basic Agent
+
+In `chatflow-agent`, an **`Agent`** represents a persona with dedicated instructions and capabilities, while the **`Runner`** orchestrates conversational turns and tool evaluation loops.
+
+Create a new file named `quickstart.py`:
+
+```python
+# [min-version: 0.3.0]
+# [no-exec: requires real openai api key for live response]
+import os
+from chatflow_agent import Agent, Runner
+
+# 1. Define the agent persona, instructions, and target model
+# chatflow-agent automatically routes "gpt-4o" to the OpenAI engine using OPENAI_API_KEY
+agent = Agent(
+    name="Assistant",
+    instructions="You are a concise and helpful AI technical assistant.",
+    model="gpt-4o",
+)
+
+# 2. Initialize the Runner with your starting agent
+runner = Runner(starting_agent=agent)
+
+# 3. Execute a conversational turn
+response = runner.run(
+    session_id="quickstart_session",
+    user_message="Explain async Python in two concise sentences.",
+)
+
+# 4. Display the output
+print("Agent Response:")
+print(response.content)
+```
+
+Run the script from your terminal:
+
+```bash
+python quickstart.py
+```
+
+<Callout type="info" title="Event Loop Guard">
+<code>runner.run()</code> is a synchronous convenience method designed for scripts and CLI utilities. If you are inside an existing asynchronous event loop (e.g. FastAPI, Jupyter Notebook, or asyncio), use <code>await runner.run_async()</code> instead. Calling <code>runner.run()</code> inside an active loop raises a clear <code>RuntimeError</code>.
+</Callout>
+
+---
+
+## 2. Adding Tools with `@tool`
+
+Agents become exponentially more powerful when given access to deterministic functions. Use the `@tool` decorator to turn any Python function into an introspectable tool:
+
+```python
+# [min-version: 0.3.0]
+# [no-exec: requires real openai api key for live response]
+import os
+from chatflow_agent import Agent, Runner, tool
+
+# 1. Define a tool with typed parameters and docstrings
+@tool(name="calculate_discount", description="Calculate discounted price from original amount and percentage.")
+def calculate_discount(price: float, discount_percent: float) -> str:
+    """Calculate the final price after applying a percentage discount.
+
+    Args:
+        price: The original price in dollars.
+        discount_percent: The percentage discount to apply (e.g. 15 for 15%).
+    """
+    savings = price * (discount_percent / 100.0)
+    final_price = price - savings
+    return f"Original: ${price:.2f}, Savings: ${savings:.2f}, Final Price: ${final_price:.2f}"
+
+# 2. Attach the tool to the Agent
+agent = Agent(
+    name="SalesBot",
+    instructions="You help customers with purchase calculations. Always use calculate_discount for math.",
+    model="gpt-4o",
+    tools=[calculate_discount],
+)
+
+runner = Runner(starting_agent=agent)
+
+# 3. Ask a question requiring tool execution
+response = runner.run(
+    session_id="sales_session_1",
+    user_message="What is the final price for a jacket priced at $120 with a 25% discount?",
+)
+print(response.content)
+```
+
+### Inspecting Tool Execution
+
+The returned `AgentResponse` object retains full transparency into the conversational turn:
+
+```python
+# Inspect executed tool names
+for tool_name in response.tool_calls_executed:
+    print(f"Tool executed: {tool_name}")
+```
+
+---
+
+## 3. Asynchronous Execution with `Runner.run_async`
+
+For high-concurrency web services, chatbots, and event loops, use the native asynchronous API:
+
+```python
+import asyncio
+import os
+from chatflow_agent import Agent, Runner
+
+async def main() -> None:
+    agent = Agent(
+        name="AsyncBot",
+        instructions="Provide concise answers.",
+        model="gpt-4o",
+    )
+
+    runner = Runner(starting_agent=agent)
+
+    # Asynchronous turn
+    response = await runner.run_async(
+        session_id="async_session_1",
+        user_message="List three key advantages of asynchronous Python.",
+    )
+
+    print(response.content)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+---
+
+## 4. Multi-Provider Flexibility
+
+Because `chatflow-agent` uses direct REST engines, switching between providers is instantaneous without changing your agent logic:
+
+```python
+import os
+from chatflow_agent import Agent, OpenAIEngine
+
+# Option 1: Direct model configuration (engines are resolved automatically)
+openai_agent = Agent(
+    name="OpenAIBot",
+    instructions="You are powered by GPT-4o.",
+    model="gpt-4o",
+)
+
+claude_agent = Agent(
+    name="ClaudeBot",
+    instructions="You are powered by Claude 3.5 Sonnet.",
+    model="claude-3-5-sonnet-20241022",
+)
+
+gemini_agent = Agent(
+    name="GeminiBot",
+    instructions="You are powered by Google Gemini.",
+    model="gemini-2.5-flash",
+)
+
+# Option 2: Custom endpoints via OpenAIEngine (Groq, Ollama, DeepSeek)
+groq_engine = OpenAIEngine(
+    base_url="https://api.groq.com/openai/v1",
+    api_key=os.getenv("GROQ_API_KEY"),
+    provider="groq",
+)
+
+groq_agent = Agent(
+    name="GroqBot",
+    instructions="You are powered by LLaMA 3.3 on Groq.",
+    model="llama-3.3-70b-versatile",
+    engine=groq_engine,
+)
+```
+
+<Callout type="warn" title="Provider Differences in v0.3.4 vs v0.4.0rc1">
+In <VersionBadge version="0.3.4" status="stable" />, <code>GeminiEngine</code> relies on the <code>google-genai</code> package. In <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>GeminiEngine</code> was refactored to pure HTTP REST via <code>httpx</code>, eliminating external Google SDK dependencies.
+</Callout>
+
+---
+
+## Next Steps
+
+Now that you have executed your first agents, dive into the foundational concepts:
+
+* [Core Concepts](/en/docs/v0.3/getting-started/core-concepts): Learn about State Management, Memory, Handoffs, and Concurrency.

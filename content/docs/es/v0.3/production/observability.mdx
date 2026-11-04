@@ -1,0 +1,145 @@
+---
+title: "Observabilidad y Depuración"
+description: "Registro estructurado en producción, telemetría, IDs de correlación, trazado de herramientas e inspección en sistemas chatflow-agent."
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+Operar enjambres multi-agente en entornos de producción exige una visibilidad exhaustiva. Cuando un agente transfiere una conversación, invoca APIs externas o activa mecanismos de respaldo, los operadores requieren registros estructurados e IDs de correlación para diagnosticar latencias, investigar anomalías y auditar decisiones.
+
+`chatflow-agent` expone loggers estructurados de la biblioteca estándar de Python a lo largo de cada capa arquitectónica, desde los webhooks de canales hasta las peticiones de red de los motores.
+
+## Jerarquía de Loggers
+
+Todos los loggers se organizan bajo el espacio de nombres `chatflow_agent`. Puedes ajustar la verbosidad globalmente o de forma granular por componente:
+
+```text
+chatflow_agent
+├── chatflow_agent.runner      (Ejecución de turnos, handoffs, llamadas a herramientas, checkpoints)
+├── chatflow_agent.tools       (Generación de esquemas, ejecución de herramientas, validación de argumentos)
+├── chatflow_agent.memory      (Creación de sesiones, E/S de SQLite, TTL de deduplicación)
+├── chatflow_agent.engine
+│   ├── chatflow_agent.engine.openai     (Cargas útiles y latencias de OpenAI/Groq/DeepSeek)
+│   ├── chatflow_agent.engine.gemini     (Peticiones REST v1beta, turnos del modelo)
+│   └── chatflow_agent.engine.anthropic  (Cabeceras de Messages API, recuento de tokens)
+├── chatflow_agent.telegram    (Polling de actualizaciones, autorización de administradores, fragmentación)
+└── chatflow_agent.whatsapp    (Validación HMAC, deduplicación, enmascaramiento de teléfonos)
+```
+
+## Configuración de Registros Estructurados
+
+En producción, formatea los registros como líneas individuales en JSON para que sistemas de ingestión centralizados (como Datadog, CloudWatch o Google Cloud Logging) indexen los campos automáticamente:
+
+```python
+import json
+import logging
+import sys
+from chatflow_agent import Agent, Runner
+
+class JSONLogFormatter(logging.Formatter):
+    """Format log records as structured JSON."""
+    def format(self, record: logging.LogRecord) -> str:
+        log_entry = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "lineno": record.lineno,
+        }
+        if record.exc_info:
+            log_entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_entry)
+
+def setup_production_logging(log_level: int = logging.INFO) -> None:
+    """Initialize structured JSON logging for chatflow-agent."""
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(JSONLogFormatter())
+    
+    # Configurar logger raíz
+    root_logger = logging.getLogger("chatflow_agent")
+    root_logger.setLevel(log_level)
+    root_logger.handlers = [handler]
+    root_logger.propagate = False
+
+if __name__ == "__main__":
+    setup_production_logging()
+    
+    agent = Agent(name="ObservabilityBot", instructions="Test logging.")
+    runner = Runner(starting_agent=agent)
+    print("Structured logging configured.")
+```
+
+## Correlación de Trazas con `trace_id`
+
+Cuando una herramienta falla durante la ejecución, el `Runner` genera automáticamente un UUID `trace_id` y lo adjunta tanto al registro interno como al mensaje entregado al agente:
+
+```text
+[ERROR] 2026-10-30T18:22:15Z chatflow_agent.runner: Tool execution failed [trace_id: 3c9b7e41-0f2d-4e92-bc12-f71e549d8802] - Tool: 'query_database' on agent 'BillingAgent': Connection timed out to db.internal.corp:5432
+```
+
+### Importancia de la Correlación
+
+1. **Privacidad del Usuario:** El usuario final no visualiza trazas de la pila (*stack traces*) crudas ni direcciones IP internas.
+2. **Triaje Determinista:** Cuando un usuario reporta *"Mi consulta falló a las 18:22"*, el equipo de soporte técnico puede buscar directamente `trace_id: 3c9b7e41...` en los registros para inspeccionar los parámetros de entrada y el error completo.
+
+## Inspección de Telemetría de Respuesta
+
+Cada invocación de `Runner.run()` o `Runner.run_async()` devuelve un objeto `AgentResponse` con metadatos de ejecución:
+
+```python
+from chatflow_agent import Agent, Runner
+
+agent = Agent(name="Inspector", instructions="Provide analytical responses.")
+runner = Runner(starting_agent=agent)
+
+response = runner.run(
+    session_id="session-user-99",
+    user_message="Calculate quarterly forecast.",
+)
+
+# 1. Texto entregado al usuario
+print(f"Content: {response.content}")
+
+# 2. Agente activo final que formuló la respuesta
+print(f"Active Agent: {response.active_agent_name}")
+
+# 3. Lista de herramientas ejecutadas en este turno
+print(f"Tools Executed: {response.tool_calls_executed}")
+
+# 4. Detalles de transferencia si ocurrió un handoff
+if response.handoff:
+    print(f"Transferred to: {response.handoff.target_agent_name}")
+    print(f"Reason: {response.handoff.reason}")
+```
+
+## Auditoría del Historial de Conversación
+
+Para inspeccionar los turnos conversacionales almacenados en una sesión, recupera el contexto de la sesión directamente del almacenamiento configurado:
+
+```python
+from chatflow_agent import Agent, Runner
+from chatflow_agent.core.memory import SessionStore
+
+store = SessionStore()
+agent = Agent(name="Support", instructions="Help customers.")
+runner = Runner(starting_agent=agent, session_store=store)
+
+# Ejecutar turno
+runner.run(session_id="sess-42", user_message="Hello, I need assistance.")
+
+# Inspeccionar sesión almacenada
+session = store.get(session_id="sess-42")
+if session:
+    print(f"Total Messages: {len(session.history)}")
+    for msg in session.history:
+        print(f"[{msg.role.value}] {msg.content}")
+```
+
+<Callout type="info" title="Cero Registro de Claves de API">
+Los loggers de `chatflow-agent` redactan automáticamente tokens de API y cabeceras de autorización. Las cabeceras de autorización en registros HTTP aparecen como `Bearer sk-****` o se omiten de las cadenas de consulta, garantizando el cumplimiento de auditorías SOC 2 y GDPR.
+</Callout>

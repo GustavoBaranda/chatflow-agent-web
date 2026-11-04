@@ -1,0 +1,188 @@
+---
+title: "Webhooks y Canales Personalizados"
+description: "Construye integraciones de webhook y adaptadores de canal personalizados utilizando BaseChannel, FastAPI y despacho asíncrono."
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+Aunque `chatflow-agent` proporciona canales preconstruidos para Telegram y WhatsApp, los sistemas modernos requieren con frecuencia conectar enjambres multi-agente con microservicios internos, Slack Events API, bots de Discord o webhooks de plataformas CRM (Zendesk, Intercom).
+
+A través de la interfaz `BaseChannel` y el extra opcional `webhook` (`fastapi>=0.110.0`, `uvicorn>=0.29.0`), puedes implementar receptores de webhook con nivel de producción en unas pocas líneas de código.
+
+## Arquitectura de BaseChannel
+
+Todos los canales de comunicación heredan de `BaseChannel`, el cual establece un ciclo de vida estandarizado:
+
+```
+[ Webhook HTTP Entrante ]
+           |
+           v
++-------------------------------------------------------------------+
+|                     WebhookChannel Personalizado                  |
+|   1. Autenticar Petición (API Key o Firma HMAC)                   |
+|   2. Extraer session_id, message y metadata                       |
+|   3. Despachar vía dispatch_async(session_id, message, metadata)  |
++---------------------------------+---------------------------------+
+                                  |
+                                  v
++---------------------------------+---------------------------------+
+|                       chatflow-agent Runner                       |
+|   - Bloqueo de Sesión y Recuperación de Memoria                   |
+|   - Orquestación Multi-Agente y Llamadas a Herramientas           |
+|   - Persistencia de Estado                                        |
++---------------------------------+---------------------------------+
+                                  |
+                        AgentResponse (text, data)
+                                  |
+                                  v
+[ Respuesta HTTP Inmediata o Callback Webhook Asíncrono ]
+```
+
+### Métodos Clave de BaseChannel
+
+```python
+from chatflow_agent.channels import BaseChannel
+
+class MyChannel(BaseChannel):
+    """Minimal channel definition."""
+
+    def run(self, **kwargs):
+        """Start the listening service."""
+        pass
+```
+
+* `attach(runner: Runner) -> BaseChannel`: Vincula una instancia de Runner multi-agente al canal.
+* `dispatch_async(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Reenvía el mensaje al runner vinculado de forma asíncrona, garantizando el bloqueo de concurrencia de la sesión.
+* `dispatch(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Homólogo síncrono para entornos de ejecución bloqueantes.
+* `split_message(text: str, max_len: int = 4096) -> list[str]`: Utilidad para fragmentar respuestas salientes extensas respetando los límites de mensajería.
+
+## Implementación de un Webhook de Producción con FastAPI
+
+A continuación se muestra una implementación completa y lista para producción de un canal de webhook personalizado utilizando FastAPI:
+
+```python
+import hmac
+import hashlib
+from typing import Any
+from fastapi import FastAPI, Header, HTTPException, Request
+import uvicorn
+from chatflow_agent import Agent, Runner
+from chatflow_agent.channels.base import BaseChannel, ChannelError
+
+class GenericWebhookChannel(BaseChannel):
+    """Custom webhook receiver supporting HMAC verification and session routing."""
+
+    def __init__(self, secret: str = "webhook-secret") -> None:
+        super().__init__()
+        self.secret = secret
+        self.app = FastAPI(title="Agent Webhook Channel")
+        self._setup_routes()
+
+    def _setup_routes(self) -> None:
+        @self.app.post("/api/v1/chat")
+        async def handle_chat_webhook(
+            request: Request,
+            x_signature: str = Header(None, alias="X-Webhook-Signature"),
+        ) -> dict[str, Any]:
+            body_bytes = await request.body()
+
+            # Opcional: Verificación criptográfica de firma
+            if self.secret and x_signature:
+                expected = hmac.new(
+                    self.secret.encode("utf-8"),
+                    body_bytes,
+                    hashlib.sha256,
+                ).hexdigest()
+                if not hmac.compare_digest(expected, x_signature):
+                    raise HTTPException(status_code=403, detail="Invalid signature")
+
+            data = await request.json()
+            session_id = data.get("session_id", "default-session")
+            message = data.get("message", "")
+            metadata = data.get("metadata", {})
+
+            if not message:
+                raise HTTPException(status_code=400, detail="Field 'message' is required")
+
+            # Despachar directamente al runner vinculado
+            try:
+                response = await self.dispatch_async(session_id, message, metadata=metadata)
+                return {
+                    "session_id": session_id,
+                    "reply": response.text,
+                    "agent": response.agent_name,
+                }
+            except ChannelError as err:
+                raise HTTPException(status_code=500, detail=str(err))
+
+    def run(self, host: str = "0.0.0.0", port: int = 8080) -> None:
+        """Start Uvicorn server."""
+        self._ensure_runner_attached()
+        uvicorn.run(self.app, host=host, port=port)
+```
+
+## Ejecución del Servicio de Webhook
+
+Conecta el canal con tu agente y runner:
+
+```python
+from chatflow_agent import Agent, Runner
+from chatflow_agent.core.memory import SQLiteSessionStore
+
+# 1. Definir agente
+assistant = Agent(
+    name="APIAssistant",
+    instructions="You are an automated API assistant.",
+)
+
+# 2. Configurar memoria persistente
+store = SQLiteSessionStore("webhook_sessions.db")
+runner = Runner(starting_agent=assistant, session_store=store)
+
+# 3. Instanciar canal y vincular runner
+channel = GenericWebhookChannel(secret="super-secret-key")
+channel.attach(runner)
+
+if __name__ == "__main__":
+    channel.run(host="0.0.0.0", port=8080)
+```
+
+## Montaje en Aplicaciones FastAPI Existentes
+
+Si tu backend ya ejecuta una aplicación FastAPI o Starlette, no necesitas un servidor independiente. Puedes montar `runner.run_async()` directamente dentro de los manejadores de rutas existentes:
+
+```python
+from fastapi import FastAPI, Depends
+from chatflow_agent import Agent, Runner
+
+app = FastAPI()
+
+agent = Agent(name="RouterAgent", instructions="Triage support requests.")
+runner = Runner(starting_agent=agent)
+
+@app.post("/crm/webhook")
+async def crm_webhook_endpoint(payload: dict):
+    session_id = payload["customer_id"]
+    incoming_text = payload["ticket_description"]
+
+    # Ejecutar agente directamente
+    response = await runner.run_async(
+        session_id=session_id,
+        user_message=incoming_text,
+        metadata={"priority": payload.get("priority")},
+    )
+
+    return {"status": "processed", "solution": response.content}
+```
+
+## Buenas Prácticas de Seguridad
+
+<Callout type="warn" title="Lista de Verificación de Seguridad en Producción">
+* **Validación de Firmas HMAC:** Siempre valida firmas entrantes (ej. `X-Hub-Signature-256`, `X-Slack-Signature`) mediante `hmac.compare_digest` para evitar ataques de temporización.
+* **Tokens de Autenticación:** Exige encabezados con token de API o Bearer token si el webhook proviene de microservicios internos.
+* **Confirmación Inmediata con Herramientas Lentas:** Si tu agente ejecuta herramientas de larga duración, responde de inmediato con `HTTP 200` al proveedor del webhook y delega el turno del agente como tarea en segundo plano (`asyncio.create_task`), notificando el resultado mediante una URL de callback saliente.
+</Callout>

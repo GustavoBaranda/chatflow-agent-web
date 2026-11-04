@@ -1,0 +1,54 @@
+---
+title: "Visão Geral da Documentação (v0.4 Prerelease)"
+description: "Documentação preliminar do chatflow-agent v0.4.0rc1: provedores REST nativos, contexto de runner assíncrono e melhorias na memória."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+<Callout type="warn" title="Documentação de Pré-lançamento (v0.4.0rc1)">
+Você está visualizando a documentação preliminar do <strong>chatflow-agent v0.4.0rc1</strong>. Esta versão introduz pools de conexões (<code>async with runner:</code>), execução nativa do Gemini via REST, SQLite persistente em memória e tempos limite de turno (<code>turn_timeout</code>). Para ambientes de produção, utilize a versão estável <strong>v0.3.4</strong>.
+</Callout>
+
+Bem-vindo à documentação preliminar do **chatflow-agent v0.4.x**, com atualizações arquiteturais e de concorrência essenciais.
+
+Criado e liderado por **Gustavo Baranda** junto a uma comunidade internacional de código aberto, o `chatflow-agent` foi concebido para eliminar o excesso de dependências e a dependência de fornecedores (*vendor lock-in*), oferecendo concorrência de nível corporativo, memória resiliente e conectividade multicanal.
+
+---
+
+## Destaques da Arquitetura
+
+<Cards>
+  <Card title="Zero Bloqueio de SDKs (Vendor Lock-In)">
+    Conecta-se a LLMs através de REST HTTP assíncrono puro utilizando `httpx`. Sem necessidade de SDKs pesados de provedores ou dependências desnecessárias em tempo de execução.
+  </Card>
+  <Card title="Handoffs Multiagente Nativos">
+    Declare enxames colaborativos. Os agentes delegam tarefas dinamicamente usando ferramentas sintetizadas `transfer_to_*` com prevenção automática de ciclos.
+  </Card>
+  <Card title="Memória Transacional e Resiliente">
+    Cada turno realiza uma captura atômica de estado. Em caso de erro ou estouro de tempo limite, o estado é revertido automaticamente. As operações SQLite rodam em pools de threads dedicados.
+  </Card>
+  <Card title="Pronto para Múltiplos Canais">
+    Implante seus agentes facilmente em terminais REPL, bots do Telegram ou na API do WhatsApp Business Cloud com verificação de assinatura criptográfica HMAC SHA-256.
+  </Card>
+</Cards>
+
+---
+
+## Instalando a Versão de Pré-lançamento
+
+```bash
+# Instalar a versão candidata de pré-lançamento a partir do PyPI
+pip install --pre "chatflow-agent==0.4.0rc1"
+```
+
+---
+
+## Trilha de Primeiros Passos
+
+Siga nosso guia estruturado de introdução para ir da instalação a um agente funcional em minutos:
+
+1. **[Instalação](/pt-BR/docs/v0.4/getting-started/installation):** Verifique seu ambiente Python (`>=3.10`), instale os pacotes principais e configure os extras opcionais de canais.
+2. **[Início Rápido](/pt-BR/docs/v0.4/getting-started/quickstart):** Crie seu primeiro agente em menos de 5 minutos, invoque ferramentas personalizadas com `@tool` e explore a execução assíncrona.
+3. **[Conceitos Fundamentais](/pt-BR/docs/v0.4/getting-started/core-concepts):** Conheça a arquitetura fundamental: `Agent`, `Runner`, `Engines`, `Tools`, `Memory` e `Handoffs`.

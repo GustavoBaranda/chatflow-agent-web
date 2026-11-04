@@ -193,7 +193,61 @@ flowchart LR
 
 ---
 
-## 2. Contributor Experience & Open-Source Operating Model
+## 2. Comprehensive SEO, Discoverability & Personal Branding Strategy
+
+This strategy is permanently embedded into the roadmap to achieve three primary outcomes:
+1. **Adoption:** Facilitate effortless discovery, evaluation, and onboarding for developers and AI engineers seeking Python agent orchestration.
+2. **Market Differentiation & Search Positioning:** Organically distinguish `chatflow-agent` from similarly named software (such as "Chatflow" or "Chat Flow") by dominating high-intent technical long-tail queries.
+3. **Professional Recognition & Authorship:** Clearly identify **Gustavo Baranda** as the Creator & Lead Maintainer while actively celebrating and acknowledging open-source community contributors.
+
+> **Operational Boundary:** Integrating this SEO strategy into the roadmap defines architecture, standards, and phased milestones. It **does not** authorize premature implementation of future phases (Phases 4 through 8).
+
+### 2.1 Target Search Query Universe
+Search intent research defines three distinct keyword clusters:
+* **Brand & Authority Queries:** `chatflow-agent`, `chatflow agent python`, `chatflow-agent documentation`, `chatflow-agent GitHub`, `chatflow-agent framework`.
+* **Technical Discovery Queries:** `Python AI agents`, `Python AI agent framework`, `Python multi-agent framework`, `Multi-agent orchestration`, `LLM tools and function calling`, `Persistent agent sessions`, `AI agent integrations`, verified SDK real-world use cases.
+* **Professional Brand & Author Queries:** `Gustavo Baranda`, `Python development`, `AI agent development`, `Open-source software`, `Software engineering`, `Gustavo Baranda chatflow-agent`.
+
+*(Note: Candidate queries are refined and validated during authorized research phases. Zero keyword stuffing or unverified claims).*
+
+### 2.2 Identity, Authorship & Ecosystem Linking
+* **Framework-First Architecture:** Homepage and Documentation prioritize developer enablement, architectural clarity, and verifiable runnable code snippets.
+* **Institutional Recognition:** The **About** page elaborates project origins, design philosophy, maintainer background, and open collaboration.
+* **Community Visibility:** The **Community** page highlights international contributors and provides direct avenues for participation.
+* **Cohesive Cross-Platform Identity:** Maintain synchronous, authentic references across the documentation platform, GitHub repository ([https://github.com/GustavoBaranda/chatflow-agent](https://github.com/GustavoBaranda/chatflow-agent)), PyPI (`chatflow-agent`), and the creator's professional portfolio ([https://github.com/GustavoBaranda](https://github.com/GustavoBaranda)).
+* **Authenticity Policy:** No artificial repetition of creator name on technical docs; no fabricated statistics, stars, or contributions.
+
+### 2.3 Permanent Technical SEO Standards
+* **Multilingual Architecture:** Authoritative English (`en`), Spanish (`es`), and Brazilian Portuguese (`pt-BR`) with explicit URL routing prefixes (`/en/...`, `/es/...`, `/pt-BR/...`).
+* **Canonical & Hreflang:** Bidirectional `hreflang` alternates across all launch locales, canonical URLs on all public routes, and explicit `x-default` pointing to the authoritative English route.
+* **Robots & Indexing Controls:** Localized `sitemap.xml` strictly indexable pages; `robots.txt` granting access to public content; explicit `<meta name="robots" content="noindex, follow" />` on fallback pages and `noindex, nofollow` on maintenance and error states.
+* **Semantic HTML & Metadata:** Exactly one `<h1>` per page, hierarchical subheadings (`<h2>`, `<h3>`), descriptive anchor text for internal links, and unique meta descriptions.
+* **Structured Data (Schema.org):** Verifiable structured JSON-LD for `SoftwareSourceCode`, `SoftwareApplication`, `Person` (Creator & Lead Maintainer), and `BreadcrumbList`.
+* **Core Web Vitals:** Strict performance budgets ($\text{LCP} \le 1.2\text{ s}$, $\text{INP} \le 100\text{ ms}$, $\text{CLS} \le 0.05$) with 100% keyboard accessibility and WCAG 2.1 AA compliance.
+
+### 2.4 Technical Documentation SEO
+* Every MDX documentation page includes unique frontmatter (`title`, `description`, `sourceRevision`, `sourceHash`).
+* Grounded exclusively in verified, published SDK APIs: taking stable release `0.3.4` as the baseline and distinguishing `0.4.0rc1` as prerelease.
+
+### 2.5 Phase-by-Phase SEO Integration
+* **Stage 3 — Resilience (Current Phase):** Semantic HTTP status codes (`200 OK`, `404 Not Found`, `503 Service Unavailable` with `Retry-After`), zero indexation of maintenance states, zero redirect/rewrite loops, and safe error boundary recovery.
+* **Stage 4 — Technical Documentation & Content SEO:** Complete MDX documentation trees with localized metadata, internal linking graphs, and homepage CTA connectivity.
+* **Stage 5 — Community, Authority & Creator Branding:** Multilingual Community hub, contributor recognition, enhanced About page, and verified PyPI/GitHub/Portfolio ecosystem linking.
+* **Stage 6 — Advanced SEO, Competitive Differentiation & Governance:** Search intent analysis, competitive differentiation vs "Chatflow", Schema.org validation, sitemap/robots auditing, Core Web Vitals profiling, and Search Console readiness.
+* **Stage 7 — Quality Assurance, Performance & Verification:** Localized sitemap validation, canonical/hreflang verification, accessibility audit with axe-core, and zero broken links.
+* **Stage 8 — Publication, Launch & Post-Launch Search Tracking:** Production domain verification, Search Console setup, and ongoing organic search performance tracking (impressions, queries, indexing).
+
+### 2.6 Automated SEO Quality Gates
+Before any new public route or documentation page is approved:
+1. Unique metadata and canonical URL verified.
+2. Valid bidirectional hreflang links verified.
+3. Accurate HTTP response code confirmed.
+4. Clean semantic HTML and zero broken internal links.
+5. Zero unverified SDK claims or keyword stuffing.
+
+---
+
+## 3. Contributor Experience & Open-Source Operating Model
 
 ### 2.1 Reproducible Local Environment
 To enable frictionless contributions from worldwide developers and technical writers:

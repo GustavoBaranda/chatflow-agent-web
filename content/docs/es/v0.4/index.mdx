@@ -1,0 +1,54 @@
+---
+title: "Visión General de la Documentación (v0.4 Prerelease)"
+description: "Documentación preliminar de chatflow-agent v0.4.0rc1: proveedores REST nativos, contexto de runner asíncrono y mejoras en la memoria."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+<Callout type="warn" title="Documentación Preliminar (v0.4.0rc1)">
+Estás visualizando la documentación preliminar de <strong>chatflow-agent v0.4.0rc1</strong>. Esta línea introduce grupos de conexiones (<code>async with runner:</code>), ejecución de Gemini nativa mediante REST, persistencia de SQLite en memoria y tiempos límite de turno (<code>turn_timeout</code>). Para entornos de producción, utiliza la versión estable <strong>v0.3.4</strong>.
+</Callout>
+
+Bienvenido a la documentación preliminar de **chatflow-agent v0.4.x**, con importantes actualizaciones de concurrencia y arquitectura.
+
+Creado y liderado por **Gustavo Baranda** junto a una comunidad internacional de código abierto, `chatflow-agent` está diseñado para eliminar la sobrecarga innecesaria de dependencias y el bloqueo con proveedores específicos, proporcionando concurrencia de nivel empresarial, memoria resiliente y conectividad multicanal.
+
+---
+
+## Aspectos Destacados de la Arquitectura
+
+<Cards>
+  <Card title="Sin Bloqueo de SDKs">
+    Conéctate a los LLMs mediante HTTP REST asíncrono y puro utilizando `httpx`. No se requieren SDKs monolíticos de proveedores ni dependencias pesadas en tiempo de ejecución.
+  </Card>
+  <Card title="Handoffs Multi-Agente Nativos">
+    Declara enjambres colaborativos. Los agentes delegan tareas dinámicamente mediante herramientas `transfer_to_*` sintetizadas con prevención automática de bucles.
+  </Card>
+  <Card title="Memoria Transaccional Resiliente">
+    Cada turno toma una instantánea atómica. Si ocurre un error o expira el tiempo límite, el estado se revierte automáticamente. Las operaciones de SQLite se ejecutan en grupos dedicados de hilos.
+  </Card>
+  <Card title="Preparado para Múltiples Canales">
+    Despliega tus agentes sin problemas en REPLs de terminal, bots de Telegram o la API Cloud de WhatsApp Business con verificación criptográfica HMAC SHA-256.
+  </Card>
+</Cards>
+
+---
+
+## Instalación de la Versión Preliminar
+
+```bash
+# Instalar la versión candidata preliminar desde PyPI
+pip install --pre "chatflow-agent==0.4.0rc1"
+```
+
+---
+
+## Ruta de Primeros Pasos
+
+Sigue nuestra guía estructurada de incorporación para pasar de la instalación a un agente funcional en minutos:
+
+1. **[Instalación](/es/docs/v0.4/getting-started/installation):** Verifica tu entorno Python (`>=3.10`), instala los paquetes centrales y configura extras opcionales de canales.
+2. **[Inicio Rápido](/es/docs/v0.4/getting-started/quickstart):** Construye tu primer agente en menos de 5 minutos, invoca herramientas personalizadas con `@tool` y explora la ejecución asíncrona.
+3. **[Conceptos Fundamentales](/es/docs/v0.4/getting-started/core-concepts):** Conoce la arquitectura base: `Agent`, `Runner`, `Engines`, `Tools`, `Memory` y `Handoffs`.

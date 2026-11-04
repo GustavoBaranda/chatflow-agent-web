@@ -3,6 +3,7 @@
 import { forwardRef, useSyncExternalStore } from 'react';
 import { motion, MotionConfig } from 'framer-motion';
 import { useTranslations } from 'next-intl';
+import { cn } from '@/lib/utils';
 
 const motionQuery = '(prefers-reduced-motion: reduce)';
 
@@ -19,10 +20,11 @@ const getReducedMotion = () =>
 export interface MenuToggleProps {
   active: boolean;
   onToggle: () => void;
+  className?: string;
 }
 
 export const MenuToggle = forwardRef<HTMLButtonElement, MenuToggleProps>(
-  function MenuToggle({ active, onToggle }, ref) {
+  function MenuToggle({ active, onToggle, className }, ref) {
     const t = useTranslations('navigation');
     const reducedMotion = useSyncExternalStore(subscribeMotion, getReducedMotion, () => false);
 
@@ -42,14 +44,17 @@ export const MenuToggle = forwardRef<HTMLButtonElement, MenuToggleProps>(
           aria-controls="mobile-navigation"
           aria-haspopup="dialog"
           onClick={onToggle}
-          className="relative z-50 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary cursor-pointer md:hidden"
+          className={cn(
+            'relative z-50 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary cursor-pointer md:hidden pointer-events-auto',
+            className
+          )}
           animate={active ? 'open' : 'closed'}
           aria-label={active ? t('closeMenu') : t('menu')}
         >
           {/* Top bar -> rotates 45deg to form top-left to bottom-right slash of the X */}
           <motion.span
             aria-hidden="true"
-            className="absolute h-[2px] w-5 rounded-full bg-current"
+            className="absolute h-0.5 w-5 rounded-full bg-current"
             style={{ left: '50%', top: '35%', x: '-50%', y: '-50%' }}
             variants={{
               open: {
@@ -66,7 +71,7 @@ export const MenuToggle = forwardRef<HTMLButtonElement, MenuToggleProps>(
           {/* Middle bar -> rotates -45deg to form bottom-left to top-right stroke */}
           <motion.span
             aria-hidden="true"
-            className="absolute h-[2px] w-5 rounded-full bg-current"
+            className="absolute h-0.5 w-5 rounded-full bg-current"
             style={{ left: '50%', top: '50%', x: '-50%', y: '-50%' }}
             variants={{
               open: {
@@ -81,7 +86,7 @@ export const MenuToggle = forwardRef<HTMLButtonElement, MenuToggleProps>(
           {/* Bottom bar -> half-width, animates to align and complete the X */}
           <motion.span
             aria-hidden="true"
-            className="absolute h-[2px] w-2.5 rounded-full bg-current"
+            className="absolute h-0.5 w-2.5 rounded-full bg-current"
             style={{
               left: 'calc(50% - 5px)',
               bottom: '35%',

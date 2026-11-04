@@ -1,7 +1,11 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { routing } from '@/i18n/routing';
+import { Link } from '@/i18n/navigation';
 import { GitHubIcon } from '@/components/ui/icons';
+import { SITE_ORIGIN, createSocialMetadata } from '@/config/docs-seo';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { getAboutStructuredData } from '@/lib/structured-data';
 import {
   Code2,
   Users,
@@ -11,6 +15,7 @@ import {
   Radio,
   Database,
   ArrowRight,
+  BookOpen,
 } from 'lucide-react';
 import type { Metadata } from 'next';
 
@@ -31,6 +36,13 @@ export async function generateMetadata({
   );
   languages['x-default'] = `/${routing.defaultLocale}/about`;
 
+  const social = createSocialMetadata({
+    title: `${t('metaTitle')} | chatflow-agent`,
+    description: t('metaDescription'),
+    url: `${SITE_ORIGIN}/${locale}/about`,
+    locale,
+  });
+
   return {
     title: t('metaTitle'),
     description: t('metaDescription'),
@@ -38,6 +50,8 @@ export async function generateMetadata({
       canonical: `/${locale}/about`,
       languages,
     },
+    openGraph: social.openGraph,
+    twitter: social.twitter,
   };
 }
 
@@ -79,8 +93,10 @@ export default async function AboutPage({
   ];
 
   return (
-    <main id="main-content" className="flex-1">
-      <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
+    <>
+      <JsonLd data={getAboutStructuredData(locale)} />
+      <main id="main-content" className="flex-1">
+        <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
         {/* Page Hero */}
         <header className="text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1 text-xs font-semibold text-primary">
@@ -98,12 +114,14 @@ export default async function AboutPage({
 
         {/* Origin & Purpose Section */}
         <section aria-labelledby="origin-heading" className="mt-16 rounded-2xl border border-border bg-card p-8 sm:p-10 shadow-xs">
-          <h2 id="origin-heading" className="text-2xl font-bold tracking-tight text-foreground">
-            {t('originTitle')}
-          </h2>
-          <div className="mt-4 space-y-4 text-base leading-relaxed text-muted-foreground">
-            <p>{t('originP1')}</p>
-            <p>{t('originP2')}</p>
+          <div className="max-w-3xl">
+            <h2 id="origin-heading" className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              {t('originTitle')}
+            </h2>
+            <div className="mt-4 space-y-4 text-base leading-relaxed text-muted-foreground">
+              <p>{t('originP1')}</p>
+              <p>{t('originP2')}</p>
+            </div>
           </div>
         </section>
 
@@ -141,9 +159,9 @@ export default async function AboutPage({
             {t('leadershipTitle')}
           </h2>
 
-          <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
+          <div className="mt-8 grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-2">
             {/* Creator & Lead Maintainer Card */}
-            <article className="flex flex-col justify-between rounded-xl border border-border bg-card p-6 sm:p-8 shadow-xs transition-shadow hover:shadow-md">
+            <article className="flex flex-col justify-between rounded-xl border border-border bg-card p-5 sm:p-8 shadow-xs transition-shadow hover:shadow-md">
               <div>
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -178,7 +196,7 @@ export default async function AboutPage({
             </article>
 
             {/* Global Community Card */}
-            <article className="flex flex-col justify-between rounded-xl border border-border bg-card p-6 sm:p-8 shadow-xs transition-shadow hover:shadow-md">
+            <article className="flex flex-col justify-between rounded-xl border border-border bg-card p-5 sm:p-8 shadow-xs transition-shadow hover:shadow-md">
               <div>
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
@@ -213,7 +231,39 @@ export default async function AboutPage({
             </article>
           </div>
         </section>
+
+        {/* Closing Navigation / Next Steps Section */}
+        <section
+          aria-labelledby="about-closing-heading"
+          className="mt-16 rounded-2xl border border-border bg-linear-to-b from-card to-card/50 p-8 sm:p-10 shadow-xs text-center"
+        >
+          <div className="max-w-2xl mx-auto">
+            <h2 id="about-closing-heading" className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              {t('closingTitle')}
+            </h2>
+            <p className="mt-3 text-sm sm:text-base leading-relaxed text-muted-foreground">
+              {t('closingSubtitle')}
+            </p>
+            <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 max-w-xs sm:max-w-none mx-auto w-full">
+              <Link
+                href="/docs"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-xs transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-primary w-full sm:w-auto"
+              >
+                <BookOpen className="h-4 w-4" aria-hidden="true" />
+                <span>{t('closingDocsAction')}</span>
+              </Link>
+              <Link
+                href="/community"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-5 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary w-full sm:w-auto"
+              >
+                <span>{t('closingCommunityAction')}</span>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
+    </>
   );
 }

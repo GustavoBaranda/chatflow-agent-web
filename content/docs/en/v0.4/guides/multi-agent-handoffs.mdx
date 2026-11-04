@@ -1,0 +1,255 @@
+---
+title: "Multi-Agent Handoffs"
+description: "Orchestrating autonomous swarms, peer-to-peer delegation, synthetic transfer tools, and cycle prevention in chatflow-agent."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+Multi-agent coordination in **chatflow-agent** is modeled after autonomous **peer-to-peer swarms**. Instead of relying on a centralized coordinator or rigid hardcoded graphs, agents autonomously delegate tasks to specialized peers by invoking synthesized handoff tools.
+
+When an agent triggers a handoff, the conversational context is seamlessly preserved, the active agent pointer is updated, and the new agent immediately continues the turn within the same execution cycle.
+
+---
+
+## The Swarm Mental Model
+
+In a swarm architecture, each agent specializes in a distinct domain (e.g., triage, billing, engineering, refunds). Coordination occurs naturally through dialogue:
+
+1. **Decentralized Delegation:** Agents know which peers they can hand off to via their `handoffs` list.
+2. **Dynamic Decision Making:** The LLM decides at runtime whether to answer directly, call a domain tool, or hand off control to a peer.
+3. **Transparent Execution:** The user interacts with a unified conversational endpoint (`Runner`), unaware that multiple specialized models or agents are collaborating behind the scenes.
+
+---
+
+## Declaring Handoffs Between Agents
+
+Handoff relationships are declared either during instantiation or imperatively:
+
+### Method 1: Constructor Declaration
+Pass a list of target `Agent` instances in the `handoffs` parameter:
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from chatflow_agent import Agent
+
+# Define specialized destination agents first
+billing_agent = Agent(
+    name="BillingSpecialist",
+    instructions="Handle payments, invoice queries, and subscription upgrades.",
+    model="gemini-2.5-flash",
+)
+
+technical_agent = Agent(
+    name="TechnicalSupport",
+    instructions="Diagnose software bugs, API errors, and configuration issues.",
+    model="gemini-2.5-flash",
+)
+
+# Triage agent routes to specialists
+triage_agent = Agent(
+    name="TriageAgent",
+    instructions=(
+        "Welcome the user and determine their needs. "
+        "Transfer billing questions to BillingSpecialist and technical questions to TechnicalSupport."
+    ),
+    handoffs=[billing_agent, technical_agent],
+    model="gemini-2.5-flash",
+)
+```
+
+### Method 2: Bidirectional & Cyclic Handoffs
+Specialists often need to transfer users back and forth. Use `agent.add_handoff()` to establish bidirectional links:
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from chatflow_agent import Agent
+
+support = Agent(name="Support", instructions="General support", model="gpt-4o")
+billing = Agent(name="Billing", instructions="Billing support", model="gpt-4o")
+
+# Establish bidirectional handoff
+support.add_handoff(billing)
+billing.add_handoff(support)
+
+assert any(h.name == "Billing" for h in support.handoffs)
+assert any(h.name == "Support" for h in billing.handoffs)
+```
+
+<Callout type="warn" title="Self-Handoff Prohibition">
+An agent cannot register a handoff to itself. Calling <code>agent.add_handoff(agent)</code> immediately raises a <code>ValueError("Agent 'X' cannot register a handoff to itself.")</code>.
+</Callout>
+
+---
+
+## Synthetic Routing Tools Under the Hood
+
+When an agent defines peers in `handoffs`, `chatflow-agent` automatically synthesizes dedicated routing tools exposed through `agent.get_all_tools()`.
+
+For each peer agent:
+* **Tool Name:** Generated as `transfer_to_<sanitized_name>` (e.g., `transfer_to_billingspecialist`).
+* **Tool Description:** Combines the target agent name with an excerpt of its instructions:
+  `"Hand off the dialogue to 'BillingSpecialist'. Target agent specialty: Handle payments, invoice queries..."`
+* **Signature:** Accepts an optional `reason: str | None = None` parameter.
+* **Return Value:** Returns a typed `Handoff(target_agent_name="BillingSpecialist", reason=...)` payload.
+
+Because handoff tools look and behave like standard function calls, the model learns naturally when to transfer control based on user intent and tool descriptions.
+
+---
+
+## Handoff Execution Lifecycle in `Runner`
+
+When `runner.run_async()` processes a turn:
+
+```
+[User Message] 
+       │
+       ▼
+ [Active Agent] ──(Generates Tool Call)──► transfer_to_billingspecialist(reason="...")
+                                                    │
+                                                    ▼
+                                           [Executes Handoff]
+                                                    │
+                                                    ▼
+                                         [Swaps Active Agent]
+                                      (session.set_active_agent)
+                                                    │
+                                                    ▼
+                                       [Next Model Generation]
+                                       (BillingSpecialist responds)
+                                                    │
+                                                    ▼
+                                             [Final Response]
+```
+
+1. **Tool Invocation:** The LLM emits a tool call for `transfer_to_billingspecialist`.
+2. **Registry Verification:** The `Runner` verifies that `BillingSpecialist` exists in its internal agent registry. If the agent is missing, it raises an `AgentHandoffError`.
+3. **Active Agent Swap:** The `Runner` updates `session.set_active_agent(target_agent)`.
+4. **Handoff Result Injection:** A `ToolResult` containing `status: "HANDOFF_SUCCESS"` and the transfer reason is appended to the session history.
+5. **Immediate Turn Continuation:** Within the same `runner.run()` call, the new active agent is prompted with the updated conversation history to formulate its response.
+
+---
+
+## Cycle Prevention & Turn Limits
+
+Uncontrolled handoffs between agents could trigger infinite loops if prompts are ambiguous. `chatflow-agent` protects your execution with built-in safeguards:
+
+* **`max_handoffs_per_turn` (Default: 5):**
+  The maximum number of agent transfers permitted within a single user message turn. If this limit is exceeded, the runner halts further transfers and injects an error result:
+  `"Maximum agent transfers exceeded for a single turn."`
+* **`max_tool_iterations` (Default: 10):**
+  The overall cap on tool executions per turn, ensuring guaranteed termination even if tools repeatedly chain calls.
+
+```python
+from chatflow_agent import Agent, Runner
+
+triage = Agent(name="Triage", instructions="...", model="gpt-4o")
+
+# Configure stricter turn limits for high-throughput or low-cost endpoints
+runner = Runner(
+    starting_agent=triage,
+    max_handoffs_per_turn=3,
+    max_tool_iterations=6,
+)
+```
+
+---
+
+## Version Differences & Prerelease Features
+
+Handoff generation and sanitization include major reliability enhancements in newer versions:
+
+### Stable Release (`v0.3.4`)
+* <VersionBadge version="0.3.4" status="stable" /> Basic regex sanitization: `clean = re.sub(r"[^a-zA-Z0-9_]", "_", name.strip().lower())`.
+* Shared session history maintains full conversational context across handoffs.
+
+### Prerelease Enhancements (`v0.4.0rc1`)
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **NFKD Unicode Transliteration:** Automatically normalizes accented characters into clean ASCII (e.g., `AtenciónAlCliente` becomes `transfer_to_atencionalcliente`).
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Deterministic Hash Fallbacks:** Agent names in non-Latin scripts (e.g., Japanese, Arabic, Cyrillic) or emojis fall back to a deterministic SHA-256 hash prefix (`transfer_to_u<hash>`) to guarantee valid identifier syntax.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Disambiguation on Collisions:** If two agents produce conflicting sanitized names, numeric suffixes (`_2`, `_3`) are automatically appended to prevent schema overwrites.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Length Capping:** Handoff tool identifiers are capped at 60 characters to satisfy provider constraints.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Context Updates Forwarding:** `session.set_active_agent(agent, context_updates)` supports forwarding metadata state alongside the handoff event.
+
+---
+
+## Complete Example: Multi-Tier Support Swarm
+
+```python
+from chatflow_agent import Agent, Runner, tool
+from chatflow_agent.core.memory import SessionStore
+
+# 1. Specialized tools
+@tool
+def issue_refund(transaction_id: str, amount: float) -> dict:
+    """Process a refund back to customer original payment method."""
+    return {"status": "REFUNDED", "transaction_id": transaction_id, "amount": amount}
+
+@tool
+def lookup_kb_article(topic: str) -> str:
+    """Search knowledge base for troubleshooting steps."""
+    return f"Knowledge base instructions for {topic}: Clear cache and restart application."
+
+# 2. Specialized destination agents
+billing_agent = Agent(
+    name="BillingAgent",
+    instructions="Assist with refunds and payment disputes. Use issue_refund when appropriate.",
+    tools=[issue_refund],
+    model="gemini-2.5-flash",
+)
+
+tech_agent = Agent(
+    name="TechSupportAgent",
+    instructions="Assist with software errors. Use lookup_kb_article for troubleshooting.",
+    tools=[lookup_kb_article],
+    model="gemini-2.5-flash",
+)
+
+# 3. Triage agent
+triage_agent = Agent(
+    name="TriageAgent",
+    instructions=(
+        "Welcome the user. Ask what they need help with. "
+        "Transfer billing/refund issues to BillingAgent and technical bugs to TechSupportAgent."
+    ),
+    handoffs=[billing_agent, tech_agent],
+    model="gemini-2.5-flash",
+)
+
+# 4. Allow specialists to hand off back to triage if needed
+billing_agent.add_handoff(triage_agent)
+tech_agent.add_handoff(triage_agent)
+
+# 5. Initialize runner
+store = SessionStore()
+runner = Runner(starting_agent=triage_agent, session_store=store)
+
+# 6. Execute dialogue
+response = runner.run(
+    session_id="customer-session-101",
+    user_message="I have an unexpected charge on my invoice and need a refund.",
+)
+
+print("Active Agent:", response.active_agent_name)
+print("Response:", response.content)
+print("Handoff:", response.handoff)
+```
+
+---
+
+## Common Pitfalls & Best Practices
+
+### 1. Unreachable Agents in Registry
+The `Runner` automatically indexes all agents reachable via the `starting_agent` handoff tree. If an agent is not linked in the graph, it must be registered explicitly:
+```python
+# If an agent is introduced dynamically:
+runner.register_agent(specialist_agent)
+```
+
+### 2. Overly Generic Handoff Instructions
+Ensure destination agent instructions clearly state what issues they solve. If two agents have overlapping descriptions, models may hesitate or route unpredictably.
+
+### 3. Preserving Session Identity
+Never create a new `session_id` when expecting a handoff to continue. The handoff state and agent transition are recorded within the active session.

@@ -1,0 +1,125 @@
+---
+title: "Instalación"
+description: "Instala chatflow-agent y configura los extras opcionales de canales para Telegram, WhatsApp y desarrollo."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+---
+
+## Requisitos Previos
+
+Antes de instalar `chatflow-agent`, asegúrate de que tu sistema cumpla con los requisitos mínimos de Python:
+
+* **Versión de Python:** Python `>=3.10` (probado en 3.10, 3.11, 3.12 y 3.13).
+* **Gestor de Paquetes:** `pip`, `uv` o `poetry`.
+* **Sistemas Operativos:** Linux, macOS y Windows (x86_64, arm64).
+
+Verifica la versión local de Python en tu terminal:
+
+```bash
+python --version
+# La salida debe ser Python 3.10.x o superior
+```
+
+---
+
+## Instalación del Paquete Principal
+
+`chatflow-agent` ofrece un núcleo ligero sin dependencias pesadas de proveedores. Puedes elegir entre la versión estable para producción o la candidata de pre-lanzamiento:
+
+<Tabs items={['pip', 'uv', 'poetry']}>
+  <Tab value="pip">
+```bash
+# Instalar la versión estable actual (v0.3.4 - recomendada para producción)
+pip install chatflow-agent
+
+# O instalar la versión candidata de pre-lanzamiento (v0.4.0rc1+)
+pip install --pre chatflow-agent
+# o bien: pip install "chatflow-agent==0.4.0rc1"
+```
+  </Tab>
+  <Tab value="uv">
+```bash
+# Instalar la versión estable actual con uv
+uv add chatflow-agent
+
+# O instalar la versión candidata de pre-lanzamiento
+uv add --prerelease=allow chatflow-agent
+# o bien: uv add "chatflow-agent==0.4.0rc1"
+```
+  </Tab>
+  <Tab value="poetry">
+```bash
+# Instalar la versión estable actual con poetry
+poetry add chatflow-agent
+
+# O instalar la versión candidata de pre-lanzamiento
+poetry add chatflow-agent@0.4.0rc1
+```
+  </Tab>
+</Tabs>
+
+<Callout type="info" title="Cero Dependencia Cautiva y Dependencias Principales">
+En **v0.3.4**, las dependencias principales están estrictamente limitadas a `google-genai>=0.1.1`, `pydantic>=2.6.0` y `httpx>=0.27.0`. En **v0.4.0rc1+**, `google-genai` ya no es requerido: toda la comunicación con Gemini y proveedores compatibles con OpenAI se ejecuta directamente sobre REST asíncrono mediante `httpx`. La persistencia con SQLite utiliza la biblioteca integrada `sqlite3` de Python sin requerir controladores de bases de datos de terceros.
+</Callout>
+
+---
+
+## Extras Opcionales de Canales
+
+`chatflow-agent` declara dependencias opcionales en `pyproject.toml` para mantener el núcleo compacto. Instala únicamente las funciones que tu despliegue requiera:
+
+| Nombre del Extra | Descripción | Dependencias Clave Agregadas | Comando |
+| :--- | :--- | :--- | :--- |
+| `[telegram]` | Integración con bots de Telegram vía polling o webhooks | `python-telegram-bot>=21.0` | `pip install "chatflow-agent[telegram]"` |
+| `[whatsapp]` | Webhooks y receptor para Meta WhatsApp Cloud API | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[whatsapp]"` |
+| `[webhook]` | Servidor HTTP de webhooks genérico para integraciones externas | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[webhook]"` |
+| `[all]` | Instala todas las dependencias de canales simultáneamente | `telegram`, `whatsapp`, `webhook` | `pip install "chatflow-agent[all]"` |
+| `[dev]` | Herramientas para ejecutar suites de pruebas unitarias y de integración | `pytest>=8.0.0`, `pytest-asyncio`, `ruff`, `mypy` | `pip install "chatflow-agent[dev]"` |
+
+---
+
+## Verificación
+
+Confirma que `chatflow-agent` esté correctamente instalado consultando su versión en Python:
+
+```bash
+python -c "import chatflow_agent; print(chatflow_agent.__version__)"
+```
+
+Salida esperada:
+```text
+0.3.4
+```
+*(o `0.4.0rc1` si se instaló con el indicador de pre-lanzamiento)*.
+
+---
+
+## Configuración de Claves de API de Proveedores
+
+Para interactuar con modelos LLM, exporta la clave de API del proveedor seleccionado como variable de entorno en tu terminal o archivo `.env`:
+
+```bash
+# Proveedores OpenAI o compatibles con OpenAI (Groq, xAI, DeepSeek, Ollama)
+export OPENAI_API_KEY="sk-..."
+
+# Modelos Claude de Anthropic
+export ANTHROPIC_API_KEY="sk-ant-..."
+
+# Modelos Gemini de Google
+export GEMINI_API_KEY="AIzaSy..."
+```
+
+En Windows PowerShell:
+```powershell
+$env:OPENAI_API_KEY="sk-..."
+$env:ANTHROPIC_API_KEY="sk-ant-..."
+$env:GEMINI_API_KEY="AIzaSy..."
+```
+
+---
+
+## Próximos Pasos
+
+Una vez configurado tu entorno, continúa con la [Guía de Inicio Rápido](/es/docs/v0.3/getting-started/quickstart) para poner en marcha tu primer agente conversacional en menos de 5 minutos.

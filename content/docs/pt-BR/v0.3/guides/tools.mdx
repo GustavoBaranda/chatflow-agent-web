@@ -1,0 +1,228 @@
+---
+title: "Ferramentas e Chamada de Funções"
+description: "Guia arquitetural completo sobre chamada de funções, esquemas de tipos de parâmetros, despacho síncrono/assíncrono e isolamento de erros no chatflow-agent."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+Ferramentas capacitam agentes a interagir com ambientes externos, executar cálculos, consultar bancos de dados e disparar ações de negócio. No **chatflow-agent**, ferramentas são objetos de primeira classe criados através do decorador `@tool` ou instanciados diretamente com a classe `Tool`.
+
+O framework fornece um motor automatizado de introspecção que converte anotações de tipo nativas e docstrings do Python em declarações compatíveis com OpenAPI e JSON Schema para modelos do Google Gemini, OpenAI e Anthropic, dispensando definições manuais de esquemas.
+
+---
+
+## Definindo Ferramentas com `@tool`
+
+A forma padrão de construir uma ferramenta é através do decorador `@tool`. Você pode aplicá-lo de forma direta ou customizar seu nome e descrição:
+
+### 1. Decorador Simples
+Infere o nome da ferramenta a partir do identificador da função e a descrição a partir da sua docstring:
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from chatflow_agent import tool
+
+@tool
+def calculate_vat(subtotal: float, rate: float = 0.20) -> float:
+    """Calculate Value-Added Tax for an order subtotal."""
+    return round(subtotal * rate, 2)
+
+assert calculate_vat.name == "calculate_vat"
+assert "Calculate Value-Added Tax" in calculate_vat.description
+```
+
+### 2. Decorador Parametrizado
+Sobrescreve explicitamente o nome e a descrição expostos ao LLM:
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from chatflow_agent import tool
+
+@tool(
+    name="lookup_stock_ticker",
+    description="Fetch the latest real-time market quote for a stock symbol.",
+)
+def fetch_quote(symbol: str) -> dict:
+    """Internal function to retrieve stock prices."""
+    # Consulta serviço financeiro
+    return {"symbol": symbol.upper(), "price": 182.50, "currency": "USD"}
+
+assert fetch_quote.name == "lookup_stock_ticker"
+```
+
+---
+
+## Mapeamento de Tipos e Introspecção de Esquemas
+
+Quando uma ferramenta é registrada, o `chatflow-agent` analisa sua assinatura via módulo padrão `inspect` do Python e monta o esquema de parâmetros:
+
+| Anotação Python | Tipo Canônico no Esquema | Obrigatório Se |
+| :--- | :--- | :--- |
+| `str` | `"STRING"` | Nenhum valor padrão atribuído |
+| `int` | `"INTEGER"` | Nenhum valor padrão atribuído |
+| `float` | `"NUMBER"` | Nenhum valor padrão atribuído |
+| `bool` | `"BOOLEAN"` | Nenhum valor padrão atribuído |
+| `list` | `"ARRAY"` | Nenhum valor padrão atribuído |
+| `dict` | `"OBJECT"` | Nenhum valor padrão atribuído |
+| *Não anotado* / `Any` | `"STRING"` (Fallback) | Nenhum valor padrão atribuído |
+
+Parâmetros com valores padrão (ex.: `rate: float = 0.20`) são marcados como opcionais no esquema, enquanto parâmetros sem valor padrão são incluídos na matriz `required`.
+
+<Callout type="tip" title="Boas Práticas para Docstrings">
+Os modelos de linguagem decidem se devem acionar uma ferramenta com base em seu nome e descrição. Redija sempre docstrings concisas e inequívocas especificando o propósito exato da função e os argumentos esperados.
+</Callout>
+
+---
+
+## Execução de Ferramentas Síncronas vs. Assíncronas
+
+O `chatflow-agent` é projetado com foco em assincronia, mas suporta funções síncronas (`def`) e assíncronas (`async def`) de forma intercambiável.
+
+```python
+import asyncio
+from chatflow_agent import tool
+
+# Ferramenta síncrona
+@tool
+def sync_reverse(text: str) -> str:
+    """Reverse a string synchronously."""
+    return text[::-1]
+
+# Ferramenta assíncrona
+@tool
+async def async_fetch_status(service_name: str) -> dict:
+    """Query service health asynchronously without blocking."""
+    await asyncio.sleep(0.01)  # Simula I/O assíncrono de rede
+    return {"service": service_name, "status": "healthy"}
+```
+
+### Métodos de Execução
+
+* **`await tool.execute_async(**kwargs)` (Recomendado):**
+  * Se a ferramenta for `async def`, ela é aguardada diretamente no loop de eventos atual.
+  * Se a ferramenta for síncrona `def`, ela é automaticamente despachada para uma thread de trabalho através de `asyncio.to_thread`. Isso assegura que processamentos pesados, I/O de disco ou bibliotecas de rede bloqueantes nunca congelem o loop assíncrono principal.
+* **`tool.execute(**kwargs)` (Conveniência Síncrona):**
+  * Executa ferramentas síncronas diretamente.
+  * Se chamada sobre uma ferramenta `async def` fora de um loop de eventos, executa-a utilizando `asyncio.run()`.
+
+<Callout type="warn" title="Proteção de Loop de Eventos">
+Chamar <code>tool.execute()</code> de forma síncrona sobre uma ferramenta <code>async def</code> dentro de um loop de eventos já em execução (ex.: dentro de FastAPI, manipuladores do Telegram ou turnos do Runner) não é permitido pelo Python e levantará um <code>RuntimeError</code>. Utilize sempre <code>await tool.execute_async()</code> em código assíncrono.
+</Callout>
+
+---
+
+## Diferenças de Versão e Recursos de Pré-lançamento
+
+A geração de esquemas e execução de ferramentas evoluiu significativamente entre versões:
+
+### Versão Estável (`v0.3.4`)
+* <VersionBadge version="0.3.4" status="stable" /> Formato de declaração canônico do Gemini (`to_gemini_declaration()`).
+* Mapeamento de tipos em nível único para tipos primitivos e coleções não parametrizadas (`list`/`dict`).
+* Funções síncronas despachadas via `asyncio.to_thread` durante `execute_async()`.
+
+### Melhorias de Pré-lançamento (`v0.4.0rc1`)
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Tipagem Profunda de Coleções:** Inspeciona esquemas internos de itens para `list[T]`, `Sequence[T]`, `set[T]` e tuplas homogêneas `tuple[T, ...]`:
+
+```python
+from chatflow_agent import tool
+
+@tool
+def sum_metrics(values: list[float]) -> float:
+    """Sum a list of numeric measurements."""
+    return sum(values)
+
+# Gera: {"type": "ARRAY", "items": {"type": "NUMBER"}}
+```
+
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Suporte a Union e Optional:**
+  * `Optional[T]` ou `T | None` gera `{ "type": "...", "nullable": True }`.
+  * `int | float` é expandido deterministicamente para `"NUMBER"` independentemente da ordem da declaração.
+  * Uniões de múltiplos tipos geram uma lista de esquemas `anyOf`.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`to_openai_parameters()`:** Gera parâmetros formatados em JSON Schema (nomes de tipos em minúsculas, `type: "null"` e sem o atributo `nullable`) para os motores OpenAI e Anthropic.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`ToolSchemaError`:** Valida assinaturas no momento da definição, levantando um `ToolSchemaError` descritivo caso um tipo não suportado não possa ser mapeado para um esquema válido.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Exclusão de Argumentos Variáveis:** `*args` e `**kwargs` são omitidos automaticamente dos esquemas de parâmetros.
+
+---
+
+## Isolamento de Erros e Tolerância a Falhas
+
+Em produção, ferramentas podem sofrer quedas de rede, consultas inválidas ao banco de dados ou exceções inesperadas.
+
+O `chatflow-agent` isola falhas de ferramentas dentro do turno de execução. Se uma ferramenta levantar uma exceção não tratada durante sua execução:
+
+1. A exceção é interceptada e encapsulada em um `ToolExecutionError`.
+2. O `Runner` captura a falha e injeta um `ToolResult` no histórico da conversa com a flag `is_error=True`:
+   ```python
+   # Injetado no histórico de mensagens para o LLM:
+   # ToolResult(tool_call_id="call_123", name="query_db", content="Database connection timeout", is_error=True)
+   ```
+3. Em vez de interromper toda a conversa do usuário com uma falha catastrófica, o agente ativo enxerga o resultado de erro e pode explicar o problema ao usuário, tentar novamente com parâmetros alternativos ou transferir para uma fila de atendimento humano.
+
+---
+
+## Exemplo Completo: Agente com Múltiplas Ferramentas
+
+```python
+from chatflow_agent import Agent, Runner, tool
+from chatflow_agent.core.memory import SessionStore
+
+# 1. Definir ferramentas de domínio modulares
+@tool
+def calculate_shipping(weight_kg: float, destination: str) -> dict:
+    """Calculate shipping estimate based on weight and country destination."""
+    rate_per_kg = 8.50 if destination.upper() in ["US", "CA"] else 14.00
+    total = round(weight_kg * rate_per_kg, 2)
+    return {"destination": destination.upper(), "cost_usd": total, "delivery_days": 3}
+
+@tool
+def check_inventory(sku: str) -> dict:
+    """Check stock availability for a product SKU."""
+    return {"sku": sku, "in_stock": True, "warehouse": "east-region-1"}
+
+# 2. Vincular ferramentas ao agente
+logistics_agent = Agent(
+    name="LogisticsCoordinator",
+    instructions="Help customers check inventory availability and calculate shipping rates.",
+    tools=[calculate_shipping, check_inventory],
+    model="gemini-2.5-flash",
+)
+
+# 3. Criar o runner com armazenamento de sessão
+store = SessionStore()
+runner = Runner(starting_agent=logistics_agent, session_store=store)
+
+# 4. Executar o turno
+response = runner.run(
+    session_id="customer-turn-42",
+    user_message="Can you check stock for SKU-990 and estimate shipping 2.5 kg to CA?",
+)
+print("Agent Response:", response.content)
+print("Tools Executed:", response.tool_calls_executed)
+```
+
+---
+
+## Armadilhas Comuns e Anti-padrões
+
+### 1. Esquecer Anotações de Tipo
+Parâmetros sem anotações de tipo recaem para `"STRING"`. Se sua ferramenta espera números ou booleanos, inclua sempre dicas de tipo (*type hints*):
+```python
+# [INCORRETO]: "count" será exposto como STRING, exigindo conversão manual para int
+@tool
+def repeat_phrase(phrase, count): ...
+
+# [CORRETO]: Parâmetros totalmente tipados geram validação OpenAPI exata
+@tool
+def repeat_phrase(phrase: str, count: int) -> str:
+    return phrase * count
+```
+
+### 2. Chamadas de Rede Bloqueantes em Ferramentas Síncronas
+Embora ferramentas síncronas sejam despachadas para threads de trabalho via `asyncio.to_thread`, operações pesadas de rede sem tempo limite (*timeout*) podem esgotar o pool de threads do Python. Sempre que possível, construa ferramentas de I/O de rede usando `async def` com limites de tempo explícitos.
+
+### 3. Modificar Estado Global em Funções de Ferramentas
+Ferramentas devem ser funções puras ou interagir com armazenamentos externos através de clientes seguros para concorrência (*thread-safe*). Evite alterar variáveis globais, pois múltiplas sessões de usuários podem invocar a mesma ferramenta concorrentemente.

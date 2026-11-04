@@ -20,6 +20,7 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(brand).toContainText('chatflow-agent');
 
     // Header nav links (Home, Docs, Community, About)
+    await expect(page.locator('header nav a[href="/en"]')).toBeVisible();
     await expect(page.locator('header nav a[href="/en/docs"]')).toBeAttached();
     await expect(page.locator('header nav a[href="/en/community"]')).toBeAttached();
     await expect(page.locator('header nav a[href="/en/about"]')).toBeVisible();
@@ -49,17 +50,36 @@ test.describe('Navigation, Home, and About Suite', () => {
     const getStartedBtn = page.locator('a[href="#quickstart"]').first();
     await expect(getStartedBtn).toBeVisible();
 
-    const docsBtn = page.locator('a[href="https://github.com/GustavoBaranda/chatflow-agent#readme"]');
+    const docsBtn = page.locator('section[aria-labelledby="hero-title"] a[href="/en/docs"]');
     await expect(docsBtn).toBeVisible();
 
-    // Installation command block
+    // Package manager tabs and command box (pip and uv)
+    const pipTab = page.locator('button:has-text("pip")').first();
+    const uvTab = page.locator('button:has-text("uv")').first();
+    await expect(pipTab).toBeVisible();
+    await expect(uvTab).toBeVisible();
     await expect(page.locator('code:has-text("pip install chatflow-agent")')).toBeVisible();
+
+    await uvTab.click();
+    await expect(page.locator('code:has-text("uv add chatflow-agent")')).toBeVisible();
 
     // Python Code Showcase
     const codeShowcase = page.locator('#quickstart');
     await expect(codeShowcase).toBeVisible();
     await expect(codeShowcase).toContainText('from chatflow_agent import Agent, Runner, SQLiteSessionStore');
     await expect(codeShowcase).toContainText('chatflow-agent v0.3.4');
+
+    // Quickstart deep-link
+    const quickstartLink = codeShowcase.locator('a[href="/en/docs/v0.3/getting-started/quickstart"]');
+    await expect(quickstartLink).toBeVisible();
+
+    // Documentation Discovery Section (3 cards)
+    const docsDiscovery = page.locator('section[aria-labelledby="docs-discovery-title"]');
+    await expect(docsDiscovery).toBeVisible();
+    await expect(docsDiscovery.locator('article')).toHaveCount(3);
+    await expect(docsDiscovery.locator('a[href="/en/docs/v0.3/getting-started/installation"]')).toBeVisible();
+    await expect(docsDiscovery.locator('a[href="/en/docs/v0.3/guides/agents"]')).toBeVisible();
+    await expect(docsDiscovery.locator('a[href="/en/docs/v0.3/integrations/webhook"]')).toBeVisible();
 
     // Features Section (6 verified capabilities)
     const featuresSection = page.locator('section[aria-labelledby="features-title"]');
@@ -71,11 +91,26 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(communityTeaser).toBeVisible();
     await expect(communityTeaser.locator('a[href="/en/about"]')).toBeVisible();
 
-    // Footer
+    // Enriched Multi-column Footer
     const footer = page.locator('footer');
     await expect(footer).toBeVisible();
     await expect(footer).toContainText('chatflow-agent');
     await expect(footer).toContainText('MIT License');
+
+    // Verify creator signature and link
+    const signatureLink = footer.locator('a[href="https://gustavobaranda.com/"]');
+    await expect(signatureLink).toBeVisible();
+    await expect(signatureLink).toContainText('Gustavo Baranda · © 2026');
+    const signatureImg = signatureLink.locator('img[src="/brand/gustavo-baranda.svg"]');
+    await expect(signatureImg).toBeVisible();
+
+    // Verify GitHub Sponsors link with pink heart in footer (exactly one in bottom attribution, no duplicates in nav columns)
+    const footerSponsorLinks = footer.locator('a[href="https://github.com/sponsors/GustavoBaranda"]');
+    await expect(footerSponsorLinks).toHaveCount(1);
+    await expect(footerSponsorLinks).toBeVisible();
+    await expect(footerSponsorLinks).toHaveAttribute('target', '_blank');
+    await expect(footerSponsorLinks).toHaveAttribute('rel', 'noopener noreferrer');
+    await expect(footerSponsorLinks).toContainText('Sponsor');
   });
 
   test('should navigate to dedicated multilingual About page and verify Creator attribution in English', async ({ page }) => {
@@ -262,7 +297,7 @@ test.describe('Navigation, Home, and About Suite', () => {
     await morphX.click();
 
     await expect(drawer).not.toBeVisible();
-    // After closing, label returns to Toggle navigation menu
+    // After closing, hamburger button is visible
     await expect(hamburger).toBeVisible();
   });
 
@@ -277,7 +312,7 @@ test.describe('Navigation, Home, and About Suite', () => {
     const drawer = page.locator('div[role="dialog"]');
     await expect(drawer).toBeVisible();
 
-    await expect(drawer.locator('a[href="/pt-BR"]')).toContainText('Início');
+    await expect(drawer.locator('nav a[href="/pt-BR"]')).toContainText('Início');
     await expect(drawer.locator('a[href="/pt-BR/docs"]')).toContainText('Documentação');
     await expect(drawer.locator('a[href="/pt-BR/community"]')).toContainText('Comunidade');
     await expect(drawer.locator('a[href="/pt-BR/about"]')).toContainText('Sobre');
@@ -319,5 +354,221 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(page.locator('h1')).toContainText('O fluxo conversacional atingiu uma rota não mapeada');
     await expect(page.locator('a:has-text("Voltar ao início")')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
+  });
+
+  test('should toggle theme from Light to Dark to Light and update computed styles across Home, Community, and About', async ({ page }) => {
+    const routes = ['/en', '/en/community', '/en/about'];
+
+    for (const route of routes) {
+      await page.goto(route);
+      await page.waitForLoadState('networkidle');
+
+      const themeBtn = page.locator('header button[aria-pressed]').first();
+      await expect(themeBtn).toBeVisible();
+
+      // Ensure start state is light
+      const initialHtmlClass = await page.evaluate(() => document.documentElement.className);
+      if (initialHtmlClass.includes('dark')) {
+        await themeBtn.click();
+        await page.waitForTimeout(300);
+      }
+
+      const lightBg = await page.evaluate(() => window.getComputedStyle(document.body).backgroundColor);
+      expect(lightBg).toBe('rgb(255, 255, 255)');
+
+      // Toggle to dark
+      await themeBtn.click();
+      await page.waitForTimeout(300);
+
+      const darkBg = await page.evaluate(() => window.getComputedStyle(document.body).backgroundColor);
+      expect(darkBg).toBe('rgb(6, 11, 24)');
+      await expect(page.locator('html')).toHaveClass(/dark/);
+
+      // Toggle back to light
+      await themeBtn.click();
+      await page.waitForTimeout(300);
+
+      const revertedBg = await page.evaluate(() => window.getComputedStyle(document.body).backgroundColor);
+      expect(revertedBg).toBe('rgb(255, 255, 255)');
+      await expect(page.locator('html')).toHaveClass(/light/);
+    }
+  });
+
+  test('should prevent horizontal overflow across 320px, 375px, 390px, 430px, 768px, and 1280px viewports', async ({ page }) => {
+    const viewports = [
+      { width: 320, height: 600 },
+      { width: 375, height: 667 },
+      { width: 390, height: 844 },
+      { width: 430, height: 932 },
+      { width: 768, height: 1024 },
+      { width: 1280, height: 800 },
+    ];
+
+    const testPages = ['/en', '/en/community', '/en/about'];
+
+    for (const vp of viewports) {
+      await page.setViewportSize(vp);
+
+      for (const route of testPages) {
+        await page.goto(route);
+        await page.waitForLoadState('domcontentloaded');
+
+        const isOverflowing = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+        });
+
+        expect(
+          isOverflowing,
+          `Horizontal overflow detected on ${route} at viewport ${vp.width}x${vp.height}`
+        ).toBe(false);
+      }
+    }
+  });
+
+  test('should render localized Open Graph and Twitter Card metadata across routes', async ({ page }) => {
+    // 1. Home EN
+    await page.goto('/en');
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+      'content',
+      'chatflow-agent — Conversational AI Agents in Python'
+    );
+    await expect(page.locator('meta[property="og:locale"]')).toHaveAttribute('content', 'en_US');
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/en'
+    );
+    await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute(
+      'content',
+      'chatflow-agent'
+    );
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/brand/social-preview.png'
+    );
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
+      'content',
+      'summary_large_image'
+    );
+    await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/brand/social-preview.png'
+    );
+
+    // 2. Home ES
+    await page.goto('/es');
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+      'content',
+      'chatflow-agent — Agentes de IA Conversacional en Python'
+    );
+    await expect(page.locator('meta[property="og:locale"]')).toHaveAttribute('content', 'es_ES');
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/es'
+    );
+
+    // 3. Home PT-BR
+    await page.goto('/pt-BR');
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+      'content',
+      'chatflow-agent — Agentes de IA Conversacional em Python'
+    );
+    await expect(page.locator('meta[property="og:locale"]')).toHaveAttribute('content', 'pt_BR');
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/pt-BR'
+    );
+
+    // 4. About page
+    await page.goto('/en/about');
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/en/about'
+    );
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/brand/social-preview.png'
+    );
+
+    // 5. Community page
+    await page.goto('/en/community');
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/en/community'
+    );
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/brand/social-preview.png'
+    );
+
+    // 6. Docs page
+    await page.goto('/en/docs');
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/en/docs/v0.3'
+    );
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      'https://chatflowagent.org/brand/social-preview.png'
+    );
+  });
+
+  test('should present mobile Quickstart code cleanly without horizontal page overflow or intrusive scrollbar', async ({ page }) => {
+    const mobileViewports = [
+      { width: 320, height: 600 },
+      { width: 375, height: 667 },
+      { width: 390, height: 844 },
+      { width: 430, height: 932 },
+    ];
+
+    for (const vp of mobileViewports) {
+      await page.setViewportSize(vp);
+      await page.goto('/en');
+      await page.waitForLoadState('domcontentloaded');
+
+      // 1. Confirm no horizontal page overflow
+      const pageOverflow = await page.evaluate(() => {
+        return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+      });
+      expect(pageOverflow, `Horizontal page overflow at ${vp.width}px`).toBe(false);
+
+      // 2. Code container scroll capability & non-intrusive scrollbar
+      const codeContainer = page.locator('#quickstart div.code-scroll-container[tabindex="0"]');
+      await expect(codeContainer).toBeVisible();
+
+      const scrollMetrics = await codeContainer.evaluate((el) => {
+        const canScroll = el.scrollWidth > el.clientWidth;
+        const initialScrollLeft = el.scrollLeft;
+        el.scrollLeft = 50;
+        const scrolled = el.scrollLeft > 0;
+        el.scrollLeft = initialScrollLeft;
+
+        const style = window.getComputedStyle(el);
+        return {
+          canScroll,
+          scrolled,
+          scrollbarWidth: style.scrollbarWidth,
+        };
+      });
+
+      // Code line is long so on mobile widths it should be scrollable
+      expect(scrollMetrics.canScroll).toBe(true);
+      expect(scrollMetrics.scrolled).toBe(true);
+      // scrollbar-width should be 'none' on <=640px to eliminate intrusive native scrollbars
+      expect(scrollMetrics.scrollbarWidth).toBe('none');
+
+      // 3. Package manager tabs and copy functionality work
+      const pipTab = page.locator('button:has-text("pip")').first();
+      const uvTab = page.locator('button:has-text("uv")').first();
+      await uvTab.click();
+      await expect(page.locator('code:has-text("uv add chatflow-agent")')).toBeVisible();
+      await pipTab.click();
+      await expect(page.locator('code:has-text("pip install chatflow-agent")')).toBeVisible();
+
+      // 4. Code copy button
+      const copyCodeBtn = page.locator('#quickstart button[aria-label="Copy command"], #quickstart button[aria-label="Copied!"]').nth(1);
+      await expect(copyCodeBtn).toBeVisible();
+      await copyCodeBtn.click();
+      await expect(copyCodeBtn).toContainText(/Copied!|Copy command/);
+    }
   });
 });

@@ -1,0 +1,146 @@
+---
+title: Observability & Debugging
+description: Production logging, telemetry, correlation IDs, tool tracing, and inspection strategies in chatflow-agent systems.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+Operating multi-agent swarms in production requires comprehensive visibility. When an agent hands off a conversation, invokes external APIs, or triggers fallbacks, operators need structured logs and correlation IDs to diagnose latency, investigate anomalies, and audit decisions.
+
+`chatflow-agent` exposes structured Python standard library loggers across every layer of the architecture, from channel webhooks to engine network requests.
+
+## Logger Hierarchy
+
+All loggers are arranged under the `chatflow_agent` namespace. You can configure verbosity globally or fine-tune individual components:
+
+```text
+chatflow_agent
+├── chatflow_agent.runner      (Turn execution, handoffs, tool calls, checkpoints)
+├── chatflow_agent.tools       (Schema generation, tool execution, argument validation)
+├── chatflow_agent.memory      (Session creation, SQLite I/O, deduplication TTL)
+├── chatflow_agent.engine
+│   ├── chatflow_agent.engine.openai     (OpenAI/Groq/DeepSeek payloads and latency)
+│   ├── chatflow_agent.engine.gemini     (REST v1beta requests, model turns)
+│   └── chatflow_agent.engine.anthropic  (Messages API headers, token counts)
+├── chatflow_agent.telegram    (Update polling, admin authorization, chunking)
+└── chatflow_agent.whatsapp    (HMAC validation, deduplication, phone masking)
+```
+
+## Configuring Structured Logging
+
+In production, format logs as single-line JSON records so central ingestion systems (such as Datadog, CloudWatch, or Google Cloud Logging) can index fields automatically:
+
+```python
+import json
+import logging
+import sys
+from chatflow_agent import Agent, Runner
+
+class JSONLogFormatter(logging.Formatter):
+    """Format log records as structured JSON."""
+    def format(self, record: logging.LogRecord) -> str:
+        log_entry = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "lineno": record.lineno,
+        }
+        if record.exc_info:
+            log_entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_entry)
+
+def setup_production_logging(log_level: int = logging.INFO) -> None:
+    """Initialize structured JSON logging for chatflow-agent."""
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(JSONLogFormatter())
+    
+    # Configure root logger
+    root_logger = logging.getLogger("chatflow_agent")
+    root_logger.setLevel(log_level)
+    root_logger.handlers = [handler]
+    root_logger.propagate = False
+
+if __name__ == "__main__":
+    setup_production_logging()
+    
+    agent = Agent(name="ObservabilityBot", instructions="Test logging.")
+    runner = Runner(starting_agent=agent)
+    print("Structured logging configured.")
+```
+
+## Trace Correlation with `trace_id`
+
+When a tool fails during execution, `Runner` automatically generates a random UUID `trace_id` and attaches it both to the internal log record and to the message delivered to the agent:
+
+```text
+[ERROR] 2026-10-30T18:22:15Z chatflow_agent.runner: Tool execution failed [trace_id: 3c9b7e41-0f2d-4e92-bc12-f71e549d8802] - Tool: 'query_database' on agent 'BillingAgent': Connection timed out to db.internal.corp:5432
+```
+
+### Why Correlation Matters
+
+1. **User Privacy:** The end user is not shown raw stack traces or internal IP addresses.
+2. **Deterministic Triage:** When a user reports *"My query failed at 18:22"*, support engineers can search directly for `trace_id: 3c9b7e41...` in logs to inspect the full stack trace and input parameters.
+
+## Inspecting Response Telemetry
+
+Every invocation of `Runner.run()` or `Runner.run_async()` returns an `AgentResponse` object containing execution metadata:
+
+```python
+from chatflow_agent import Agent, Runner
+
+agent = Agent(name="Inspector", instructions="Provide analytical responses.")
+runner = Runner(starting_agent=agent)
+
+response = runner.run(
+    session_id="session-user-99",
+    user_message="Calculate quarterly forecast.",
+)
+
+# 1. Text delivered to user
+print(f"Content: {response.content}")
+
+# 2. Final active agent that generated the response
+print(f"Active Agent: {response.active_agent_name}")
+
+# 3. List of tool names executed during this turn
+print(f"Tools Executed: {response.tool_calls_executed}")
+
+# 4. Handoff details if a transfer occurred
+if response.handoff:
+    print(f"Transferred to: {response.handoff.target_agent_name}")
+    print(f"Reason: {response.handoff.reason}")
+```
+
+## Audit Inspection of Conversation History
+
+To inspect conversation turns stored in a session, retrieve the session context directly from the configured store:
+
+```python
+from chatflow_agent import Agent, Runner
+from chatflow_agent.core.memory import SessionStore
+
+store = SessionStore()
+agent = Agent(name="Support", instructions="Help customers.")
+runner = Runner(starting_agent=agent, session_store=store)
+
+# Execute turn
+runner.run(session_id="sess-42", user_message="Hello, I need assistance.")
+
+# Inspect stored session
+session = store.get(session_id="sess-42")
+if session:
+    print(f"Total Messages: {len(session.history)}")
+    for msg in session.history:
+        print(f"[{msg.role.value}] {msg.content}")
+```
+
+<Callout type="info" title="Zero API Key Logging">
+`chatflow-agent` loggers automatically redact API tokens and bearer headers. Authorization headers in HTTP logs appear as `Bearer sk-****` or are omitted from query strings, ensuring compliance with SOC 2 and GDPR auditing standards.
+</Callout>
+

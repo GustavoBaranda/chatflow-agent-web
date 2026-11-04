@@ -2,10 +2,32 @@ import { notFound } from 'next/navigation';
 import { setRequestLocale } from 'next-intl/server';
 import { DocsPage, DocsBody, DocsTitle, DocsDescription } from 'fumadocs-ui/page';
 import defaultMdxComponents from 'fumadocs-ui/mdx';
-import { source } from '@/lib/source';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { source, resolveDocPage } from '@/lib/source';
 import { TranslationNotice } from '@/components/docs/TranslationNotice';
 import { OutdatedNotice } from '@/components/docs/OutdatedNotice';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+import { PrereleaseBanner } from '@/components/docs/PrereleaseBanner';
+import { DEFAULT_STABLE_TRACK } from '@/config/docs-versions';
+import { resolveDocSeo, createSocialMetadata } from '@/config/docs-seo';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { getDocStructuredData } from '@/lib/structured-data';
 import type { Metadata } from 'next';
+
+const customMdxComponents = {
+  ...defaultMdxComponents,
+  Card,
+  Cards,
+  Callout,
+  Tab,
+  Tabs,
+  Step,
+  Steps,
+  VersionBadge,
+};
 
 interface PageProps {
   params: Promise<{
@@ -15,7 +37,17 @@ interface PageProps {
 }
 
 export async function generateStaticParams() {
-  return source.generateParams('slug', 'locale');
+  const versionedParams = source.generateParams('slug', 'locale');
+
+  // For every stable track page ['v0.3', ...rest], also generate the unversioned alias [...rest]
+  const unversionedParams = versionedParams
+    .filter((p) => Array.isArray(p.slug) && p.slug[0] === DEFAULT_STABLE_TRACK)
+    .map((p) => ({
+      locale: p.locale,
+      slug: (p.slug as string[]).slice(1),
+    }));
+
+  return [...versionedParams, ...unversionedParams];
 }
 
 export async function generateMetadata({
@@ -24,13 +56,7 @@ export async function generateMetadata({
   const { locale, slug = [] } = await params;
   setRequestLocale(locale);
 
-  let page = source.getPage(slug, locale);
-  let isFallback = false;
-
-  if (!page && locale !== 'en') {
-    page = source.getPage(slug, 'en');
-    isFallback = true;
-  }
+  const { page, isFallback, isExplicitTrack, track, cleanSlug } = resolveDocPage(slug, locale);
 
   if (!page) {
     return {
@@ -38,30 +64,31 @@ export async function generateMetadata({
     };
   }
 
-  const cleanSlug = slug.join('/');
-  const canonicalPath = `/${locale}/docs${cleanSlug ? `/${cleanSlug}` : ''}`;
+  const seo = resolveDocSeo({
+    track,
+    cleanSlug,
+    locale,
+    isExplicitTrack,
+    isFallback,
+  });
 
-  const languages: Record<string, string> = {};
-  for (const l of ['en', 'es', 'pt-BR']) {
-    const localizedPage = source.getPage(slug, l);
-    if (localizedPage) {
-      languages[l] = `/${l}/docs${cleanSlug ? `/${cleanSlug}` : ''}`;
-    }
-  }
+  const social = createSocialMetadata({
+    title: `${page.data.title} | chatflow-agent`,
+    description: page.data.description ?? '',
+    url: seo.canonicalUrl,
+    locale,
+  });
 
   return {
     title: page.data.title,
     description: page.data.description,
     alternates: {
-      canonical: canonicalPath,
-      languages,
+      canonical: seo.canonicalUrl,
+      languages: seo.languages,
     },
-    robots: isFallback
-      ? {
-          index: false,
-          follow: true,
-        }
-      : undefined,
+    robots: seo.robots,
+    openGraph: social.openGraph,
+    twitter: social.twitter,
   };
 }
 
@@ -69,33 +96,51 @@ export default async function Page({ params }: PageProps) {
   const { locale, slug = [] } = await params;
   setRequestLocale(locale);
 
-  let page = source.getPage(slug, locale);
-  let isFallback = false;
-
-  if (!page && locale !== 'en') {
-    page = source.getPage(slug, 'en');
-    isFallback = true;
-  }
+  const { page, targetSlug, isFallback, track, cleanSlug, isExplicitTrack } = resolveDocPage(slug, locale);
 
   if (!page) {
     notFound();
   }
 
+  const seo = resolveDocSeo({
+    track,
+    cleanSlug,
+    locale,
+    isExplicitTrack,
+    isFallback,
+  });
+
+  const structuredData = getDocStructuredData({
+    title: page.data.title,
+    description: page.data.description ?? '',
+    canonicalUrl: seo.canonicalUrl,
+    locale,
+    track,
+    cleanSlug,
+  });
+
   const MDX = page.data.body;
-  const cleanSlug = slug.join('/');
+  const cleanNoticeSlug = targetSlug.join('/');
 
   return (
-    <DocsPage toc={page.data.toc} full={page.data.full}>
-      <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription>{page.data.description}</DocsDescription>
+    <>
+      <JsonLd data={structuredData} />
+      <DocsPage toc={page.data.toc} full={page.data.full}>
+        <DocsTitle>{page.data.title}</DocsTitle>
+        <DocsDescription>{page.data.description}</DocsDescription>
 
-      {isFallback && (
-        <TranslationNotice targetLocale={locale} slug={cleanSlug} />
-      )}
+        {isFallback && (
+          <TranslationNotice targetLocale={locale} slug={cleanNoticeSlug} />
+        )}
 
-      <DocsBody>
-        <MDX components={defaultMdxComponents} />
-      </DocsBody>
-    </DocsPage>
+        {track === 'v0.4' && (
+          <PrereleaseBanner locale={locale} currentSlug={cleanSlug} />
+        )}
+
+        <DocsBody>
+          <MDX components={customMdxComponents} />
+        </DocsBody>
+      </DocsPage>
+    </>
   );
 }

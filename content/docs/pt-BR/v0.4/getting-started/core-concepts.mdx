@@ -1,0 +1,220 @@
+---
+title: "Conceitos Fundamentais"
+description: "Compreenda a arquitetura fundamental do chatflow-agent: Agentes, Motores, Ferramentas, Runner, Memória e Handoffs."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+O `chatflow-agent` é construído sobre seis primitivas arquiteturais fundamentais que, combinadas, viabilizam sistemas conversacionais de IA leves, modulares e tolerantes a falhas:
+
+---
+
+## 1. O Agente (`Agent`)
+
+Um `Agent` representa um ator autônomo com persona explícita, instruções em prompt de sistema, um modelo e motor de LLM designados e acesso a ferramentas ou agentes de transferência (*handoffs*).
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from chatflow_agent import Agent
+
+# Instruções de prompt estáticas com modelo alvo
+agent = Agent(
+    name="TriageBot",
+    instructions="You are the front desk concierge. Route questions to specialists.",
+    model="gpt-4o",
+)
+```
+
+### Instruções Dinâmicas
+
+As instruções podem ser uma string estática ou um invocável (*callable*) em Python (`Callable[[], str]`). Instruções dinâmicas são avaliadas no início de cada turno:
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from datetime import datetime
+from chatflow_agent import Agent
+
+def get_live_instructions() -> str:
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return f"You are a scheduling assistant. Current server time is {now}."
+
+agent = Agent(
+    name="ScheduleBot",
+    instructions=get_live_instructions,
+    model="gemini-2.5-flash",
+)
+```
+
+<Callout type="info" title="Validação de Identidade no Enxame em v0.4.0rc1">
+Na versão <VersionBadge version="0.4.0rc1" status="prerelease" />, o <code>Runner</code> valida estritamente que todos os agentes de um enxame possuam atributos <code>name</code> distintos, lançando um <code>ValueError</code> caso nomes duplicados sejam detectados para evitar colisões na geração de ferramentas.
+</Callout>
+
+---
+
+## 2. O Motor de Execução (`Runner`)
+
+O `Runner` orquestra o ciclo de vida da conversação, gerenciando:
+
+1. O carregamento do contexto da sessão e histórico de mensagens a partir do `SessionStore`.
+2. A captura de um **snapshot atômico** do estado da sessão antes de executar o turno.
+3. A invocação do motor do modelo.
+4. O parsing de chamadas a ferramentas, a execução das funções correspondentes e o envio dos resultados de volta ao modelo até a obtenção de uma resposta textual final.
+5. A confirmação das alterações de estado, ou reversão automática (*rollback*) em caso de exceções não tratadas ou expiração de tempo limite.
+
+```python
+from chatflow_agent import Agent, Runner, SessionStore
+
+agent = Agent(
+    name="Assistant",
+    instructions="Concise scheduling assistant.",
+    model="gpt-4o",
+)
+
+store = SessionStore()
+
+runner = Runner(
+    starting_agent=agent,
+    session_store=store,
+)
+
+# Invocação síncrona
+response = runner.run(
+    session_id="user_123",
+    user_message="Book a meeting tomorrow at 3 PM",
+)
+
+# Invocação assíncrona
+response = await runner.run_async(
+    session_id="user_123",
+    user_message="Book a meeting tomorrow at 3 PM",
+)
+```
+
+<Callout type="info" title="turn_timeout em v0.4.0rc1">
+Na versão <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>Runner.run_async</code> introduz o parâmetro opcional nomeado <code>turn_timeout: float | None = None</code> (por exemplo, <code>turn_timeout=30.0</code>). Se um turno exceder o prazo limite, ele é cancelado e o estado é revertido atomicamente.
+</Callout>
+
+---
+
+## 3. Motores de Provedores (`Engines`)
+
+Toda a comunicação com modelos no `chatflow-agent` é desacoplada sob a interface `BaseEngine`. Os motores comunicam-se através de REST HTTP assíncrono via `httpx`, eliminando a necessidade de bibliotecas cliente monolíticas de fornecedores:
+
+* **`OpenAIEngine`**: Suporta modelos OpenAI e qualquer API compatível com OpenAI (Groq, DeepSeek, xAI Grok, Ollama, vLLM) através de `base_url`.
+* **`AnthropicEngine`**: Integração REST direta com modelos Claude da Anthropic.
+* **`GeminiEngine`**: Integração com Google Gemini. Na versão <VersionBadge version="0.4.0rc1" status="prerelease" />, foi totalmente reescrito com chamadas REST nativas.
+
+```python
+from chatflow_agent import Agent, OpenAIEngine
+
+# Motor universal compatível com OpenAI para endpoints customizados ou locais
+local_engine = OpenAIEngine(
+    base_url="http://localhost:11434/v1",
+    provider="ollama",
+    api_key="ollama",
+)
+
+local_agent = Agent(
+    name="LocalBot",
+    instructions="You run locally via Ollama.",
+    model="llama3.2:latest",
+    engine=local_engine,
+)
+```
+
+---
+
+## 4. Ferramentas Determinísticas (`Tool` e `@tool`)
+
+As ferramentas conferem aos agentes poder de execução determinístico. Quando decoradas com `@tool`, o `chatflow-agent` analisa automaticamente as anotações de tipo do Python e as docstrings para gerar especificações JSON Schema padronizadas para o LLM:
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from chatflow_agent import tool
+
+@tool(name="fetch_user_profile", description="Fetch user metadata from internal database.")
+def fetch_user_profile(user_id: str) -> dict[str, str]:
+    """Retrieve user details.
+
+    Args:
+        user_id: Unique user identifier string.
+    """
+    return {"user_id": user_id, "tier": "enterprise", "status": "active"}
+```
+
+Funções síncronas (`def`) e assíncronas (`async def`) são suportadas nativamente. Alternativamente, você pode usar o decorador `@agent.tool` diretamente em uma instância de agente.
+
+---
+
+## 5. Memória Resiliente e Concorrência (`SessionStore`)
+
+O `chatflow-agent` trata a persistência de estado e a segurança de concorrência como prioridades de primeira classe:
+
+```python
+from chatflow_agent import SQLiteSessionStore
+
+# Armazenamento persistente de sessões em SQLite com limite configurável de turnos
+store = SQLiteSessionStore(
+    db_path="./chat_sessions.db",
+    default_max_turns=40,
+)
+```
+
+### A Garantia de Reversão Transacional (*Rollback*)
+
+Antes de processar um turno, o `Runner` captura uma imagem instantânea da sessão ativa. Caso ocorra uma queda de conexão, uma ferramenta lance uma exceção não tratada ou o `turn_timeout` expire, o snapshot é restaurado imediatamente. Isso garante que turnos corrompidos ou parciais nunca degradem o histórico da conversação.
+
+### Proteção do Event Loop e Escudos de Concorrência
+
+* **Descarga para Pools de Threads:** Operações de E/S em disco com SQLite rodam em threads trabalhadoras dedicadas (`_run_blocking`), impedindo que bloqueios de sistema de arquivos travem o loop de eventos asyncio do Python.
+* **Bloqueio de Sessão (`ReentrantTurnError`):** Cada ID de sessão possui um bloqueio interno. Requisições simultâneas para o mesmo ID de sessão lançarão `ReentrantTurnError` em vez de permitir condições de corrida que corrompam o estado.
+
+---
+
+## 6. Handoffs Multiagente (`Handoffs`)
+
+Enxames multiagente delegam tarefas dinamicamente através de transferências declarativas (*handoffs*). Quando um agente define `handoffs=[agent_b]`, o `chatflow-agent` sintetiza automaticamente uma ferramenta chamada `transfer_to_agent_b`:
+
+```python
+from chatflow_agent import Agent, Runner
+
+# Agente Especialista
+billing_agent = Agent(
+    name="BillingAgent",
+    instructions="You specialize in invoices, receipts, and refund requests.",
+    model="gpt-4o",
+)
+
+# Agente de Triagem Inicial
+triage_agent = Agent(
+    name="TriageAgent",
+    instructions="Greet users. Transfer billing issues to BillingAgent.",
+    model="gpt-4o",
+    handoffs=[billing_agent],
+)
+
+runner = Runner(starting_agent=triage_agent)
+
+# Executar turno com transferência
+response = runner.run(
+    session_id="user_billing_query",
+    user_message="I need a copy of my invoice from last month.",
+)
+
+print(f"Responding agent: {response.active_agent_name}")
+print(f"Message content: {response.content}")
+```
+
+O `Runner` rastreia automaticamente as delegações, e o agente que efetivamente gerou a resposta final permanece sempre visível através de `response.active_agent_name`.
+
+---
+
+## Próximos Passos
+
+Agora que você compreende os pilares arquiteturais do `chatflow-agent`:
+
+* Consulte o [Guia de Instalação](/pt-BR/docs/v0.4/getting-started/installation) para configurar o framework.
+* Explore o [Guia de Início Rápido](/pt-BR/docs/v0.4/getting-started/quickstart) para criar um projeto prático.

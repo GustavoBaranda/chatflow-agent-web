@@ -1,0 +1,174 @@
+---
+title: Google Gemini & Anthropic Claude
+description: High-performance foundation model integration with Google Gemini REST v1beta and Anthropic Claude Messages API.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+Google Gemini and Anthropic Claude represent two of the most capable frontier model families for agentic workflows. `chatflow-agent` provides dedicated, native engines for both providers, optimized for low latency, zero SDK lock-in, and reliable tool calling.
+
+---
+
+## Google Gemini Engine
+
+`GeminiEngine` communicates directly with Google's Gemini Developer API (`v1beta`) to execute multi-turn conversations and function calling.
+
+<Callout type="info" title="Supported Gemini API Flavor">
+`GeminiEngine` supports the **Gemini Developer API** (Google AI Studio API keys). Google Cloud Vertex AI is not supported by this engine.
+</Callout>
+
+### Authentication and Credentials
+
+The engine reads credentials from the following sources, in order of priority:
+1. `api_key` passed directly to `GeminiEngine(api_key="...")` or `Agent(api_key="...")`.
+2. `GEMINI_API_KEY` environment variable.
+3. `GOOGLE_API_KEY` environment variable.
+
+By default, the API key is transmitted via the secure `x-goog-api-key` HTTP header. Passing `api_key_in_query=True` transmits the key as a `?key=` query parameter instead:
+
+```python
+import os
+from chatflow_agent import Agent, Runner
+from chatflow_agent.core.engines.gemini import GeminiEngine
+
+# Recommended: Secure header authentication
+gemini_engine = GeminiEngine(
+    api_key=os.environ.get("GEMINI_API_KEY"),
+    timeout_seconds=30.0,
+    max_retries=3,
+)
+
+assistant = Agent(
+    name="GeminiAssistant",
+    model="gemini-2.5-flash",
+    engine=gemini_engine,
+    instructions="Provide concise, accurate answers.",
+)
+```
+
+### Connection Pooling & Zero-SDK Architecture
+
+<div className="flex gap-2 my-3">
+  <VersionBadge version="0.4.0rc1" status="prerelease" />
+  <VersionBadge version="0.3.4" status="stable" />
+</div>
+
+The Gemini implementation underwent an architectural shift between releases:
+
+* **In `v0.3.4` (Stable):** The engine imported Google's official `google-genai` SDK (`from google import genai`), requiring external client library installation.
+* **In `v0.4.0rc1` (Prerelease):** The engine was completely rewritten using native asynchronous `httpx` against `https://generativelanguage.googleapis.com/v1beta`. This eliminates heavy dependencies and enables **connection pooling** across agent turns:
+
+```python
+# [no-exec: requires real gemini api key]
+import asyncio
+from chatflow_agent import Agent, Runner
+
+agent = Agent(name="Assistant", model="gemini-2.5-flash")
+runner = Runner(starting_agent=agent)
+
+async def main():
+    # In v0.3.x, execute asynchronous turns directly on the runner
+    res1 = await runner.run_async("session-1", "What is quantum computing?")
+    res2 = await runner.run_async("session-1", "Summarize in 3 bullet points.")
+    print(res2.text)
+
+asyncio.run(main())
+```
+
+### Custom Proxy Configuration
+
+To route Gemini requests through an enterprise proxy or gateway, set the `GOOGLE_GEMINI_BASE_URL` environment variable:
+
+```bash
+export GOOGLE_GEMINI_BASE_URL="https://gemini-proxy.internal.corp"
+```
+The engine automatically appends `/v1beta` to the base URL.
+
+---
+
+## Anthropic Claude Engine
+
+`AnthropicEngine` provides native integration with Anthropic's Claude 3.5 Sonnet, Claude 3.5 Haiku, and Claude 3 Opus via the Messages API.
+
+### Authentication and Headers
+
+Anthropic requests require the `x-api-key` header and the `anthropic-version` header (defaults to `"2023-06-01"`).
+
+The engine reads credentials from:
+1. `api_key` passed explicitly to `AnthropicEngine(api_key="...")` or `Agent(api_key="...")`.
+2. `ANTHROPIC_API_KEY` environment variable.
+
+<Callout type="warn" title="Credential Security Rule">
+Like `OpenAIEngine`, `AnthropicEngine` only sends `ANTHROPIC_API_KEY` to the official endpoint `https://api.anthropic.com/v1`. If you specify a custom `base_url`, you must pass `api_key` explicitly.
+</Callout>
+
+```python
+import os
+from chatflow_agent import Agent
+from chatflow_agent.core.engines.anthropic import AnthropicEngine
+
+claude_engine = AnthropicEngine(
+    api_key=os.environ.get("ANTHROPIC_API_KEY"),
+    timeout=60.0,
+)
+
+editor = Agent(
+    name="Editor",
+    model="claude-3-5-sonnet-20241022",
+    engine=claude_engine,
+    instructions="Edit and refine technical documentation.",
+)
+```
+
+### Automatic Retries and Jittered Backoff
+
+`AnthropicEngine` automatically handles rate limiting (`429 Too Many Requests`) and temporary gateway errors (`500`, `502`, `503`, `504`) using exponential backoff:
+* **Max Retries:** 3 attempts.
+* **Base Delay:** 1.0 second.
+* **Max Delay:** 10.0 seconds.
+
+If a `429` response includes a `Retry-After` header, the engine honors the provider's requested delay before retrying.
+
+---
+
+## Multi-Model Agent Collaboration
+
+A major advantage of `chatflow-agent` is composing swarms where different agents utilize different foundation models according to their strengths:
+
+```python
+from chatflow_agent import Agent, Runner
+from chatflow_agent.core.engines.gemini import GeminiEngine
+from chatflow_agent.core.engines.anthropic import AnthropicEngine
+
+gemini = GeminiEngine()
+claude = AnthropicEngine()
+
+researcher = Agent(
+    name="Researcher",
+    model="gemini-2.5-flash",
+    engine=gemini,
+    instructions="Gather facts quickly using Gemini's high-throughput processing.",
+)
+
+synthesizer = Agent(
+    name="Synthesizer",
+    model="claude-3-5-sonnet-20241022",
+    engine=claude,
+    instructions="Synthesize gathered facts into clear, well-structured prose.",
+)
+
+# Connect agents via handoffs
+researcher.add_handoff(synthesizer)
+synthesizer.add_handoff(researcher)
+
+runner = Runner(starting_agent=researcher)
+```
+
+In this swarm:
+1. The **Researcher** runs on Gemini 2.5 Flash for rapid ingestion and search.
+2. Once data is collected, the session hands off to the **Synthesizer** on Claude 3.5 Sonnet.
+3. Historical messages and tool call IDs are automatically normalized, preventing cross-provider format mismatches.

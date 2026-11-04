@@ -3,12 +3,11 @@
 import { useEffect, useRef } from 'react';
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import { useTranslations } from 'next-intl';
-import Image from 'next/image';
-import { Link } from '@/i18n/navigation';
-import { BookOpen, Users, Home, Info } from 'lucide-react';
+import { Link, usePathname } from '@/i18n/navigation';
+import { BookOpen, Users, Home, Info, Heart } from 'lucide-react';
 import { GitHubIcon } from '@/components/ui/icons';
+import { cn } from '@/lib/utils';
 import { LanguageSelector } from './LanguageSelector';
-import { ThemeToggle } from './ThemeToggle';
 import { menuSlide, slide } from './Animation';
 
 interface MobileDrawerProps {
@@ -19,14 +18,18 @@ interface MobileDrawerProps {
 
 export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps) {
   const t = useTranslations('navigation');
-  const tFooter = useTranslations('footer');
+  const tLang = useTranslations('languageSelector');
+  const tFoot = useTranslations('footer');
+  const pathname = usePathname();
   const drawerRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
 
-  // Background isolation: Mark background inert and aria-hidden when open
+  // Scroll lock, scroll restoration, background isolation, and focus management
   useEffect(() => {
     if (!isOpen) return;
 
+    // 1. Capture exact scroll position before locking
+    const scrollY = window.scrollY || document.documentElement.scrollTop;
     previousActiveElement.current = document.activeElement as HTMLElement | null;
     const triggerElement = triggerRef?.current;
 
@@ -38,16 +41,42 @@ export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps)
     footer?.setAttribute('inert', '');
     footer?.setAttribute('aria-hidden', 'true');
 
+    // 2. Lock scroll on documentElement and body without shifting DOM elements
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevBodyTouchAction = document.body.style.touchAction;
+
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
     document.documentElement.classList.add('menu-open');
 
+    // 3. Move focus into first focusable element inside drawer
+    const timer = setTimeout(() => {
+      const drawer = drawerRef.current;
+      if (!drawer) return;
+      const firstFocusable = drawer.querySelector<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      firstFocusable?.focus({ preventScroll: true });
+    }, 50);
+
     return () => {
+      clearTimeout(timer);
       mainContent?.removeAttribute('inert');
       mainContent?.removeAttribute('aria-hidden');
       footer?.removeAttribute('inert');
       footer?.removeAttribute('aria-hidden');
+
+      // 4. Release scroll lock and restore exact scroll position
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.touchAction = prevBodyTouchAction;
       document.documentElement.classList.remove('menu-open');
 
-      // Focus restoration
+      window.scrollTo(0, scrollY);
+
+      // 5. Restore focus to trigger element
       if (triggerElement) {
         triggerElement.focus({ preventScroll: true });
       } else if (previousActiveElement.current) {
@@ -77,27 +106,29 @@ export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps)
           drawer.querySelectorAll<HTMLElement>(focusableSelector)
         ).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
 
-        // Include trigger button in the focus loop if provided
-        const allFocusables = triggerRef?.current
-          ? [triggerRef.current, ...drawerFocusables]
-          : drawerFocusables;
+        if (drawerFocusables.length === 0 && !triggerRef?.current) return;
 
-        if (allFocusables.length === 0) return;
+        const trigger = triggerRef?.current;
+        const allFocusables = trigger ? [trigger, ...drawerFocusables] : drawerFocusables;
 
         const firstElement = allFocusables[0];
         const lastElement = allFocusables[allFocusables.length - 1];
 
         if (event.shiftKey) {
-          // Shift + Tab on first element wraps to last
-          if (document.activeElement === firstElement) {
+          if (document.activeElement === firstElement || (trigger && (document.activeElement === trigger || trigger.contains(document.activeElement)))) {
             event.preventDefault();
             lastElement.focus();
+          } else if (trigger && document.activeElement === drawerFocusables[0]) {
+            event.preventDefault();
+            trigger.focus();
           }
         } else {
-          // Tab on last element wraps to first
           if (document.activeElement === lastElement) {
             event.preventDefault();
             firstElement.focus();
+          } else if (trigger && (document.activeElement === trigger || trigger.contains(document.activeElement))) {
+            event.preventDefault();
+            drawerFocusables[0]?.focus();
           }
         }
       }
@@ -136,46 +167,41 @@ export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps)
             aria-modal="true"
             id="mobile-navigation"
             aria-label={t('menu')}
-            className="fixed inset-0 z-40 md:hidden"
+            className="fixed inset-0 top-14 z-40 md:hidden"
           >
-            {/* Backdrop overlay */}
+            {/* Backdrop overlay covering the entire viewport below the persistent navbar */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.25 }}
               onClick={onClose}
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+              onTouchMove={(e) => e.preventDefault()}
+              className="fixed inset-0 top-14 z-40 bg-black/60 backdrop-blur-xs touch-none"
               aria-hidden="true"
             />
 
-            {/* Drawer panel sliding in from the right */}
+            {/* Drawer panel anchored below the persistent navbar */}
             <motion.div
               ref={drawerRef}
+              data-drawer-panel
               variants={menuSlide}
               initial="initial"
               animate="enter"
               exit="exit"
-              className="fixed inset-y-0 right-0 z-40 flex h-full w-full max-w-xs flex-col border-l border-border bg-card px-6 pt-18 pb-6 shadow-2xl"
+              className="fixed top-14 right-0 bottom-0 z-40 flex h-[calc(100dvh-3.5rem)] w-full max-w-xs flex-col border-l border-border bg-card shadow-2xl"
             >
-              {/* Header info inside drawer (brand badge) */}
-              <div className="flex items-center gap-2 border-b border-border pb-4">
-                <Image
-                  src="/brand/logo-symbol.svg"
-                  alt="chatflow-agent logo"
-                  width={26}
-                  height={26}
-                  className="h-6.5 w-6.5 object-contain"
-                />
-                <span className="text-base font-bold tracking-tight text-foreground">
-                  chatflow<span className="bg-gradient-to-r from-blue-500 to-violet-500 bg-clip-text text-transparent">-agent</span>
-                </span>
-              </div>
-
-              {/* Staggered Navigation Items */}
-              <nav className="mt-6 flex flex-1 flex-col space-y-2" aria-label="Mobile navigation">
+              {/* Navigation Items with comfortable >=44px touch targets and generous spacing */}
+              <nav
+                className="flex flex-1 flex-col space-y-2.5 overflow-y-auto px-5 py-6 sm:px-6"
+                aria-label="Mobile navigation"
+              >
                 {navItems.map((item, index) => {
                   const Icon = item.icon;
+                  const isActive =
+                    item.href === '/'
+                      ? pathname === '/'
+                      : pathname === item.href || pathname.startsWith(`${item.href}/`);
                   return (
                     <motion.div
                       key={item.href}
@@ -188,19 +214,40 @@ export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps)
                       <Link
                         href={item.href}
                         onClick={onClose}
-                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
+                        aria-current={isActive ? 'page' : undefined}
+                        className={cn(
+                          'flex min-h-11 items-center gap-3.5 rounded-lg px-3.5 py-2.5 text-[15px] transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                          isActive
+                            ? 'bg-muted font-semibold text-foreground'
+                            : 'font-medium text-foreground hover:bg-muted'
+                        )}
                       >
-                        <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                        <Icon
+                          className={cn('h-5 w-5', isActive ? 'text-primary' : 'text-muted-foreground')}
+                          aria-hidden="true"
+                        />
                         <span>{item.label}</span>
                       </Link>
                     </motion.div>
                   );
                 })}
 
-                {/* GitHub Link in nav */}
+                {/* Subtle visual separator before external GitHub link */}
                 <motion.div
                   variants={slide}
                   custom={navItems.length}
+                  initial="initial"
+                  animate="enter"
+                  exit="exit"
+                  className="py-1"
+                >
+                  <div className="h-px w-full bg-border/60" role="separator" />
+                </motion.div>
+
+                {/* GitHub link in nav */}
+                <motion.div
+                  variants={slide}
+                  custom={navItems.length + 1}
                   initial="initial"
                   animate="enter"
                   exit="exit"
@@ -209,41 +256,69 @@ export function MobileDrawer({ isOpen, onClose, triggerRef }: MobileDrawerProps)
                     href="https://github.com/GustavoBaranda/chatflow-agent"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
+                    className="flex min-h-11 items-center gap-3.5 rounded-lg px-3.5 py-2.5 text-[15px] font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
                   >
-                    <GitHubIcon className="h-4 w-4 text-muted-foreground" />
+                    <GitHubIcon className="h-5 w-5 text-muted-foreground" />
                     <span>{t('github')}</span>
                   </a>
                 </motion.div>
               </nav>
 
-              {/* Drawer Footer with ThemeToggle, LanguageSelector and License */}
+              {/* Compact Bottom Section: Language Selector, Python SDK Attribution, Creator Signature & Sponsor */}
               <motion.div
                 variants={slide}
-                custom={navItems.length + 1}
+                custom={navItems.length + 2}
                 initial="initial"
                 animate="enter"
                 exit="exit"
-                className="mt-auto border-t border-border pt-5"
+                className="mt-auto shrink-0 border-t border-border bg-card/60 px-5 py-4 sm:px-6 pb-[max(1rem,env(safe-area-inset-bottom))] flex flex-col gap-3"
               >
+                {/* Language Selector */}
                 <div className="flex items-center justify-between gap-3">
-                  <LanguageSelector />
-                  <div className="flex items-center gap-2">
-                    <ThemeToggle />
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {tLang('label')}
+                  </span>
+                  <LanguageSelector side="top" onSelect={onClose} />
+                </div>
+
+                <div className="h-px w-full bg-border/60" />
+
+                {/* Attribution: Python SDK MIT License, Creator Signature, Sponsor & Contributor recognition */}
+                <div className="flex flex-col gap-1.5 text-center text-[11px] leading-tight text-muted-foreground">
+                  <p>{tFoot('sdkLicense')}</p>
+                  <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
                     <a
-                      href="https://github.com/GustavoBaranda/chatflow-agent"
+                      href="https://gustavobaranda.com/"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
-                      aria-label={t('github')}
+                      className="inline-flex items-center gap-1.5 font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
+                      aria-label="Gustavo Baranda Personal Website"
                     >
-                      <GitHubIcon className="h-4 w-4" />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src="/brand/gustavo-baranda.svg"
+                        alt="Gustavo Baranda"
+                        width={20}
+                        height={20}
+                        className="h-5 w-5 object-contain dark:brightness-0 dark:invert dark:opacity-65 transition-opacity hover:opacity-80"
+                      />
+                      <span>Gustavo Baranda · © 2026</span>
                     </a>
+                    <span className="text-muted-foreground/50 select-none">•</span>
+                    <a
+                      href="https://github.com/sponsors/GustavoBaranda"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-medium text-pink-700 dark:text-pink-300 transition-colors hover:text-pink-600 dark:hover:text-pink-200 focus-visible:outline-2 focus-visible:outline-pink-500"
+                      aria-label="GitHub Sponsors Gustavo Baranda"
+                    >
+                      <Heart className="h-3 w-3 fill-pink-500 text-pink-500" aria-hidden="true" />
+                      <span>{tFoot('links.sponsor')}</span>
+                    </a>
+                    <span className="text-muted-foreground/50 select-none">•</span>
+                    <span>contributors</span>
                   </div>
                 </div>
-                <p className="mt-4 text-center text-xs text-muted-foreground">
-                  {tFooter('license')}
-                </p>
               </motion.div>
             </motion.div>
           </div>

@@ -1,0 +1,10 @@
+{
+  "title": "Core Architecture",
+  "pages": [
+    "agents",
+    "tools",
+    "multi-agent-handoffs",
+    "runner-lifecycle",
+    "sessions-state"
+  ]
+}

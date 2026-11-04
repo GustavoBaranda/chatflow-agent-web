@@ -1,0 +1,229 @@
+---
+title: "Tools & Function Calling"
+description: "Complete architectural guide to function calling, parameter type schemas, sync/async dispatch, and error isolation in chatflow-agent."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+Tools empower agents to interact with external environments, execute computation, query databases, and trigger business actions. In **chatflow-agent**, tools are first-class objects created via the `@tool` decorator or directly instantiated with the `Tool` class.
+
+The framework provides an automated introspection engine that translates native Python type annotations and docstrings into compliant OpenAPI and JSON Schema declarations for Google Gemini, OpenAI, and Anthropic models without requiring manual schema definitions.
+
+---
+
+## Defining Tools with `@tool`
+
+The standard way to author a tool is using the `@tool` decorator. You can apply it bare or customize its name and description:
+
+### 1. Bare Decorator
+Infers the tool name from the function identifier and description from the function docstring:
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from chatflow_agent import tool
+
+@tool
+def calculate_vat(subtotal: float, rate: float = 0.20) -> float:
+    """Calculate Value-Added Tax for an order subtotal."""
+    return round(subtotal * rate, 2)
+
+assert calculate_vat.name == "calculate_vat"
+assert "Calculate Value-Added Tax" in calculate_vat.description
+```
+
+### 2. Parameterized Decorator
+Explicitly overrides the name and description exposed to the LLM:
+
+```python
+# [min-version: 0.3.0]
+# [executable]
+from chatflow_agent import tool
+
+@tool(
+    name="lookup_stock_ticker",
+    description="Fetch the latest real-time market quote for a stock symbol.",
+)
+def fetch_quote(symbol: str) -> dict:
+    """Internal function to retrieve stock prices."""
+    # Queries finance service
+    return {"symbol": symbol.upper(), "price": 182.50, "currency": "USD"}
+
+assert fetch_quote.name == "lookup_stock_ticker"
+```
+
+---
+
+## Type Mapping & Parameter Schema Introspection
+
+When a tool is registered, `chatflow-agent` inspects its signature via Python's standard `inspect` module and constructs a parameter schema:
+
+| Python Annotation | Canonical Schema Type | Required If |
+| :--- | :--- | :--- |
+| `str` | `"STRING"` | No default value assigned |
+| `int` | `"INTEGER"` | No default value assigned |
+| `float` | `"NUMBER"` | No default value assigned |
+| `bool` | `"BOOLEAN"` | No default value assigned |
+| `list` | `"ARRAY"` | No default value assigned |
+| `dict` | `"OBJECT"` | No default value assigned |
+| *Unannotated* / `Any` | `"STRING"` (Fallback) | No default value assigned |
+
+Parameters with default values (e.g., `rate: float = 0.20`) are marked as optional in the schema, while parameters without defaults are placed in the `required` array.
+
+<Callout type="tip" title="Docstring Best Practice">
+Language models decide whether to invoke a tool based on its name and description. Always write concise, unambiguous docstrings specifying the exact purpose and expected arguments.
+</Callout>
+
+---
+
+## Synchronous vs. Asynchronous Tool Execution
+
+`chatflow-agent` is designed async-first, but supports both synchronous (`def`) and asynchronous (`async def`) tools interchangeably.
+
+```python
+import asyncio
+from chatflow_agent import tool
+
+# Synchronous tool
+@tool
+def sync_reverse(text: str) -> str:
+    """Reverse a string synchronously."""
+    return text[::-1]
+
+# Asynchronous tool
+@tool
+async def async_fetch_status(service_name: str) -> dict:
+    """Query service health asynchronously without blocking."""
+    await asyncio.sleep(0.01)  # Simulates async network I/O
+    return {"service": service_name, "status": "healthy"}
+```
+
+### Execution Methods
+
+* **`await tool.execute_async(**kwargs)` (Recommended):**
+  * If the tool is `async def`, it is directly awaited on the current event loop.
+  * If the tool is synchronous `def`, it is automatically dispatched to an executor worker thread via `asyncio.to_thread`. This ensures that heavy calculations, disk I/O, or blocking network libraries never freeze the main async event loop.
+* **`tool.execute(**kwargs)` (Synchronous Convenience):**
+  * Executes synchronous tools directly.
+  * If called on an `async def` tool outside an event loop, runs it using `asyncio.run()`.
+
+<Callout type="warn" title="Event Loop Guard">
+Calling <code>tool.execute()</code> synchronously on an <code>async def</code> tool from within an already running event loop (e.g., inside FastAPI, Telegram handlers, or Runner turns) is not permitted by Python and will raise a <code>RuntimeError</code>. Always use <code>await tool.execute_async()</code> in asynchronous code.
+</Callout>
+
+---
+
+## Version Differences & Prerelease Features
+
+Tool schema generation and execution have evolved significantly between releases:
+
+### Stable Release (`v0.3.4`)
+* <VersionBadge version="0.3.4" status="stable" /> Canonical Gemini declaration format (`to_gemini_declaration()`).
+* Single-level type mapping for primitive types and unparameterized `list`/`dict`.
+* Sync functions offloaded via `asyncio.to_thread` during `execute_async()`.
+
+### Prerelease Enhancements (`v0.4.0rc1`)
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Deep Collection Typing:** Introspects item schemas for `list[T]`, `Sequence[T]`, `set[T]`, and homogeneous tuples `tuple[T, ...]`:
+
+```python
+from chatflow_agent import tool
+
+@tool
+def sum_metrics(values: list[float]) -> float:
+    """Sum a list of numeric measurements."""
+    return sum(values)
+
+# Generates: {"type": "ARRAY", "items": {"type": "NUMBER"}}
+```
+
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Union & Optional Support:**
+  * `Optional[T]` or `T | None` generates `{ "type": "...", "nullable": True }`.
+  * `int | float` broadens deterministically to `"NUMBER"` regardless of declaration order.
+  * Multi-type unions generate an `anyOf` schema list.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`to_openai_parameters()`:** Generates JSON Schema formatted parameters (lowercased type names, `type: "null"`, and no `nullable` keyword) for OpenAI and Anthropic engines.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`ToolSchemaError`:** Validates signatures at definition time, raising a descriptive `ToolSchemaError` if an unsupported type cannot be mapped into a valid schema.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Varargs Exclusion:** `*args` and `**kwargs` are automatically omitted from parameter schemas.
+
+---
+
+## Error Isolation & Fault Tolerance
+
+In production, tools may encounter network timeouts, invalid database queries, or unexpected exceptions.
+
+`chatflow-agent` isolates tool failures within the execution turn. If a tool raises an unhandled exception during execution:
+
+1. The exception is intercepted and wrapped in a `ToolExecutionError`.
+2. The `Runner` catches the failure and injects a `ToolResult` into conversation history marked with `is_error=True`:
+   ```python
+   # Injected into message history for the LLM:
+   # ToolResult(tool_call_id="call_123", name="query_db", content="Database connection timeout", is_error=True)
+   ```
+3. Instead of crashing the entire user conversation, the active agent sees the error result and can explain the issue to the user, retry with alternative parameters, or hand off to a human support queue.
+
+---
+
+## Complete Example: Multi-Tool Agent
+
+```python
+from chatflow_agent import Agent, Runner, tool
+from chatflow_agent.core.memory import SessionStore
+
+# 1. Define modular domain tools
+@tool
+def calculate_shipping(weight_kg: float, destination: str) -> dict:
+    """Calculate shipping estimate based on weight and country destination."""
+    rate_per_kg = 8.50 if destination.upper() in ["US", "CA"] else 14.00
+    total = round(weight_kg * rate_per_kg, 2)
+    return {"destination": destination.upper(), "cost_usd": total, "delivery_days": 3}
+
+@tool
+def check_inventory(sku: str) -> dict:
+    """Check stock availability for a product SKU."""
+    return {"sku": sku, "in_stock": True, "warehouse": "east-region-1"}
+
+# 2. Bind tools to agent
+logistics_agent = Agent(
+    name="LogisticsCoordinator",
+    instructions="Help customers check inventory availability and calculate shipping rates.",
+    tools=[calculate_shipping, check_inventory],
+    model="gemini-2.5-flash",
+)
+
+# 3. Create runner with session store
+store = SessionStore()
+runner = Runner(starting_agent=logistics_agent, session_store=store)
+
+# 4. Execute turn
+response = runner.run(
+    session_id="customer-turn-42",
+    user_message="Can you check stock for SKU-990 and estimate shipping 2.5 kg to CA?",
+)
+print("Agent Response:", response.content)
+print("Tools Executed:", response.tool_calls_executed)
+```
+
+---
+
+## Common Pitfalls & Anti-Patterns
+
+### 1. Forgetting Type Annotations
+Parameters without type annotations fall back to `"STRING"`. If your tool expects numbers or booleans, always include type hints:
+```python
+# [INCORRECT]: "count" will be exposed as STRING, requiring manual int casting
+@tool
+def repeat_phrase(phrase, count): ...
+
+# [CORRECT]: Fully typed parameters produce exact OpenAPI validation
+@tool
+def repeat_phrase(phrase: str, count: int) -> str:
+    return phrase * count
+```
+
+### 2. Blocking Network Calls in Synchronous Tools
+While synchronous tools are dispatched to worker threads via `asyncio.to_thread`, heavy blocking network operations without timeouts can exhaust Python's thread pool. Whenever possible, author network I/O tools using `async def` with explicit timeouts.
+
+### 3. Modifying Global State in Tool Functions
+Tools should be pure functions or interact with external storage through thread-safe clients. Avoid mutating global variables, as multiple user sessions can invoke the same tool concurrently.
+

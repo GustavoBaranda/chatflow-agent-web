@@ -1,0 +1,155 @@
+---
+title: "Configuração e Ambiente"
+description: "Gerencie variáveis de ambiente, predefinições de provedores, timeouts e configuração de aplicações Twelve-Factor em implantações do chatflow-agent."
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+Sistemas de IA em produção exigem uma separação clara entre código e configuração. Seguindo a metodologia [Twelve-Factor App](https://12factor.net/config), credenciais, endereços de rede e limites operacionais de tempo de execução devem ser configurados por variáveis de ambiente, e nunca codificados diretamente em módulos Python.
+
+O `chatflow-agent` adota uma hierarquia estruturada de resolução: argumentos explícitos no construtor têm precedência sobre variáveis de ambiente, que por sua vez prevalecem sobre os padrões definidos pelo framework.
+
+## Hierarquia de Resolução de Configuração
+
+Ao inicializar um agente ou mecanismo, os valores são resolvidos na seguinte ordem de prioridade:
+
+```text
+Prioridade 1: Argumentos Explícitos no Construtor
+    └── Agent(engine=OpenAIEngine(api_key="...", timeout=30.0))
+          │ (Sobrescreve qualquer outra origem)
+          ▼
+Prioridade 2: Variáveis de Ambiente Específicas do Provedor
+    └── OPENAI_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY
+          │ (Carregadas a partir de os.environ)
+          ▼
+Prioridade 3: Predefinições e Padrões do Framework
+    └── URLs base (https://api.openai.com/v1), modelos padrão, timeout (60.0s)
+```
+
+## Referência de Variáveis de Ambiente
+
+As seguintes variáveis de ambiente são reconhecidas pelos diversos componentes do SDK:
+
+### Credenciais de Provedores de LLM
+
+| Variável | Provedor Alvo | Descrição | Valor de Fallback |
+| :--- | :--- | :--- | :--- |
+| `OPENAI_API_KEY` | OpenAI | Token Bearer para endpoints oficiais da OpenAI. | `None` (Obrigatório para OpenAI) |
+| `GROQ_API_KEY` | Groq Cloud | Token Bearer para LPUs da Groq (`provider="groq"`). | `None` (Obrigatório para Groq) |
+| `DEEPSEEK_API_KEY` | DeepSeek | Token Bearer para a API da DeepSeek (`provider="deepseek"`). | `None` (Obrigatório para DeepSeek) |
+| `XAI_API_KEY` | xAI Grok | Token Bearer para endpoints da xAI Grok (`provider="grok"`). | `None` (Obrigatório para Grok) |
+| `GEMINI_API_KEY` | Google Gemini | Chave de API para endpoints REST v1beta do Gemini. | `GOOGLE_API_KEY` |
+| `GOOGLE_API_KEY` | Google Gemini | Chave alternativa de fallback para ambientes Google Cloud. | `None` |
+| `GOOGLE_GEMINI_BASE_URL` | Google Gemini | URL base customizada para proxies do Gemini. | `https://generativelanguage.googleapis.com` |
+| `ANTHROPIC_API_KEY` | Anthropic | Chave de API para a Messages API da Claude (`x-api-key`). | `None` (Obrigatório para Anthropic) |
+| `OLLAMA_API_KEY` | Ollama | Token opcional para gateways autenticados do Ollama. | `"ollama"` (Chave dummy segura) |
+
+### Credenciais de Canais de Integração
+
+| Variável | Integração | Descrição |
+| :--- | :--- | :--- |
+| `TELEGRAM_BOT_TOKEN` | Telegram | Token de API HTTP emitido pelo @BotFather. |
+| `WHATSAPP_VERIFY_TOKEN` | WhatsApp | Token de verificação para o desafio de inscrição do webhook da Meta. |
+| `WHATSAPP_ACCESS_TOKEN` | WhatsApp | Token de acesso de usuário do sistema com permissões de `whatsapp_business_messaging`. |
+| `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp | Identificador de número de telefone do Painel de Desenvolvedores da Meta. |
+| `META_APP_SECRET` | WhatsApp | Segredo do aplicativo utilizado na validação HMAC SHA-256 das cargas úteis. |
+
+## Exemplo de Configuração para Produção
+
+A abordagem recomendada para ambientes produtivos é declarar uma classe de configurações fortemente tipada (utilizando `dataclasses` ou `pydantic-settings`) para validar todas as variáveis no momento de inicialização da aplicação:
+
+```python
+import os
+from dataclasses import dataclass
+from chatflow_agent import Agent, Runner
+from chatflow_agent.core.memory import SQLiteSessionStore
+from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
+
+@dataclass(frozen=True)
+class AppConfig:
+    """Validated application configuration."""
+    database_path: str = os.getenv("CHATFLOW_DB_PATH", "production_sessions.db")
+    max_tool_iterations: int = int(os.getenv("CHATFLOW_MAX_ITERATIONS", "8"))
+    max_handoffs: int = int(os.getenv("CHATFLOW_MAX_HANDOFFS", "4"))
+    llm_timeout: float = float(os.getenv("CHATFLOW_LLM_TIMEOUT", "45.0"))
+    environment: str = os.getenv("ENVIRONMENT", "production")
+
+config = AppConfig()
+
+# Configurar motor com timeout explícito para produção
+production_engine = OpenAIEngine(
+    api_key=os.environ.get("OPENAI_API_KEY"),
+    provider="openai",
+    timeout=config.llm_timeout,
+)
+
+# Configurar armazenamento persistente no SQLite
+store = SQLiteSessionStore(
+    db_path=config.database_path,
+    default_max_turns=30,
+)
+
+support_agent = Agent(
+    name="CustomerSupport",
+    model="gpt-4o",
+    engine=production_engine,
+    instructions="Provide timely and professional customer service.",
+)
+
+runner = Runner(
+    starting_agent=support_agent,
+    session_store=store,
+    max_tool_iterations=config.max_tool_iterations,
+    max_handoffs_per_turn=config.max_handoffs,
+)
+```
+
+## Tratamento de Credenciais Sensíveis em CI/CD
+
+<Callout type="warn" title="Zero Vazamento de Credenciais">
+Nunca realize commit de arquivos `.env`, tokens de API ou segredos em repositórios Git. Adicione sempre `.env`, `.env.*` e `*.db` ao seu arquivo `.gitignore`.
+</Callout>
+
+### Entradas Recomendadas para o `.gitignore`
+
+```bash
+# Ambiente e Segredos
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# Bancos de Dados de Sessão Persistentes
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache e Bytecode Python
+__pycache__/
+*.pyc
+.venv/
+```
+
+### Modelo de Arquivo de Ambiente (`.env.example`)
+
+Mantenha um modelo sanitizado em seu repositório para orientar os novos desenvolvedores da equipe:
+
+```bash
+# Provedores de LLM
+OPENAI_API_KEY="your-openai-api-key"
+GROQ_API_KEY="your-groq-api-key"
+GEMINI_API_KEY="your-gemini-api-key"
+ANTHROPIC_API_KEY="your-anthropic-api-key"
+
+# Configurações da Aplicação
+ENVIRONMENT="development"
+CHATFLOW_DB_PATH="sessions.db"
+CHATFLOW_LLM_TIMEOUT="45.0"
+CHATFLOW_MAX_ITERATIONS="10"
+CHATFLOW_MAX_HANDOFFS="5"
+```

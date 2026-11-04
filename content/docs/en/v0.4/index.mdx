@@ -1,0 +1,54 @@
+---
+title: "Documentation Overview (v0.4 Prerelease)"
+description: "Prerelease preview documentation for chatflow-agent v0.4.0rc1: native REST providers, async runner context, and memory improvements."
+---
+
+import { VersionBadge } from '@/components/docs/VersionBadge';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+<Callout type="warn" title="Prerelease Documentation (v0.4.0rc1)">
+You are viewing the preview documentation for <strong>chatflow-agent v0.4.0rc1</strong>. This track introduces connection pooling (<code>async with runner:</code>), REST-native Gemini execution, persistent in-memory SQLite, and turn timeouts. For production environments, use the <strong>v0.3.4</strong> stable release.
+</Callout>
+
+Welcome to the preview documentation for **chatflow-agent v0.4.x**, featuring major concurrency and architectural upgrades.
+
+Created and led by **Gustavo Baranda** alongside an international open-source community, `chatflow-agent` is designed to eliminate framework bloat and vendor lock-in while providing enterprise-grade concurrency, resilient memory, and multi-channel connectivity.
+
+---
+
+## Architecture Highlights
+
+<Cards>
+  <Card title="Zero-SDK Lock-In">
+    Connects to LLMs over pure, asynchronous HTTP REST using `httpx`. No monolithic vendor SDKs or heavy runtime dependencies required.
+  </Card>
+  <Card title="Native Multi-Agent Handoffs">
+    Declare collaborative swarms. Agents delegate tasks dynamically using synthesized `transfer_to_*` tools with automatic cycle prevention.
+  </Card>
+  <Card title="Transactional Resilient Memory">
+    Every turn takes an atomic snapshot. If an error or timeout occurs, state automatically rolls back. SQLite operations run in dedicated thread pools.
+  </Card>
+  <Card title="Multi-Channel Readiness">
+    Deploy your agents seamlessly to terminal REPLs, Telegram bots, or WhatsApp Business Cloud API with HMAC SHA-256 signature verification.
+  </Card>
+</Cards>
+
+---
+
+## Installing the Prerelease
+
+```bash
+# Install prerelease candidate from PyPI
+pip install --pre "chatflow-agent==0.4.0rc1"
+```
+
+---
+
+## Getting Started Path
+
+Follow our structured onboarding guide to go from installation to a running production agent in minutes:
+
+1. **[Installation](/en/docs/v0.4/getting-started/installation):** Verify your Python environment (`>=3.10`), install core packages, and configure optional channel extras.
+2. **[Quickstart](/en/docs/v0.4/getting-started/quickstart):** Build your first agent in under 5 minutes, invoke custom tools with `@tool`, and explore asynchronous execution.
+3. **[Core Concepts](/en/docs/v0.4/getting-started/core-concepts):** Learn the foundational architecture: `Agent`, `Runner`, `Engines`, `Tools`, `Memory`, and `Handoffs`.

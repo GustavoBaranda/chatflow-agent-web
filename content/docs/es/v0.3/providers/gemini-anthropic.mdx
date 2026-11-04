@@ -1,0 +1,174 @@
+---
+title: "Google Gemini y Anthropic Claude"
+description: "Integración de modelos fundacionales de alto rendimiento con Google Gemini REST v1beta y Anthropic Claude Messages API."
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+Google Gemini y Anthropic Claude representan dos de las familias de modelos de frontera más potentes para flujos de trabajo basados en agentes. `chatflow-agent` proporciona motores dedicados y nativos para ambos proveedores, optimizados para baja latencia, cero dependencia cautiva de SDKs y ejecución fiable de llamadas a herramientas.
+
+---
+
+## Motor Google Gemini
+
+`GeminiEngine` se comunica directamente con la API para desarrolladores de Gemini (`v1beta`) para ejecutar conversaciones de múltiples turnos y llamadas a funciones.
+
+<Callout type="info" title="Variante de API de Gemini Soportada">
+`GeminiEngine` es compatible con la **API de desarrolladores de Gemini** (claves de API de Google AI Studio). Google Cloud Vertex AI no está soportado por este motor.
+</Callout>
+
+### Autenticación y Credenciales
+
+El motor lee las credenciales desde las siguientes fuentes, en orden de prioridad:
+1. `api_key` pasado directamente a `GeminiEngine(api_key="...")` o `Agent(api_key="...")`.
+2. Variable de entorno `GEMINI_API_KEY`.
+3. Variable de entorno `GOOGLE_API_KEY`.
+
+Por defecto, la clave de API se transmite a través de la cabecera HTTP segura `x-goog-api-key`. Pasar `api_key_in_query=True` transmite la clave como parámetro de consulta `?key=`:
+
+```python
+import os
+from chatflow_agent import Agent, Runner
+from chatflow_agent.core.engines.gemini import GeminiEngine
+
+# Recomendado: Autenticación segura mediante cabecera HTTP
+gemini_engine = GeminiEngine(
+    api_key=os.environ.get("GEMINI_API_KEY"),
+    timeout_seconds=30.0,
+    max_retries=3,
+)
+
+assistant = Agent(
+    name="GeminiAssistant",
+    model="gemini-2.5-flash",
+    engine=gemini_engine,
+    instructions="Provide concise, accurate answers.",
+)
+```
+
+### Pool de Conexiones y Arquitectura sin Dependencias de SDK
+
+<div className="flex gap-2 my-3">
+  <VersionBadge version="0.4.0rc1" status="prerelease" />
+  <VersionBadge version="0.3.4" status="stable" />
+</div>
+
+La implementación de Gemini experimentó una evolución arquitectónica entre versiones:
+
+* **En `v0.3.4` (Estable):** El motor importaba el SDK oficial `google-genai` de Google (`from google import genai`), requiriendo la instalación de la biblioteca cliente externa.
+* **En `v0.4.0rc1` (Pre-lanzamiento):** El motor fue rediseñado íntegramente utilizando `httpx` asíncrono nativo contra `https://generativelanguage.googleapis.com/v1beta`. Esto elimina dependencias pesadas y habilita un **pool de conexiones** reutilizables entre turnos de agentes:
+
+```python
+# [no-exec: requires real gemini api key]
+import asyncio
+from chatflow_agent import Agent, Runner
+
+agent = Agent(name="Assistant", model="gemini-2.5-flash")
+runner = Runner(starting_agent=agent)
+
+async def main():
+    # En v0.3.x, ejecuta turnos asíncronos directamente sobre el runner
+    res1 = await runner.run_async("session-1", "What is quantum computing?")
+    res2 = await runner.run_async("session-1", "Summarize in 3 bullet points.")
+    print(res2.text)
+
+asyncio.run(main())
+```
+
+### Configuración de Proxies Personalizados
+
+Para enrutar peticiones de Gemini a través de una pasarela o proxy corporativo, define la variable de entorno `GOOGLE_GEMINI_BASE_URL`:
+
+```bash
+export GOOGLE_GEMINI_BASE_URL="https://gemini-proxy.internal.corp"
+```
+El motor añade automáticamente `/v1beta` a la URL base.
+
+---
+
+## Motor Anthropic Claude
+
+`AnthropicEngine` proporciona integración nativa con Claude 3.5 Sonnet, Claude 3.5 Haiku y Claude 3 Opus de Anthropic a través de la Messages API.
+
+### Autenticación y Cabeceras
+
+Las peticiones a Anthropic requieren la cabecera `x-api-key` y la cabecera `anthropic-version` (por defecto `"2023-06-01"`).
+
+El motor lee las credenciales de:
+1. `api_key` pasado explícitamente a `AnthropicEngine(api_key="...")` o `Agent(api_key="...")`.
+2. Variable de entorno `ANTHROPIC_API_KEY`.
+
+<Callout type="warn" title="Regla de Seguridad de Credenciales">
+Al igual que `OpenAIEngine`, `AnthropicEngine` solo transmite `ANTHROPIC_API_KEY` al endpoint oficial `https://api.anthropic.com/v1`. Si especificas un `base_url` personalizado, debes suministrar `api_key` de forma explícita.
+</Callout>
+
+```python
+import os
+from chatflow_agent import Agent
+from chatflow_agent.core.engines.anthropic import AnthropicEngine
+
+claude_engine = AnthropicEngine(
+    api_key=os.environ.get("ANTHROPIC_API_KEY"),
+    timeout=60.0,
+)
+
+editor = Agent(
+    name="Editor",
+    model="claude-3-5-sonnet-20241022",
+    engine=claude_engine,
+    instructions="Edit and refine technical documentation.",
+)
+```
+
+### Reintentos Automáticos y Retroceso con Jitter
+
+`AnthropicEngine` gestiona automáticamente los límites de tasa (`429 Too Many Requests`) y errores temporales de pasarela (`500`, `502`, `503`, `504`) mediante retroceso exponencial:
+* **Reintentos Máximos:** 3 intentos.
+* **Demora Base:** 1.0 segundo.
+* **Demora Máxima:** 10.0 segundos.
+
+Si una respuesta `429` incluye la cabecera `Retry-After`, el motor respeta el retraso solicitado por el proveedor antes de reintentar.
+
+---
+
+## Colaboración Multimodelo entre Agentes
+
+Una ventaja clave de `chatflow-agent` es componer enjambres donde distintos agentes emplean diferentes modelos fundacionales según sus fortalezas:
+
+```python
+from chatflow_agent import Agent, Runner
+from chatflow_agent.core.engines.gemini import GeminiEngine
+from chatflow_agent.core.engines.anthropic import AnthropicEngine
+
+gemini = GeminiEngine()
+claude = AnthropicEngine()
+
+researcher = Agent(
+    name="Researcher",
+    model="gemini-2.5-flash",
+    engine=gemini,
+    instructions="Gather facts quickly using Gemini's high-throughput processing.",
+)
+
+synthesizer = Agent(
+    name="Synthesizer",
+    model="claude-3-5-sonnet-20241022",
+    engine=claude,
+    instructions="Synthesize gathered facts into clear, well-structured prose.",
+)
+
+# Conectar agentes mediante handoffs
+researcher.add_handoff(synthesizer)
+synthesizer.add_handoff(researcher)
+
+runner = Runner(starting_agent=researcher)
+```
+
+En este enjambre:
+1. El **Investigador** se ejecuta sobre Gemini 2.5 Flash para ingestión y búsqueda de alto rendimiento.
+2. Una vez recopilados los datos, la sesión se transfiere al **Sintetizador** sobre Claude 3.5 Sonnet.
+3. Los mensajes históricos y los IDs de llamadas a herramientas se normalizan automáticamente, evitando incompatibilidades de formato entre proveedores.

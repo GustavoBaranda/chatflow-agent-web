@@ -75,11 +75,20 @@ pnpm install
 # Start local development server
 pnpm dev
 
-# Run quality checks (lint, typecheck, unit tests)
+# Run quality checks (lint, typecheck, unit tests, links, parity)
 pnpm run verify
 
 # Audit translation completeness
 pnpm run check:i18n
+
+# Audit documentation link and version consistency
+pnpm run check:links
+
+# Verify topic synchronization across languages
+pnpm run check:topics
+
+# Validate Python snippets against published SDK releases
+pnpm run test:sdk:parity
 
 # Run Playwright end-to-end tests
 pnpm run test:e2e

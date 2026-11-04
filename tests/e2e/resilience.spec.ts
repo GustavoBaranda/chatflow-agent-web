@@ -145,4 +145,3 @@ test.describe('Resilience, Error Boundaries & Maintenance Suite', () => {
     expect(headers['content-security-policy']).toContain("default-src 'self'");
   });
 });
-

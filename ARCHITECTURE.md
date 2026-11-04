@@ -30,7 +30,7 @@ The technology stack is aligned with current modern stable releases, avoiding ou
 
 | Layer | Selected Technology | Target Version | Technical Justification & Compatibility Notes |
 | :--- | :--- | :--- | :--- |
-| **Runtime & Engines** | Node.js + pnpm | Node `>=20.18.0` (LTS)<br/>pnpm `>=9.15.0` | Enforced via `"engines"` in `package.json` and Corepack. Guarantees 100% reproducible local environments across contributors. |
+| **Runtime & Engines** | Node.js + pnpm | Node `>=20.19.0` (LTS)<br/>pnpm `>=9.15.0` | Enforced via `"engines"` in `package.json` and Corepack. Guarantees 100% reproducible local environments across contributors. |
 | **Framework** | Next.js (App Router) | `^16.4.3` | React Server Components (RSC) by default, Turbopack support, asynchronous dynamic `params`, and optimized Static Site Generation (SSG). |
 | **UI Library** | React | `^19.3.1` | Native React 19 compatibility with Next.js 16 and modern component rendering. |
 | **Doc Engine** | Fumadocs | `fumadocs-ui ^16.17.8`<br/>`fumadocs-core ^16.17.8`<br/>`fumadocs-mdx ^15.4.10` | Modern headless documentation engine built specifically for Next.js App Router, MDX, and Tailwind CSS. Fully compatible with Next.js 16 async `params` and React 19. |
@@ -38,7 +38,7 @@ The technology stack is aligned with current modern stable releases, avoiding ou
 | **Styling & Design System** | Tailwind CSS | `^4.3.3` (`@tailwindcss/postcss`) | CSS-first configuration model (`@import "tailwindcss";`, `@theme`, `@source`), lightning-fast Oxide compiler engine, zero runtime CSS footprint, and native Fumadocs UI preset compatibility. |
 | **Search Engine** | Fumadocs / Orama Search | Embedded / Client-side | Offline-capable, zero-SaaS, build-time MDX AST indexing with multilingual tokenization and local verification. |
 | **Unit & Integration Testing** | Vitest | `^5.0.5` | ESM-native test runner, instant feedback, compatible with React Testing Library. |
-| **End-to-End Testing** | Playwright | `^1.64.1` | Cross-browser automated testing (Chromium, Firefox, WebKit) and accessibility auditing via `@axe-core/playwright`. |
+| **End-to-End Testing** | Playwright | `^1.50.0` | Cross-browser automated testing (Chromium, Firefox, WebKit) and accessibility auditing via `@axe-core/playwright`. |
 | **Code Quality** | ESLint + Prettier | ESLint `^9.20.0` (Flat Config)<br/>Prettier `^3.5.0`<br/>TypeScript `^5.9.3` | Enforces TypeScript strictness, import sorting, Tailwind class ordering, and accessibility linting (`eslint-plugin-jsx-a11y`). |
 
 ---
@@ -49,7 +49,7 @@ Combining **`next-intl`** and **Fumadocs** requires a clear, well-tested integra
 
 ### 3.1 Division of Responsibilities
 * **`next-intl` (Application Shell & Navigation):**
-  - Handles HTTP request locale negotiation and URL redirects via `src/middleware.ts`.
+  - Handles HTTP request locale negotiation and URL redirects via `src/proxy.ts`.
   - Manages application chrome UI strings: global header, navigation links, theme toggle, language dropdown, footer, and community pages via `messages/en.json` and `messages/es.json`.
   - Enforces explicit prefix routing: `localePrefix: 'always'`.
 * **Fumadocs (Content Layer & MDX Engine):**
@@ -57,8 +57,8 @@ Combining **`next-intl`** and **Fumadocs** requires a clear, well-tested integra
   - Computes localized table-of-contents, frontmatter parsing (Zod), and sidebar navigation trees (`meta.json`).
   - Renders MDX components, syntax-highlighted code blocks, and localized search dialogs.
 
-### 3.2 Handling Next.js 15 Asynchronous Route Parameters
-Next.js 15 treats `params` as a `Promise`. The documentation layout and catch-all dynamic page adhere to this specification:
+### 3.2 Handling Next.js 16 Asynchronous Route Parameters
+Next.js 16 treats `params` as a `Promise`. The documentation layout and catch-all dynamic page adhere to this specification:
 
 ```tsx
 // src/app/[locale]/docs/[[...slug]]/page.tsx
@@ -124,12 +124,12 @@ export default async function Page({ params }: PageProps) {
 ## 4. Multilingual Architecture & Localization Strategy
 
 ### 4.1 Explicit Locale Routing Matrix
-Every route is strictly scoped by its locale identifier:
+Every route is strictly scoped by its locale identifier. The following are relative route examples; this document does not assert a production host or deployment:
 
-* **English (Authoritative Base):** `https://chatflowagent.org/en/docs/quick-start`
-* **Spanish (Launch Supported):** `https://chatflowagent.org/es/docs/quick-start`
-* **Brazilian Portuguese (Launch Supported):** `https://chatflowagent.org/pt-BR/docs/quick-start`
-* **Root Redirection:** A request to `https://chatflowagent.org/` inspects the user's `Accept-Language` header and returns a `307 Temporary Redirect` (or permanent redirect in production edge middleware) to `/en/`, `/es/`, or `/pt-BR/`.
+* **English (Authoritative Base):** `/en/docs/quick-start`
+* **Spanish (Launch Supported):** `/es/docs/quick-start`
+* **Brazilian Portuguese (Launch Supported):** `/pt-BR/docs/quick-start`
+* **Root Redirection:** A request to `/` inspects the user's `Accept-Language` header and returns a `307 Temporary Redirect` to `/en/`, `/es/`, or `/pt-BR/`.
 * **Dynamic Configuration:** All locales are configured dynamically in `src/config/languages.ts` and consumed by `src/i18n/routing.ts`. Adding new languages requires zero modifications to core routing logic.
 
 ### 4.2 Outdated Translation Detection Mechanism
@@ -255,7 +255,7 @@ To prevent documenting inaccurate, outdated, or hallucinated Python SDK signatur
 
 The repository is architected for seamless onboarding of international open-source contributors:
 
-1. **Pinned Toolchain:** `"packageManager": "pnpm@9.15.0"` and `"engines": { "node": ">=20.18.0", "pnpm": ">=9.15.0" }`. Contributors using Corepack (`corepack enable`) automatically run the identical pnpm version.
+1. **Pinned Toolchain:** `"packageManager": "pnpm@9.15.0"` and `"engines": { "node": ">=20.19.0", "pnpm": ">=9.15.0" }`. Contributors using Corepack (`corepack enable`) automatically run the identical pnpm version.
 2. **Single-Command Verification:** Contributors can run:
    ```bash
    pnpm run verify

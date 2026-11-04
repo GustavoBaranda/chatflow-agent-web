@@ -64,7 +64,7 @@ The user interface renders native language names (`English`, `Español`, `Portug
 ## 3. Development Workflow & Quality Gates
 
 ### Prerequisites
-* **Node.js:** `>=20.18.0` (LTS)
+* **Node.js:** `>=20.19.0` (LTS)
 * **Package Manager:** `pnpm` `>=9.15.0`
 
 ### Local Development Commands

@@ -171,3 +171,15 @@ We welcome community contributions, bug reports, and translations! Please read o
 ## Security
 
 For vulnerability reporting guidelines and supported version scope, please review our [**Security Policy**](SECURITY.md).
+
+---
+
+## License
+
+The `chatflow-agent-web` website source code and documentation are released under the **MIT License**.
+
+- **Copyright:** Copyright (c) 2026 Gustavo Baranda.
+- **Full License Text:** Available in the root [`LICENSE`](LICENSE) file.
+- **Python SDK Licensing:** The [`chatflow-agent`](https://github.com/GustavoBaranda/chatflow-agent) Python SDK is an independent project that is also released under the MIT License.
+- **Brand & Identifiers:** The MIT License applies to the software and documentation source code and does not grant rights to use the `chatflow-agent` name, logos, or other brand identifiers in a manner that suggests official endorsement or affiliation.
+

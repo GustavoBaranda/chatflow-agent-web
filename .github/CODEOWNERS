@@ -1,0 +1,4 @@
+# Security-sensitive repository automation
+/.github/CODEOWNERS @GustavoBaranda
+/.github/workflows/ @GustavoBaranda
+/.github/dependabot.yml @GustavoBaranda

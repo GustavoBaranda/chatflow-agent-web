@@ -9,7 +9,7 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 Tools empower agents to interact with external environments, execute computation, query databases, and trigger business actions. In **chatflow-agent**, tools are first-class objects created via the `@tool` decorator or directly instantiated with the `Tool` class.
 
-The framework provides an automated introspection engine that translates native Python type annotations and docstrings into compliant OpenAPI and JSON Schema declarations for Google Gemini, OpenAI, and Anthropic models without requiring manual schema definitions.
+The framework introspects each tool's signature and generates the schema each provider needs (Gemini declarations, and JSON Schema for OpenAI and Anthropic): parameter types come from the Python type annotations, and optional parameters from their default values. The tool description is the `description=` argument, or the function docstring when none is given. Docstring sections such as `Args:` are not parsed into per-parameter descriptions. No manual schema definitions are required.
 
 ---
 
@@ -110,7 +110,7 @@ async def async_fetch_status(service_name: str) -> dict:
   * If called on an `async def` tool outside an event loop, runs it using `asyncio.run()`.
 
 <Callout type="warn" title="Event Loop Guard">
-Calling <code>tool.execute()</code> synchronously on an <code>async def</code> tool from within an already running event loop (e.g., inside FastAPI, Telegram handlers, or Runner turns) is not permitted by Python and will raise a <code>RuntimeError</code>. Always use <code>await tool.execute_async()</code> in asynchronous code.
+Calling <code>tool.execute()</code> synchronously on an <code>async def</code> tool from within an already running event loop (e.g., inside FastAPI, Telegram handlers, or Runner turns) is not supported. The call raises <code>ToolExecutionError</code>, whose <code>original_error</code> is a <code>RuntimeError</code>; an <code>except RuntimeError</code> block does not catch it. Always use <code>await tool.execute_async()</code> in asynchronous code.
 </Callout>
 
 ---
@@ -143,7 +143,7 @@ def sum_metrics(values: list[float]) -> float:
   * `int | float` broadens deterministically to `"NUMBER"` regardless of declaration order.
   * Multi-type unions generate an `anyOf` schema list.
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **`to_openai_parameters()`:** Generates JSON Schema formatted parameters (lowercased type names, `type: "null"`, and no `nullable` keyword) for OpenAI and Anthropic engines.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`ToolSchemaError`:** Validates signatures at definition time, raising a descriptive `ToolSchemaError` if an unsupported type cannot be mapped into a valid schema.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`ToolSchemaError`:** Raised when the tool is created if a union annotation contains a member with no schema mapping (for example `int | datetime`). Other unknown annotations, and unannotated parameters, still fall back to `"STRING"`.
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Varargs Exclusion:** `*args` and `**kwargs` are automatically omitted from parameter schemas.
 
 ---
@@ -158,9 +158,9 @@ In production, tools may encounter network timeouts, invalid database queries, o
 2. The `Runner` catches the failure and injects a `ToolResult` into conversation history marked with `is_error=True`:
    ```python
    # Injected into message history for the LLM:
-   # ToolResult(tool_call_id="call_123", name="query_db", content="Database connection timeout", is_error=True)
+   # ToolResult(tool_call_id="call_123", name="query_db", content="Tool execution failed [trace_id: ...]. Please try a different approach or inform the user.", is_error=True)
    ```
-3. Instead of crashing the entire user conversation, the active agent sees the error result and can explain the issue to the user, retry with alternative parameters, or hand off to a human support queue.
+3. The original exception is written to the `chatflow_agent.runner` log with the same `trace_id`; it is not exposed to the model. Instead of crashing the conversation, the active agent receives only the generic error and may try another approach, inform the user, or hand off to a human support queue. If the model needs a specific explanation, have the tool **return** a short, user-safe message instead of raising.
 
 ---
 

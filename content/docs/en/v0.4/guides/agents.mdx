@@ -41,7 +41,7 @@ agent = Agent(
 | `provider` | `str \| None` | `None` | Explicit provider name (e.g., `"openai"`, `"anthropic"`, `"gemini"`, `"groq"`). |
 | `base_url` | `str \| None` | `None` | Custom REST API endpoint for OpenAI-compatible gateways. |
 | `api_key` | `str \| None` | `None` | Specific API key overriding environment variables for this agent. |
-| `engine` | `BaseEngine \| None` | `None` | Pre-configured engine instance to override automatic engine resolution. |
+| `engine` | `Any \| None` | `None` | Pre-configured engine instance (expected to be a `BaseEngine`) that overrides automatic engine resolution. |
 
 <Callout type="info" title="Model Belongs to Agent, Not Engine">
 In <code>chatflow-agent</code>, the <code>model</code> string is configured directly on the <code>Agent</code>, never inside the <code>Engine</code> constructor. This decouples the network connection layer from specific model choices, allowing different agents to share a single engine instance while querying distinct model sizes.
@@ -166,7 +166,7 @@ assert any(t.name == "query_active_users" for t in agent.tools)
 `chatflow-agent` provides consistent agent mechanics while introducing robust validation and character normalization in newer releases:
 
 ### Stable Release (`v0.3.4`)
-* <VersionBadge version="0.3.4" status="stable" /> Base validation on agent construction.
+* <VersionBadge version="0.3.4" status="stable" /> The constructor does not validate `name`; only a handoff to the agent itself is rejected.
 * Synthetic handoff tools are formatted as `transfer_to_<sanitized_name>`.
 
 ### Prerelease Enhancements (`v0.4.0rc1`)
@@ -207,8 +207,14 @@ agent = Agent(name="Writer", instructions="...", model="gpt-4o", engine=engine)
 agent.current_user = "user_123"  # Will leak across concurrent sessions!
 
 # [CORRECT]: Store conversation state in session metadata
-# Pass metadata to runner.run_async(session_id="s1", metadata={"user_id": "user_123"})
+# await runner.run_async(
+#     session_id="s1",
+#     user_message="Hello",
+#     metadata={"user_id": "user_123"},
+# )
 ```
+
+In v0.4.0rc1, `metadata` passed to `run()` / `run_async()` is merged into the session's metadata on every turn and persisted with it.
 
 ### 3. Self-Handoff Registration
 An agent cannot register a handoff to itself. Doing so raises an immediate error:

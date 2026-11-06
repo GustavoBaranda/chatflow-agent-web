@@ -32,7 +32,7 @@ Every model interaction in the framework executes through a concrete implementat
 +----------+----------+  +--------+---------+  +-------+------------+
 |    GeminiEngine     |  | AnthropicEngine  |  |   OpenAIEngine     |
 | Direct REST v1beta  |  | Messages API v1  |  | OpenAI, Groq,      |
-| Connection Pooling  |  | Retry & Backoff  |  | DeepSeek, Ollama   |
+| Pooled in Runner    |  | Retry & Backoff  |  | DeepSeek, Ollama   |
 +---------------------+  +------------------+  +--------------------+
 ```
 
@@ -94,7 +94,7 @@ flowchart TD
     C1 -- Yes --> R1["Return agent.engine"]
     C1 -- No --> C2{"2. agent.provider set?"}
     C2 -- Yes --> R2["Instantiate Provider Engine"]
-    C2 -- No --> C3{"3. agent.base_url or api_key set?"}
+    C2 -- No --> C3{"3. agent.base_url set?"}
     C3 -- Yes --> R3["Resolve via OpenAIEngine"]
     C3 -- No --> C4{"4. prefer_default_engine and default_engine?"}
     C4 -- Yes --> R4["Return default_engine"]
@@ -113,10 +113,10 @@ flowchart TD
 
 1. **Explicit Engine:** `agent.engine` takes precedence if directly assigned on the agent instance.
 2. **Explicit Provider:** `agent.provider` matches recognized strings (`"gemini"`, `"google"`, `"anthropic"`, `"claude"`, `"openai"`, `"grok"`, `"xai"`, `"ollama"`, `"gemma"`, `"deepseek"`, `"groq"`).
-3. **Custom Connection:** `agent.base_url` or `agent.api_key` without provider. Official endpoints automatically map to their respective provider configuration; otherwise, defaults to `"openai"`.
-4. **Caller Override:** `default_engine` supplied with `prefer_default_engine=True` (used when callers deliberately enforce a test mock or specific runner default).
+3. **Custom Base URL:** `agent.base_url` without a provider. Official endpoints map to their provider; other URLs use `OpenAIEngine(provider="openai")` and require an explicit key unless local. Setting only `agent.api_key` does not select an engine.
+4. **Caller Override:** `default_engine` supplied with `prefer_default_engine=True`. `Runner` does this when you pass `Runner(engine=...)` explicitly, so an explicit engine wins over model-name prefixes.
 5. **Model Name Prefix Heuristics:** Matches recognizable prefixes (`claude-`, `gpt-`, `o1`, `o3`, `grok`, `deepseek-`, `gemma`, `llama`, `mistral`, `qwen`, `phi`). This prevents a Claude model from accidentally falling back to a Gemini default.
-6. **Default Runner Engine:** The engine built by `Runner` (e.g., from `Runner(starting_agent=..., api_key=...)`).
+6. **Default Runner Engine:** The implicit `GeminiEngine` built by `Runner` when no engine was passed (e.g., from `Runner(starting_agent=..., api_key=...)`), used for Gemini and unrecognized models.
 7. **Ultimate Fallback:** Standard `GeminiEngine(api_key=...)`.
 
 ## Security Rules and Credential Isolation
@@ -154,12 +154,13 @@ Understanding architectural differences between releases helps choose the right 
 | Architectural Area | Baseline `v0.3.4` (Stable) | Prerelease `v0.4.0rc1` |
 | :--- | :--- | :--- |
 | **Gemini Engine Runtime** | Powered by the Google `google-genai` SDK (`from google import genai`). | **Zero-SDK Lock-in**: Re-engineered with native asynchronous `httpx` directly against `https://generativelanguage.googleapis.com/v1beta`. |
-| **Connection Pooling** | Separate connection handles per request. | **Runner Lifespan Client Pool**: `_ClientPool` manages shared keepalive connections across turns via `async with runner:`. |
-| **Provider Presets** | OpenAI, Grok, Ollama. | Expanded presets: `deepseek`, `groq`, `xai`, `gemma`, with strict base URL verification. |
-| **Credential Guard** | Basic environment key fallback. | `_resolve_api_key` fail-closed verification preventing cloud key leakage to custom endpoints. |
+| **Connection Pooling** | Separate connection handles per request. | **Runner Lifespan Client Pool** for `GeminiEngine`: inside `async with runner:`, Gemini requests share one pooled `httpx` client. OpenAI-compatible and Anthropic engines still use a client per request attempt. |
+| **Provider Presets** | OpenAI, Grok/xAI, Ollama/Gemma, DeepSeek, and Groq. | Same presets; the `deepseek-` model prefix is now recognized. |
+| **Credential Guard** | `_resolve_api_key` restricts environment keys to exact official endpoints and requires explicit credentials for custom remote URLs. | Same guard; `GeminiEngine` additionally never follows redirects and redacts its key from errors. |
+| **Engine Resolution** | A `Runner`'s default engine wins before model-name prefixes, so non-Gemini models need `provider=` or `engine=`. | Model-name prefixes win over the implicit default engine; an explicit `Runner(engine=...)` still wins over prefixes. |
 
 <Callout type="info" title="Runner Connection Pooling in v0.4.0rc1">
-In `v0.4.0rc1`, wrap runner executions inside `async with runner:` to enable HTTP connection keepalive pooling across turns:
+In `v0.4.0rc1`, wrap runner executions inside `async with runner:` so that Gemini requests reuse one pooled HTTP client across turns. `Runner.run()`, `TelegramChannel.run()`, and the `WhatsAppChannel` app open this scope automatically:
 
 ```python
 # [min-version: 0.4.0rc1]

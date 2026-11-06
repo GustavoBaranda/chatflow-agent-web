@@ -11,7 +11,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 While `chatflow-agent` provides pre-built channels for Telegram and WhatsApp, modern systems frequently require connecting multi-agent swarms to internal microservices, Slack Events APIs, Discord bots, or CRM webhooks (Zendesk, Intercom). 
 
-Through the `BaseChannel` interface and the optional `webhook` extra (`fastapi>=0.110.0`, `uvicorn>=0.29.0`), you can implement production-grade webhook listeners in just a few lines of code.
+`chatflow-agent` does not ship a generic webhook channel. The optional `webhook` extra only installs `fastapi>=0.110.0` and `uvicorn>=0.29.0`; you write the endpoint yourself, either as a `BaseChannel` subclass (as below) or by calling `runner.run_async()` from an existing route. The SDK repository includes a complete reference application in [`examples/webhook_api_service.py`](https://github.com/GustavoBaranda/chatflow-agent/blob/v0.3.4/examples/webhook_api_service.py).
 
 ## The BaseChannel Architecture
 
@@ -22,7 +22,7 @@ All communication channels inherit from `BaseChannel`. It establishes a standard
            |
            v
 +-------------------------------------------------------------------+
-|                       Custom WebhookChannel                       |
+|            Your custom channel (BaseChannel subclass)             |
 |   1. Authenticate Request (API Key or HMAC Signature)             |
 |   2. Extract session_id, message, and metadata                    |
 |   3. Forward via dispatch_async(session_id, message, metadata)    |
@@ -31,12 +31,12 @@ All communication channels inherit from `BaseChannel`. It establishes a standard
                                   v
 +---------------------------------+---------------------------------+
 |                       chatflow-agent Runner                       |
-|   - Session Lock & Memory Retrieval                               |
+|   - Session Retrieval (lock serializes in-memory sessions only)   |
 |   - Multi-Agent Orchestration & Tool Calling                      |
 |   - State Persistence                                             |
 +---------------------------------+---------------------------------+
                                   |
-                        AgentResponse (text, data)
+               AgentResponse (content, active_agent_name)
                                   |
                                   v
 [ Immediate HTTP Response or Async Webhook Callback ]
@@ -56,9 +56,10 @@ class MyChannel(BaseChannel):
 ```
 
 * `attach(runner: Runner) -> BaseChannel`: Binds a multi-agent Runner instance to the channel.
-* `dispatch_async(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Forwards the message to the attached runner asynchronously, ensuring session concurrency locking.
+* `dispatch_async(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Forwards the message to the attached runner asynchronously (`runner.run_async`). Same-session turns are serialized only with the in-memory `SessionStore` in v0.3.4.
 * `dispatch(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Synchronous counterpart for synchronous runtimes.
-* `split_message(text: str, max_len: int = 4096) -> list[str]`: Utility for chunking long outbound responses across messaging limits.
+
+`split_message(text: str, max_len: int = 4096) -> list[str]` is not a `BaseChannel` method but a module-level helper for chunking long outbound responses: `from chatflow_agent.channels import split_message`.
 
 ## Implementing a Secure FastAPI Webhook Baseline
 
@@ -134,6 +135,7 @@ class GenericWebhookChannel(BaseChannel):
 Connect the channel to your agent and runner:
 
 ```python
+import os
 from chatflow_agent import Agent, Runner
 from chatflow_agent.core.memory import SQLiteSessionStore
 
@@ -148,7 +150,8 @@ store = SQLiteSessionStore("webhook_sessions.db")
 runner = Runner(starting_agent=assistant, session_store=store)
 
 # 3. Instantiate channel and attach runner
-channel = GenericWebhookChannel(secret="super-secret-key")
+# Read the signing secret from the environment; never hardcode it
+channel = GenericWebhookChannel(secret=os.environ["WEBHOOK_SIGNING_SECRET"])
 channel.attach(runner)
 
 if __name__ == "__main__":

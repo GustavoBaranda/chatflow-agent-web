@@ -111,7 +111,7 @@ reasoning_agent = Agent(
 import os
 from chatflow_agent import Agent
 
-# Implicitly maps to xAI preset via 'grok' model prefix
+# provider="grok" selects the xAI preset (api.x.ai); a "grok" model prefix alone also works in v0.4.0rc1
 # Requires XAI_API_KEY environment variable
 grok_agent = Agent(
     name="GrokAgent",
@@ -176,7 +176,7 @@ open_engine = OpenAIEngine(
 
 OpenAI enforces a strict maximum length of 40 characters on `tool_call_id` in function calling responses. In multi-agent environments where agents hand off sessions across different providers (for example, Anthropic Claude tools generating IDs longer than 40 characters), `chatflow-agent` guarantees protocol compliance:
 
-1. **Truncation and Hashing:** If an existing historical message contains a tool call ID exceeding 40 characters, `OpenAIEngine` safely replaces it using a deterministic SHA-256 derived identifier (`call_` + 24 hex characters).
+1. **Deterministic Replacement:** With `provider="openai"`, if a historical message contains a tool call ID that is empty or longer than 40 characters, `OpenAIEngine` sends a deterministic SHA-256 derived identifier instead (`call_` + 24 hex characters), the same in the call and in its result. Other providers (Groq, DeepSeek, Ollama, and so on) receive the original ID. The stored session history keeps the original ID.
 2. **Schema Type Normalization:** The engine automatically normalizes JSON schema parameter types (`_lowercase_schema_types`) while preserving custom property schemas, ensuring tool compatibility across different OpenAI model versions.
 
 ## Troubleshooting

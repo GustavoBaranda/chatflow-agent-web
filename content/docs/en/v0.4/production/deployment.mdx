@@ -95,10 +95,10 @@ async def health_check():
 
 ## SQLite Concurrency Considerations
 
-`SQLiteSessionStore` provides zero-infrastructure persistence with zero external service dependencies. When using SQLite in production, configure the following settings:
+`SQLiteSessionStore` provides zero-infrastructure persistence with zero external service dependencies. Keep these points in mind when using it in production:
 
-1. **WAL Mode (Write-Ahead Logging):** SQLite's default journal mode locks the entire file during writes. WAL mode allows concurrent readers while a write is occurring.
-2. **Worker Thread Offloading:** In `v0.4.0rc1`, `chatflow-agent` offloads SQLite database operations to worker threads via `_run_blocking()`, ensuring that disk I/O does not block the asyncio event loop.
+1. **WAL Mode (Write-Ahead Logging):** File-backed stores enable `PRAGMA journal_mode=WAL` and `busy_timeout=10000` on every connection automatically; there is nothing to configure. `":memory:"` stores use a shared cache and a busy timeout, without WAL.
+2. **Worker Thread Offloading:** In `v0.4.0rc1`, file-backed stores run their SQLite operations in a small pool of worker threads owned by the store (4 threads, created on first use, shut down by `close()`), so disk I/O does not block the asyncio event loop. An SQLite call that has started cannot be interrupted, so requests that need the database still wait while another writer holds it.
 3. **Process Isolation:** SQLite does not support safe high-concurrency writes across multiple independent OS processes (e.g. `gunicorn -w 8`). Run with a single worker process with high async concurrency (`uvicorn --workers 1`), or shard sessions by user identifier.
 
 ## Containerization with Docker
@@ -172,7 +172,7 @@ server {
 | :--- | :--- | :--- |
 | **Networking** | Proxy Read Timeout | `timeout >= 120s` |
 | **Resilience** | Turn Timeout | Set `turn_timeout=45.0` to prevent hung turns |
-| **Persistence** | SQLite Journal Mode | `PRAGMA journal_mode=WAL;` |
+| **Persistence** | SQLite Workers | Run a single process per SQLite file; WAL is enabled automatically by the store |
 | **Security** | Secrets Management | Injected via environment variables; never in code |
 | **Monitoring** | Health Checks | `/healthz` endpoint returning HTTP 200 |
 | **Process Model** | Concurrency | 1 worker process per container with asyncio concurrency |

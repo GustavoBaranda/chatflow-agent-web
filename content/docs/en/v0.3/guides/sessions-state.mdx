@@ -21,7 +21,7 @@ Every conversation session is encapsulated by a `SessionContext` object:
 from chatflow_agent import Agent
 from chatflow_agent.core.memory import SessionContext
 
-agent = Agent(name="Assistant", instructions="Helpful bot", model="gpt-4o")
+agent = Agent(name="Assistant", instructions="Helpful bot", model="gpt-4o", provider="openai")
 
 session = SessionContext(
     session_id="user-session-1001",
@@ -43,8 +43,8 @@ assert session.metadata["channel"] == "whatsapp"
 | `max_turns` | Maximum number of complete conversation turns retained in memory before pruning. |
 | `history` | List of typed `Message` objects (`Role.SYSTEM`, `Role.USER`, `Role.MODEL`, `Role.TOOL`). |
 | `metadata` | Arbitrary dictionary for user context, auth tokens, channel headers, and feature flags. |
-| `lock` | Asynchronous `asyncio.Lock` that serializes incoming message processing per session. |
-| `rollback_to(len)` | Atomically truncates history back to a previous checkpoint on failure. |
+| `lock` | Asynchronous `asyncio.Lock` held by `Runner` during a turn. It serializes turns of a session with the in-memory `SessionStore`; in v0.3.4, `SQLiteSessionStore` creates a new context (and lock) on every call, so it does not serialize them. |
+| `rollback_to(len)` | Truncates history back to a previous checkpoint length on failure (history only). |
 
 ---
 
@@ -76,7 +76,7 @@ A fast in-memory dictionary backend. It serializes turns for one session inside 
 from chatflow_agent import Agent, Runner, SessionStore
 
 store = SessionStore(default_max_turns=40)
-agent = Agent(name="Bot", instructions="Assistant", model="gpt-4o")
+agent = Agent(name="Bot", instructions="Assistant", model="gpt-4o", provider="openai")
 runner = Runner(starting_agent=agent, session_store=store)
 
 # Sessions are created on demand
@@ -105,7 +105,7 @@ sqlite_store = SQLiteSessionStore(
 When initialized, `SQLiteSessionStore` automatically creates and indexes three tables:
 
 * `chatflow_sessions`: Stores `session_id`, `active_agent_name`, `metadata_json`, and timestamps.
-* `chatflow_messages`: Stores individual dialogue messages serialized as JSON with foreign key cascading deletion (`ON DELETE CASCADE`).
+* `chatflow_messages`: Stores individual dialogue messages serialized as JSON. The schema declares `ON DELETE CASCADE`, but SQLite only enforces it with `PRAGMA foreign_keys=ON`, which the store does not enable; `delete()` and `clear_history()` remove message rows explicitly instead.
 * `chatflow_processed_messages`: Tracks processed message IDs and timestamps to enforce idempotent webhook deduplication.
 
 ---
@@ -119,8 +119,8 @@ To re-bind the persistent session to the actual `Agent` Python instance (with it
 ```python
 from chatflow_agent import Agent, Runner, SQLiteSessionStore
 
-billing = Agent(name="Billing", instructions="Billing specialist", model="gpt-4o")
-support = Agent(name="Support", instructions="Support", handoffs=[billing], model="gpt-4o")
+billing = Agent(name="Billing", instructions="Billing specialist", model="gpt-4o", provider="openai")
+support = Agent(name="Support", instructions="Support", handoffs=[billing], model="gpt-4o", provider="openai")
 
 store = SQLiteSessionStore(db_path="agents.db")
 
@@ -129,7 +129,11 @@ runner = Runner(starting_agent=support, session_store=store)
 
 # If loading sessions independently outside Runner:
 store.set_agent_resolver(lambda name: billing if name == "Billing" else support)
+
+# get() returns None when the session does not exist yet
 session = store.get("session-101")
+if session is None:
+    session = store.get_or_create("session-101", default_agent=support)
 assert session.active_agent.name in ["Billing", "Support"]
 ```
 

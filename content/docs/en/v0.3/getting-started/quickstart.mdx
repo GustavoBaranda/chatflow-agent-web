@@ -19,12 +19,14 @@ Create a new file named `quickstart.py`:
 import os
 from chatflow_agent import Agent, Runner
 
-# 1. Define the agent persona, instructions, and target model
-# chatflow-agent automatically routes "gpt-4o" to the OpenAI engine using OPENAI_API_KEY
+# 1. Define the agent persona, instructions, target model, and provider.
+# In v0.3.4, set provider="openai" explicitly: without it, Runner sends the
+# agent to its default GeminiEngine. OPENAI_API_KEY is read from the environment.
 agent = Agent(
     name="Assistant",
     instructions="You are a concise and helpful AI technical assistant.",
     model="gpt-4o",
+    provider="openai",
 )
 
 # 2. Initialize the Runner with your starting agent
@@ -48,7 +50,7 @@ python quickstart.py
 ```
 
 <Callout type="info" title="Event Loop Guard">
-<code>runner.run()</code> is a synchronous convenience method designed for scripts and CLI utilities. If you are inside an existing asynchronous event loop (e.g. FastAPI, Jupyter Notebook, or asyncio), use <code>await runner.run_async()</code> instead. Calling <code>runner.run()</code> inside an active loop raises a clear <code>RuntimeError</code>.
+<code>runner.run()</code> is a synchronous convenience method designed for scripts and CLI utilities. If you are inside an existing asynchronous event loop (e.g. FastAPI, Jupyter Notebook, or asyncio), use <code>await runner.run_async()</code> instead. In v0.3.4, calling <code>runner.run()</code> inside an active loop fails with asyncio's generic <code>RuntimeError</code> ("asyncio.run() cannot be called from a running event loop"); the explicit message pointing to <code>run_async()</code> was added in <VersionBadge version="0.4.0rc1" status="prerelease" />.
 </Callout>
 
 ---
@@ -63,15 +65,11 @@ Agents become exponentially more powerful when given access to deterministic fun
 import os
 from chatflow_agent import Agent, Runner, tool
 
-# 1. Define a tool with typed parameters and docstrings
+# 1. Define a tool. Parameter schemas come from the type annotations and
+# defaults; description= is the tool description (it overrides the docstring).
 @tool(name="calculate_discount", description="Calculate discounted price from original amount and percentage.")
 def calculate_discount(price: float, discount_percent: float) -> str:
-    """Calculate the final price after applying a percentage discount.
-
-    Args:
-        price: The original price in dollars.
-        discount_percent: The percentage discount to apply (e.g. 15 for 15%).
-    """
+    """Calculate the final price after applying a percentage discount."""
     savings = price * (discount_percent / 100.0)
     final_price = price - savings
     return f"Original: ${price:.2f}, Savings: ${savings:.2f}, Final Price: ${final_price:.2f}"
@@ -81,6 +79,7 @@ agent = Agent(
     name="SalesBot",
     instructions="You help customers with purchase calculations. Always use calculate_discount for math.",
     model="gpt-4o",
+    provider="openai",
     tools=[calculate_discount],
 )
 
@@ -120,6 +119,7 @@ async def main() -> None:
         name="AsyncBot",
         instructions="Provide concise answers.",
         model="gpt-4o",
+        provider="openai",
     )
 
     runner = Runner(starting_agent=agent)
@@ -140,23 +140,29 @@ if __name__ == "__main__":
 
 ## 4. Multi-Provider Flexibility
 
-Because `chatflow-agent` uses direct REST engines, switching between providers is instantaneous without changing your agent logic:
+Every engine implements the same `BaseEngine` interface, so switching providers does not change your agent logic:
 
 ```python
+# [min-version: 0.3.0]
+# [executable]
 import os
 from chatflow_agent import Agent, OpenAIEngine
 
-# Option 1: Direct model configuration (engines are resolved automatically)
+# Option 1: Name the provider on the agent. In v0.3.4 this is required for
+# non-Gemini models run through a Runner: its default GeminiEngine is used
+# before model-name prefixes are considered.
 openai_agent = Agent(
     name="OpenAIBot",
     instructions="You are powered by GPT-4o.",
     model="gpt-4o",
+    provider="openai",
 )
 
 claude_agent = Agent(
     name="ClaudeBot",
     instructions="You are powered by Claude 3.5 Sonnet.",
     model="claude-3-5-sonnet-20241022",
+    provider="anthropic",
 )
 
 gemini_agent = Agent(

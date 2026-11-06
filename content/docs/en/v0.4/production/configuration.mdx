@@ -27,12 +27,13 @@ Priority 2: Provider-Specific Environment Variables
           │ (Loaded from os.environ)
           ▼
 Priority 3: Framework Presets & Defaults
-    └── Base URLs (https://api.openai.com/v1), default models, timeout (60.0s)
+    └── Base URLs (https://api.openai.com/v1), default models, request timeout
+        (60.0s for OpenAIEngine and AnthropicEngine, 30.0s for GeminiEngine)
 ```
 
 ## Environment Variables Reference
 
-The following environment variables are recognized across SDK components:
+The SDK itself reads only the provider variables below. The channel variables in the second table are a naming convention for your application code (pass the values to the channel constructors yourself); the SDK does not read them.
 
 ### LLM Provider Credentials
 
@@ -42,11 +43,12 @@ The following environment variables are recognized across SDK components:
 | `GROQ_API_KEY` | Groq Cloud | Bearer token for Groq LPUs (`provider="groq"`). | `None` (Required for Groq) |
 | `DEEPSEEK_API_KEY` | DeepSeek | Bearer token for DeepSeek API (`provider="deepseek"`). | `None` (Required for DeepSeek) |
 | `XAI_API_KEY` | xAI Grok | Bearer token for xAI Grok endpoints (`provider="grok"`). | `None` (Required for Grok) |
-| `GEMINI_API_KEY` | Google Gemini | API key for Gemini REST v1beta endpoints. | `GOOGLE_API_KEY` |
+| `GEMINI_API_KEY` | Google Gemini | API key for the Gemini Developer API (Google AI Studio) REST endpoints. Vertex AI and Application Default Credentials are not supported in v0.4.0rc1. | `GOOGLE_API_KEY` |
 | `GOOGLE_API_KEY` | Google Gemini | Alternate fallback key for Google Cloud environments. | `None` |
 | `GOOGLE_GEMINI_BASE_URL` | Google Gemini | Custom base URL override for Gemini proxies. | `https://generativelanguage.googleapis.com` |
 | `ANTHROPIC_API_KEY` | Anthropic | API key for Claude Messages API (`x-api-key`). | `None` (Required for Anthropic) |
 | `OLLAMA_API_KEY` | Ollama | Optional token for authenticated Ollama gateways. | `"ollama"` (Safe dummy key) |
+| `{PROVIDER}_BASE_URL` | OpenAI-compatible presets | Base URL override read by `OpenAIEngine` for its provider, e.g. `OPENAI_BASE_URL`, `GROQ_BASE_URL`, `OLLAMA_BASE_URL`. A non-official remote URL then requires an explicit `api_key`. | Preset's official URL |
 
 ### Integration Channel Credentials
 
@@ -56,7 +58,7 @@ The following environment variables are recognized across SDK components:
 | `WHATSAPP_VERIFY_TOKEN` | WhatsApp | Verification token for Meta webhook subscription challenge. |
 | `WHATSAPP_ACCESS_TOKEN` | WhatsApp | System User access token with `whatsapp_business_messaging`. |
 | `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp | Phone number identifier from Meta Developer Console. |
-| `META_APP_SECRET` | WhatsApp | App secret used for HMAC SHA-256 payload verification. |
+| `WHATSAPP_APP_SECRET` | WhatsApp | Meta app secret used for HMAC SHA-256 payload verification (the name the SDK's error message suggests). |
 
 ## Production Settings Example
 

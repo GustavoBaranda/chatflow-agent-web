@@ -32,14 +32,11 @@ import os
 from chatflow_agent import Agent, Runner
 from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
 
-# Option 1: Implicit engine resolution via model name prefix
-analyst = Agent(
-    name="Analyst",
-    model="gpt-4o",
-    instructions="Analyze structured operational data.",
-)
+# Model-name prefixes alone are not enough in v0.3.4: an agent run through a
+# Runner without provider= or engine= is sent to the Runner's default
+# GeminiEngine. Use one of the two options below.
 
-# Option 2: Explicit provider assignment
+# Option 1: Explicit provider assignment
 writer = Agent(
     name="Writer",
     provider="openai",
@@ -47,7 +44,7 @@ writer = Agent(
     instructions="Draft concise summaries.",
 )
 
-# Option 3: Explicit engine instantiation with custom parameters
+# Option 2: Explicit engine instantiation with custom parameters
 custom_engine = OpenAIEngine(
     api_key=os.environ.get("OPENAI_API_KEY"),
     provider="openai",
@@ -63,7 +60,7 @@ senior_agent = Agent(
 
 ## Third-Party Providers: Groq, DeepSeek, and xAI Grok
 
-Connecting to ultra-fast inference providers or specialized reasoning models requires only specifying the `provider` attribute or standard model prefix:
+Connecting to ultra-fast inference providers or specialized reasoning models requires only specifying the `provider` attribute (in v0.3.4 a model prefix alone does not select the provider when the agent runs through a `Runner`):
 
 <Tabs items={["Groq Cloud", "DeepSeek API", "xAI Grok"]}>
   <Tab value="Groq Cloud">
@@ -111,7 +108,7 @@ reasoning_agent = Agent(
 import os
 from chatflow_agent import Agent
 
-# Implicitly maps to xAI preset via 'grok' model prefix
+# provider="grok" selects the xAI preset (api.x.ai)
 # Requires XAI_API_KEY environment variable
 grok_agent = Agent(
     name="GrokAgent",

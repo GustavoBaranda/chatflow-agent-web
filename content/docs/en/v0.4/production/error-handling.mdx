@@ -1,6 +1,6 @@
 ---
 title: Error Handling & Recovery
-description: Production error handling strategies in chatflow-agent, SDK exception hierarchy, automatic tool self-correction, and transactional turn rollbacks.
+description: Production error handling strategies in chatflow-agent v0.4.0rc1, the SDK exception hierarchy, tool error isolation, and transactional turn rollbacks.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -11,7 +11,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 Building robust multi-agent systems requires structured fault tolerance. LLM provider outages, network timeouts, invalid tool arguments, and unexpected exceptions must be handled gracefully without corrupting conversation state.
 
-`chatflow-agent` implements a layered recovery model: non-fatal tool errors are fed back to the LLM for autonomous self-correction, while fatal turn failures trigger atomic state rollbacks.
+`chatflow-agent` implements a layered recovery model: tool errors are reported to the LLM as a generic error result so the turn can continue, while a turn that fails, is cancelled, or times out has its history, active agent, and metadata restored to their pre-turn state.
 
 ## SDK Exception Hierarchy
 
@@ -21,11 +21,11 @@ All exceptions in `chatflow-agent` inherit from `ChatFlowError`. This allows you
 ChatFlowError (Base)
 ├── DependencyError (Missing optional extra dependencies)
 ├── ToolExecutionError (Uncaught error during tool execution)
-├── ToolSchemaError (Invalid parameter type annotation) [v0.4.0rc1]
-├── AgentHandoffError (Unknown handoff target or transfer loop)
+├── ToolSchemaError (Union annotation with an unmappable member) [v0.4.0rc1]
+├── AgentHandoffError (Unknown or unauthorized handoff target)
 ├── ProviderError (LLM API status error, network failure, or timeout)
-├── ReentrantTurnError (Concurrent turn invocation on locked session) [v0.4.0rc1]
-└── SessionDeletedError (Message dispatched to a deleted session) [v0.4.0rc1]
+├── ReentrantTurnError (Nested same-session turn started from a running turn) [v0.4.0rc1]
+└── SessionDeletedError (Running turn stores a message after its session was deleted) [v0.4.0rc1]
 ```
 
 ### Exception Reference Table
@@ -34,16 +34,16 @@ ChatFlowError (Base)
 | :--- | :--- | :--- | :--- |
 | `ChatFlowError` | `Exception` | Base class for all SDK exceptions. | Catch at top-level request boundaries. |
 | `DependencyError` | `ChatFlowError` | An optional channel extra (e.g. `[telegram]`, `[whatsapp]`) is not installed. | Install the required extra via `pip install "chatflow-agent[extra]"`. |
-| `ToolExecutionError` | `ChatFlowError` | A tool function raises an uncaught exception during execution. | Wrapped into `ToolResult(is_error=True)` so the agent can self-correct. |
-| `ToolSchemaError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Tool function arguments lack valid Python type annotations. | Fix function type signatures at development time. |
-| `AgentHandoffError` | `ChatFlowError` | Target agent does not exist in the `Runner` registry, or turn exceeds `max_handoffs_per_turn`. | Verify handoff targets and check transfer loop conditions. |
+| `ToolExecutionError` | `ChatFlowError` | A tool function raises an uncaught exception during execution. | Inside a turn, `Runner` logs it and returns a generic `ToolResult(is_error=True)` to the model. |
+| `ToolSchemaError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | A tool is created with a union annotation that contains a member with no schema mapping. Unannotated parameters are allowed. | Fix function type signatures at development time. |
+| `AgentHandoffError` | `ChatFlowError` | The handoff target does not exist or is not declared in the current agent's `handoffs`. Exceeding `max_handoffs_per_turn` does not raise: it adds an error tool result instead. | Verify handoff targets. |
 | `ProviderError` | `ChatFlowError` | Upstream model provider returns an HTTP error code (e.g. 429, 500, 503). | Implement exponential backoff or failover to a fallback engine. |
-| `ReentrantTurnError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError`, `RuntimeError` | Code executing inside a turn starts another turn for the same session. | Use background job queues or follow-up turn dispatchers. |
-| `SessionDeletedError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | A message is processed for a session that was purged during execution. | Re-create session or notify the user to restart the workflow. |
+| `ReentrantTurnError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError`, `RuntimeError` | Code started by a running turn starts another turn for the same session. | Use `Runner.spawn_turn()` to queue a follow-up turn. |
+| `SessionDeletedError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | A running turn stores a message after its SQLite session was deleted. | Notify the user to restart the workflow; a later turn starts a new, empty session. |
 
 ## Autonomous Tool Self-Correction
 
-When a registered tool raises an exception or receives arguments that fail schema validation, `Runner` catches the failure and returns a structured error to the model instead of crashing the turn:
+When a registered tool raises an exception, including a `TypeError` from arguments the function does not accept, `Runner` catches the failure and returns a structured error to the model instead of crashing the turn. v0.4.0rc1 does not validate tool arguments against the schema before calling the function:
 
 ```python
 import logging
@@ -84,11 +84,11 @@ runner = Runner(starting_agent=agent)
    {
      "tool_call_id": "call_abc123",
      "name": "process_refund",
-     "content": "Tool execution failed [trace_id: a8c2...]. Invalid order format. Order ID must begin with 'ORD-'.",
+     "content": "Tool execution failed [trace_id: a8c2...]. Please try a different approach or inform the user.",
      "is_error": true
    }
    ```
-4. The model receives `is_error=True` on the next iteration and informs the user: *"The order ID '12345' is missing the 'ORD-' prefix. Could you please confirm the full order number?"*
+4. The original exception is logged to `chatflow_agent.runner` with the same `trace_id`. The model receives only the generic `is_error=True` result and cannot see the exception text, so it can only retry differently or tell the user that the operation failed. To let the model explain a specific problem, have the tool return a user-safe message instead of raising.
 
 <Callout type="info" title="Loop Limit Protection">
 To prevent infinite retry loops where an agent repeatedly fails a tool call, `Runner` enforces `max_tool_iterations` (default: `10`). If the limit is reached without a final text response, the runner returns a controlled fallback message without hanging.
@@ -165,15 +165,15 @@ response = await runner.run_async(
 ```
 
 If `turn_timeout` expires:
-1. All running child asynchronous tasks are cancelled immediately.
-2. Synchronous tool executions are awaited in worker threads to prevent SQLite deadlocks.
-3. The conversation history and metadata roll back to the pre-turn checkpoint.
+1. The turn is cancelled. If one of its SQLite writes is running, it is allowed to finish first, so the `TimeoutError` can arrive later than the deadline.
+2. A synchronous tool cannot be interrupted: its worker thread keeps running in the background, and later turns of the same session wait for it before acquiring the session lock.
+3. The conversation history, active agent, and metadata roll back to the pre-turn checkpoint.
 4. `asyncio.TimeoutError` is raised to the caller.
 
 ## Best Practices Checklist
 
 - **Catch `ChatFlowError`:** Intercept framework exceptions before letting them propagate to HTTP handlers.
 - **Set Bounded Iterations:** Never set `max_tool_iterations` or `max_handoffs_per_turn` to unbounded values.
-- **Return Meaningful Tool Errors:** Raise descriptive `ValueError` or `KeyError` messages inside tools so the agent can interpret the error and self-correct.
+- **Return Meaningful Tool Errors:** The model never sees the text of an exception raised by a tool, only a generic error with a `trace_id`. If the model should react to a specific problem (for example a malformed order ID), have the tool **return** a short, user-safe error message instead of raising.
 - **Log Correlation IDs:** Capture the `trace_id` generated in `Runner` logs to correlate customer error reports with internal trace logs.
 

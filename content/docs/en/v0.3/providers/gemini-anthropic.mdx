@@ -36,7 +36,7 @@ import os
 from chatflow_agent import Agent, Runner
 from chatflow_agent.core.engines.gemini import GeminiEngine
 
-# Recommended: Secure header authentication
+# v0.3.4: the key is passed to the google-genai client
 gemini_engine = GeminiEngine(
     api_key=os.environ.get("GEMINI_API_KEY"),
     timeout_seconds=30.0,
@@ -51,17 +51,19 @@ assistant = Agent(
 )
 ```
 
-### Connection Pooling & Zero-SDK Architecture
+### Gemini Engine Architecture by Release
 
 <div className="flex gap-2 my-3">
-  <VersionBadge version="0.4.0rc1" status="prerelease" />
   <VersionBadge version="0.3.4" status="stable" />
+  <VersionBadge version="0.4.0rc1" status="prerelease" />
 </div>
 
 The Gemini implementation underwent an architectural shift between releases:
 
-* **In `v0.3.4` (Stable):** The engine imported Google's official `google-genai` SDK (`from google import genai`), requiring external client library installation.
-* **In `v0.4.0rc1` (Prerelease):** The engine was completely rewritten using native asynchronous `httpx` against `https://generativelanguage.googleapis.com/v1beta`. This eliminates heavy dependencies and enables **connection pooling** across agent turns:
+* **In `v0.3.4` (Stable):** The engine uses Google's official `google-genai` SDK (`from google import genai`), which is installed automatically as a core dependency. There is no connection pooling.
+* **In `v0.4.0rc1` (Prerelease):** The engine was rewritten using native asynchronous `httpx` against `https://generativelanguage.googleapis.com/v1beta`. This removes the `google-genai` dependency and, inside an `async with runner:` scope, lets Gemini requests share one pooled HTTP client.
+
+In v0.3.4, run turns directly on a shared runner:
 
 ```python
 # [no-exec: requires real gemini api key]
@@ -131,12 +133,12 @@ editor = Agent(
 
 ### Automatic Retries and Jittered Backoff
 
-`AnthropicEngine` automatically handles rate limiting (`429 Too Many Requests`) and temporary gateway errors (`500`, `502`, `503`, `504`) using exponential backoff:
-* **Max Retries:** 3 attempts.
+`AnthropicEngine` automatically retries rate limiting (`429 Too Many Requests`), temporary server errors (`500`, `502`, `503`, `504`), Anthropic's overload status (`529`), and connection errors, using exponential backoff with jitter:
+* **Max Retries:** 3 retries after the first attempt (up to 4 requests).
 * **Base Delay:** 1.0 second.
 * **Max Delay:** 10.0 seconds.
 
-If a `429` response includes a `Retry-After` header, the engine honors the provider's requested delay before retrying.
+These values are fixed in v0.3.4; they are not constructor parameters. When a retried response includes a numeric `Retry-After` header, that value replaces the exponential delay, but the wait is still capped at 10 seconds, so a longer requested delay is not fully honored.
 
 ---
 

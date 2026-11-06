@@ -68,8 +68,8 @@ Specialists often need to transfer users back and forth. Use `agent.add_handoff(
 # [executable]
 from chatflow_agent import Agent
 
-support = Agent(name="Support", instructions="General support", model="gpt-4o")
-billing = Agent(name="Billing", instructions="Billing support", model="gpt-4o")
+support = Agent(name="Support", instructions="General support", model="gpt-4o", provider="openai")
+billing = Agent(name="Billing", instructions="Billing support", model="gpt-4o", provider="openai")
 
 # Establish bidirectional handoff
 support.add_handoff(billing)
@@ -138,15 +138,14 @@ When `runner.run_async()` processes a turn:
 Uncontrolled handoffs between agents could trigger infinite loops if prompts are ambiguous. `chatflow-agent` protects your execution with built-in safeguards:
 
 * **`max_handoffs_per_turn` (Default: 5):**
-  The maximum number of agent transfers permitted within a single user message turn. If this limit is exceeded, the runner halts further transfers and injects an error result:
-  `"Maximum agent transfers exceeded for a single turn."`
+  The maximum number of agent transfers counted within a single user message turn. In v0.3.4 the check runs after the transfer: the transfer that exceeds the limit is still applied (the active agent changes), then an error result is added, `"Maximum agent transfers exceeded for a single turn."`, and the remaining tool calls of that model message receive no result. <VersionBadge version="0.4.0rc1" status="prerelease" /> checks the limit before switching agents and adds a "Tool skipped" result for each remaining call.
 * **`max_tool_iterations` (Default: 10):**
-  The overall cap on tool executions per turn, ensuring guaranteed termination even if tools repeatedly chain calls.
+  The maximum number of model/tool rounds per turn. One round is a model generation plus every tool call it requested, so a round can run several tools. When the limit is reached, the turn ends with an "Execution iteration limit reached" fallback response.
 
 ```python
 from chatflow_agent import Agent, Runner
 
-triage = Agent(name="Triage", instructions="...", model="gpt-4o")
+triage = Agent(name="Triage", instructions="...", model="gpt-4o", provider="openai")
 
 # Configure stricter turn limits for high-throughput or low-cost endpoints
 runner = Runner(
@@ -165,13 +164,14 @@ Handoff generation and sanitization include major reliability enhancements in ne
 ### Stable Release (`v0.3.4`)
 * <VersionBadge version="0.3.4" status="stable" /> Basic regex sanitization: `clean = re.sub(r"[^a-zA-Z0-9_]", "_", name.strip().lower())`.
 * Shared session history maintains full conversational context across handoffs.
+* `Handoff.context_updates` exists as a field, but the v0.3.4 runner ignores it when a handoff happens.
 
 ### Prerelease Enhancements (`v0.4.0rc1`)
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **NFKD Unicode Transliteration:** Automatically normalizes accented characters into clean ASCII (e.g., `AtenciónAlCliente` becomes `transfer_to_atencionalcliente`).
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Deterministic Hash Fallbacks:** Agent names in non-Latin scripts (e.g., Japanese, Arabic, Cyrillic) or emojis fall back to a deterministic SHA-256 hash prefix (`transfer_to_u<hash>`) to guarantee valid identifier syntax.
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Disambiguation on Collisions:** If two agents produce conflicting sanitized names, numeric suffixes (`_2`, `_3`) are automatically appended to prevent schema overwrites.
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Length Capping:** Handoff tool identifiers are capped at 60 characters to satisfy provider constraints.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Context Updates Forwarding:** `session.set_active_agent(agent, context_updates)` supports forwarding metadata state alongside the handoff event.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Context Updates Forwarding:** `session.set_active_agent(agent, context_updates)` stores `Handoff.context_updates` in the session metadata when the handoff happens. The built-in `transfer_to_*` tools never fill `context_updates`; only a custom tool that returns its own `Handoff` can.
 
 ---
 

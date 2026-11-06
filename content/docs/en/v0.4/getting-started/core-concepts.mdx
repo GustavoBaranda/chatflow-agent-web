@@ -58,10 +58,12 @@ In <VersionBadge version="0.4.0rc1" status="prerelease" />, the <code>Runner</co
 The `Runner` orchestrates the conversation lifecycle. It handles:
 
 1. Loading session context and conversation history from the `SessionStore`.
-2. Taking an **atomic snapshot** of the session state prior to executing the turn.
+2. Checkpointing the session's history, active agent, and metadata before executing the turn.
 3. Invoking the model engine.
 4. Parsing tool calls, executing the corresponding functions, and feeding results back to the model until a final response is generated.
-5. Committing state changes, or rolling back automatically if an unhandled exception or timeout occurs.
+5. Keeping the changes on success, or restoring the checkpoint if the turn raises, is cancelled, or reaches its `turn_timeout`.
+
+Synchronous invocation, for scripts and CLI tools (no event loop running):
 
 ```python
 from chatflow_agent import Agent, Runner, SessionStore
@@ -79,17 +81,35 @@ runner = Runner(
     session_store=store,
 )
 
-# Synchronous invocation
 response = runner.run(
     session_id="user_123",
     user_message="Book a meeting tomorrow at 3 PM",
 )
+```
 
-# Asynchronous invocation
-response = await runner.run_async(
-    session_id="user_123",
-    user_message="Book a meeting tomorrow at 3 PM",
-)
+Asynchronous invocation, inside an event loop (web servers, bots, `asyncio` apps):
+
+```python
+# [min-version: 0.4.0rc1]
+# [no-exec: requires real openai api key for live response]
+import asyncio
+
+from chatflow_agent import Agent, Runner
+
+async def main() -> None:
+    agent = Agent(
+        name="Assistant",
+        instructions="Concise scheduling assistant.",
+        model="gpt-4o",
+    )
+    async with Runner(starting_agent=agent) as runner:
+        response = await runner.run_async(
+            session_id="user_123",
+            user_message="Book a meeting tomorrow at 3 PM",
+        )
+        print(response.content)
+
+asyncio.run(main())
 ```
 
 <Callout type="info" title="turn_timeout in v0.4.0rc1">
@@ -128,7 +148,7 @@ local_agent = Agent(
 
 ## 4. Deterministic Tools (`Tool` & `@tool`)
 
-Tools give agents deterministic execution power. When decorated with `@tool`, `chatflow-agent` automatically parses Python type annotations and docstrings to generate standard JSON Schema specifications for the LLM:
+Tools give agents deterministic execution power. When decorated with `@tool`, `chatflow-agent` builds the parameter schema from the Python type annotations and default values. The tool description is the `description=` argument, or the function docstring when no description is given; docstring sections such as `Args:` are not parsed into per-parameter descriptions:
 
 ```python
 # [min-version: 0.3.0]
@@ -137,11 +157,7 @@ from chatflow_agent import tool
 
 @tool(name="fetch_user_profile", description="Fetch user metadata from internal database.")
 def fetch_user_profile(user_id: str) -> dict[str, str]:
-    """Retrieve user details.
-
-    Args:
-        user_id: Unique user identifier string.
-    """
+    """Retrieve user details."""
     return {"user_id": user_id, "tier": "enterprise", "status": "active"}
 ```
 
@@ -156,7 +172,8 @@ Both synchronous (`def`) and asynchronous (`async def`) tool functions are nativ
 ```python
 from chatflow_agent import SQLiteSessionStore
 
-# Persistent SQLite session store with configurable turn limit
+# Persistent SQLite session store. default_max_turns is a sliding history
+# window: it keeps the last 40 complete turns of each session.
 store = SQLiteSessionStore(
     db_path="./chat_sessions.db",
     default_max_turns=40,
@@ -165,18 +182,19 @@ store = SQLiteSessionStore(
 
 ### The Transactional Rollback Guarantee
 
-Prior to processing a turn, `Runner` snapshots the active session. If a network outage occurs, a tool raises an unhandled exception, or `turn_timeout` triggers, the snapshot is restored immediately. This guarantees that corrupted or partial turns never poison the conversation history.
+Prior to processing a turn, `Runner` checkpoints the session's history, active agent, and metadata. If an exception escapes the turn (for example a provider outage), the turn is cancelled, or `turn_timeout` triggers, the checkpoint is restored before the error is raised. Corrupted or partial turns therefore never poison the conversation history.
 
 ### Event-Loop Protection & Concurrency Shields
 
-* **Thread-Pool Offloading:** SQLite disk I/O runs inside dedicated worker threads (`_run_blocking`), preventing file system locks from choking Python's asyncio event loop.
-* **Session Locking (`ReentrantTurnError`):** Each session ID has an internal lock. Simultaneous requests for the same session ID will raise `ReentrantTurnError` rather than allowing race conditions to corrupt state.
+* **Thread-Pool Offloading:** File-backed SQLite I/O runs inside the store's dedicated worker threads, preventing file system locks from blocking Python's asyncio event loop. `":memory:"` stores stay on the event loop.
+* **Session Locking:** Turns of the same session are serialized (per store and event loop, for both `SessionStore` and `SQLiteSessionStore`); simultaneous requests for one session wait for the lock.
+* **Reentrancy Guard (`ReentrantTurnError`):** Starting a turn for a session from code started by that session's running turn (a tool, or a task or thread it spawns) raises `ReentrantTurnError` instead of deadlocking. Use `Runner.spawn_turn()` to queue a follow-up turn.
 
 ---
 
 ## 6. Multi-Agent Handoffs (`Handoffs`)
 
-Multi-agent swarms delegate tasks dynamically using declarative handoffs. When an agent defines `handoffs=[agent_b]`, `chatflow-agent` automatically synthesizes a tool named `transfer_to_agent_b`:
+Multi-agent swarms delegate tasks dynamically using declarative handoffs. When an agent declares a peer in `handoffs=[...]`, `chatflow-agent` synthesizes a transfer tool named after the peer's `name`, transliterated to ASCII, lowercased, and sanitized: a peer named `BillingAgent` becomes `transfer_to_billingagent`:
 
 ```python
 from chatflow_agent import Agent, Runner
@@ -208,7 +226,7 @@ print(f"Responding agent: {response.active_agent_name}")
 print(f"Message content: {response.content}")
 ```
 
-The `Runner` automatically traces delegations, and the final responding agent is always visible via `response.active_agent_name`.
+The final responding agent is visible via `response.active_agent_name`. Transfers within one turn are capped by `Runner(max_handoffs_per_turn=5)`; there is no separate cycle detection.
 
 ---
 

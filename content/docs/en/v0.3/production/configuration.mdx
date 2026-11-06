@@ -27,12 +27,13 @@ Priority 2: Provider-Specific Environment Variables
           │ (Loaded from os.environ)
           ▼
 Priority 3: Framework Presets & Defaults
-    └── Base URLs (https://api.openai.com/v1), default models, timeout (60.0s)
+    └── Base URLs (https://api.openai.com/v1), default models, request timeout
+        (60.0s for OpenAIEngine and AnthropicEngine, 30.0s for GeminiEngine)
 ```
 
 ## Environment Variables Reference
 
-The following environment variables are recognized across SDK components:
+The SDK itself reads only the provider variables below. The channel variables in the second table are a naming convention for your application code (pass the values to the channel constructors yourself); the SDK does not read them.
 
 ### LLM Provider Credentials
 
@@ -47,6 +48,11 @@ The following environment variables are recognized across SDK components:
 | `GOOGLE_GEMINI_BASE_URL` | Google Gemini | Custom proxy base URL in **v0.4.0rc1 prerelease only**. | Not read by v0.3.4 |
 | `ANTHROPIC_API_KEY` | Anthropic | API key for Claude Messages API (`x-api-key`). | `None` (Required for Anthropic) |
 | `OLLAMA_API_KEY` | Ollama | Optional token for authenticated Ollama gateways. | `"ollama"` (Safe dummy key) |
+| `{PROVIDER}_BASE_URL` | OpenAI-compatible presets | Base URL override read by `OpenAIEngine` for its provider, e.g. `OPENAI_BASE_URL`, `GROQ_BASE_URL`, `OLLAMA_BASE_URL`. A non-official remote URL then requires an explicit `api_key`. | Preset's official URL |
+
+<Callout type="info" title="Gemini on Vertex AI in v0.3.4">
+In v0.3.4, <code>GeminiEngine</code> reads <code>GEMINI_API_KEY</code> and passes it to the <code>google-genai</code> client. Any other environment handling, including Vertex AI configuration (for example <code>GOOGLE_GENAI_USE_VERTEXAI</code>, <code>GOOGLE_CLOUD_PROJECT</code>, <code>GOOGLE_CLOUD_LOCATION</code>), is done by <code>google-genai</code> itself, not by chatflow-agent; check the <code>google-genai</code> documentation for your installed version. Vertex AI is not supported by the REST-based engine of <VersionBadge version="0.4.0rc1" status="prerelease" />.
+</Callout>
 
 ### Integration Channel Credentials
 
@@ -56,7 +62,7 @@ The following environment variables are recognized across SDK components:
 | `WHATSAPP_VERIFY_TOKEN` | WhatsApp | Verification token for Meta webhook subscription challenge. |
 | `WHATSAPP_ACCESS_TOKEN` | WhatsApp | System User access token with `whatsapp_business_messaging`. |
 | `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp | Phone number identifier from Meta Developer Console. |
-| `META_APP_SECRET` | WhatsApp | App secret used for HMAC SHA-256 payload verification. |
+| `WHATSAPP_APP_SECRET` | WhatsApp | Meta app secret used for HMAC SHA-256 payload verification (the name the SDK's error message suggests). |
 
 ## Production Settings Example
 

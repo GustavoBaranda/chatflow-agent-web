@@ -36,7 +36,7 @@ import os
 from chatflow_agent import Agent, Runner
 from chatflow_agent.core.engines.gemini import GeminiEngine
 
-# Recomendado: Autenticación segura mediante cabecera HTTP
+# v0.3.4: la clave se pasa al cliente google-genai
 gemini_engine = GeminiEngine(
     api_key=os.environ.get("GEMINI_API_KEY"),
     timeout_seconds=30.0,
@@ -51,17 +51,19 @@ assistant = Agent(
 )
 ```
 
-### Pool de Conexiones y Arquitectura sin Dependencias de SDK
+### Arquitectura del Motor Gemini por Versión
 
 <div className="flex gap-2 my-3">
-  <VersionBadge version="0.4.0rc1" status="prerelease" />
   <VersionBadge version="0.3.4" status="stable" />
+  <VersionBadge version="0.4.0rc1" status="prerelease" />
 </div>
 
 La implementación de Gemini experimentó una evolución arquitectónica entre versiones:
 
-* **En `v0.3.4` (Estable):** El motor importaba el SDK oficial `google-genai` de Google (`from google import genai`), requiriendo la instalación de la biblioteca cliente externa.
-* **En `v0.4.0rc1` (Pre-lanzamiento):** El motor fue rediseñado íntegramente utilizando `httpx` asíncrono nativo contra `https://generativelanguage.googleapis.com/v1beta`. Esto elimina dependencias pesadas y habilita un **pool de conexiones** reutilizables entre turnos de agentes:
+* **En `v0.3.4` (Estable):** El motor usa el SDK oficial `google-genai` de Google (`from google import genai`), que se instala automáticamente como dependencia principal. No hay pool de conexiones.
+* **En `v0.4.0rc1` (Pre-lanzamiento):** El motor fue reescrito utilizando `httpx` asíncrono nativo contra `https://generativelanguage.googleapis.com/v1beta`. Esto elimina la dependencia de `google-genai` y, dentro de un ámbito `async with runner:`, permite que las peticiones a Gemini compartan un único cliente HTTP con pool de conexiones.
+
+En v0.3.4, ejecuta los turnos directamente sobre un runner compartido:
 
 ```python
 # [no-exec: requires real gemini api key]
@@ -131,12 +133,12 @@ editor = Agent(
 
 ### Reintentos Automáticos y Retroceso con Jitter
 
-`AnthropicEngine` gestiona automáticamente los límites de tasa (`429 Too Many Requests`) y errores temporales de pasarela (`500`, `502`, `503`, `504`) mediante retroceso exponencial:
-* **Reintentos Máximos:** 3 intentos.
+`AnthropicEngine` reintenta automáticamente los límites de tasa (`429 Too Many Requests`), los errores temporales del servidor (`500`, `502`, `503`, `504`), el estado de sobrecarga de Anthropic (`529`) y los errores de conexión, mediante retroceso exponencial con jitter:
+* **Reintentos Máximos:** 3 reintentos tras el primer intento (hasta 4 peticiones).
 * **Demora Base:** 1.0 segundo.
 * **Demora Máxima:** 10.0 segundos.
 
-Si una respuesta `429` incluye la cabecera `Retry-After`, el motor respeta el retraso solicitado por el proveedor antes de reintentar.
+Estos valores son fijos en v0.3.4; no son parámetros del constructor. Cuando una respuesta reintentada incluye una cabecera `Retry-After` numérica, ese valor sustituye a la demora exponencial, pero la espera sigue limitada a 10 segundos, por lo que un retraso solicitado mayor no se respeta por completo.
 
 ---
 

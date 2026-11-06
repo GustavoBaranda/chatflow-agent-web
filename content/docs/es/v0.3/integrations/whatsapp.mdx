@@ -29,8 +29,8 @@ Meta WhatsApp Cloud API
 +-------------------------------------------------------------------+
 |                         WhatsAppChannel                           |
 |  1. Verificación de Firma HMAC SHA-256 (app_secret)               |
-|  2. Deduplicación por Message-ID (dedup_ttl_hours = 192)          |
-|  3. Enmascaramiento de Números en Registros (_mask_phone)         |
+|  2. Deduplicación por Message-ID (session store, at-most-once)    |
+|  3. Enmascaramiento de Números en Registros del SDK (_mask_phone) |
 |  4. Confirmación Inmediata con HTTP 200                           |
 +---------------------------------+---------------------------------+
                                   |
@@ -39,7 +39,7 @@ Meta WhatsApp Cloud API
                                   v
 +---------------------------------+---------------------------------+
 |                       chatflow-agent Runner                       |
-|   - Bloqueo por Sesión (los turnos se serializan)                 |
+|   - Bloqueo por Sesión (serializa con SessionStore en memoria)    |
 |   - Ejecución de Turno Multi-Agente (llm_timeout_seconds=30)      |
 |   - Llamadas a Herramientas y Persistencia de Estado              |
 +---------------------------------+---------------------------------+
@@ -85,12 +85,14 @@ customer_service = Agent(
 store = SQLiteSessionStore("whatsapp_sessions.db", dedup_ttl_hours=192)
 runner = Runner(starting_agent=customer_service, session_store=store)
 
-# Inicializar canal de WhatsApp
+# Inicializar canal de WhatsApp. Lee cada credencial desde el entorno sin
+# valor de respaldo: así, si falta una variable, falla al arrancar en lugar de
+# ejecutarse con un secreto conocido públicamente.
 whatsapp = WhatsAppChannel(
-    verify_token=os.environ.get("WHATSAPP_VERIFY_TOKEN", "my-verify-token"),
-    access_token=os.environ.get("WHATSAPP_ACCESS_TOKEN", "EAAB..."),
-    phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "1029384756"),
-    app_secret=os.environ.get("META_APP_SECRET", "secret-key"),
+    verify_token=os.environ["WHATSAPP_VERIFY_TOKEN"],
+    access_token=os.environ["WHATSAPP_ACCESS_TOKEN"],
+    phone_number_id=os.environ["WHATSAPP_PHONE_NUMBER_ID"],
+    app_secret=os.environ["WHATSAPP_APP_SECRET"],
     verify_signature=True,
 )
 
@@ -119,14 +121,39 @@ Meta firma cada carga útil entrante de tipo POST utilizando tu App Secret y adj
 Si `verify_signature=True` (predeterminado), omitir `app_secret` genera `ValueError` al construir el canal. Una vez construido, un header `X-Hub-Signature-256` ausente, malformado o inválido se rechaza con `HTTP 403 Forbidden`. Nunca desactives la verificación de firmas en despliegues públicos de producción.
 </Callout>
 
+### Validación de Peticiones y Códigos de Estado HTTP
+
+Antes de ejecutar cualquier turno, el endpoint `POST /webhook` aplica estas comprobaciones:
+
+| Condición | Respuesta |
+| :--- | :--- |
+| Falta la cabecera `Content-Length` | `411 Length Required` |
+| Valor de `Content-Length` inválido, o un cuerpo que no es JSON válido | `400 Bad Request` |
+| `Content-Length` o cuerpo mayor que `max_body_size` (por defecto 1 MB) | `413` |
+| `X-Hub-Signature-256` ausente, malformada o inválida (con `verify_signature=True`) | `403 Forbidden` |
+| Petición válida, incluidas las entregas duplicadas | `200 OK` |
+
+`GET /webhook` responde al desafío de suscripción de Meta con una comparación del verify token en tiempo constante, y `GET /health` devuelve un estado de salud. Las rutas de documentación de FastAPI (`/docs`, `/redoc`, `/openapi.json`) están deshabilitadas salvo que pases `enable_docs=True`.
+
+Las peticiones deben incluir una cabecera `Content-Length`; comprueba que ningún proxy situado delante del servidor reenvíe el cuerpo con codificación de transferencia fragmentada (chunked).
+
 ### Protección de Datos Personales (PII) y Enmascaramiento de Números
 
-Para cumplir con normativas de privacidad (GDPR, LGPD), `WhatsAppChannel` enmascara automáticamente los números de teléfono en todas las salidas de registro:
+`WhatsAppChannel` enmascara los números de teléfono en los mensajes de registro propios del SDK conservando los cuatro primeros y los tres últimos caracteres. Meta envía el número del remitente solo con dígitos:
 
 ```python
-# Teléfono entrante sin procesar: "+1 (415) 555-2671"
-# Salida en registros:             "+1 (***671"
+# Teléfono entrante sin procesar: "14155552671"
+# Salida en registros:             "1415***671"
 ```
+
+El enmascaramiento se aplica solo a esas líneas de registro. El número sin procesar sigue apareciendo en:
+
+* el cuerpo de la respuesta JSON del webhook (campo `"sender"`);
+* el ID de sesión y los metadatos del turno (`"phone"`) y, por tanto, en el session store;
+* el argumento que se pasa a `on_24h_window_expired`;
+* las respuestas de error de Meta, que se registran tal como se reciben.
+
+Trata los registros, la base de datos de sesiones y cualquier registro de acceso HTTP como datos personales.
 
 ## Concurrencia, Tiempos Límite y Plazos
 
@@ -142,11 +169,11 @@ La versión estable v0.3.4 expone el siguiente plazo para la evaluación del mod
 
 Meta restringe estrictamente el envío de mensajes de texto libres a las **24 horas posteriores al último mensaje entrante del usuario**. Intentar enviar texto libre fuera de esta ventana produce el error de la API de Meta con código `131047`.
 
-`WhatsAppChannel` incluye un hook de callback dedicado `on_24h_window_expired`:
+`WhatsAppChannel` incluye un hook de callback dedicado `on_24h_window_expired`. Se invoca con un único argumento, el número de teléfono del destinatario (sin enmascarar). En v0.3.4 debe ser una función `async def` o una función normal; otros invocables que devuelven una corrutina (como un objeto con un `async __call__`) no se esperan con `await`. Las excepciones lanzadas por el hook se registran y no detienen el canal:
 
 ```python
-async def handle_expired_window(phone_number: str, response):
-    """Activado cuando la respuesta no puede entregarse como mensaje libre."""
+async def handle_expired_window(phone_number: str) -> None:
+    """Activado cuando una respuesta no puede entregarse como mensaje libre."""
     print(f"24h window closed for {phone_number}. Queuing template notification...")
     # Disparar plantilla aprobada de WhatsApp, ticket en CRM o notificación por email
 
@@ -161,4 +188,12 @@ whatsapp = WhatsAppChannel(
 
 ## Deduplicación de Mensajes (TTL)
 
-Los webhooks de Meta reenvían entregas duplicadas si la latencia de red demora la confirmación. `WhatsAppChannel` se coordina con `SQLiteSessionStore(dedup_ttl_hours=192)` (8 días) para registrar IDs de mensajes. Cargas útiles de webhooks duplicadas reciben respuestas inmediatas con `HTTP 200` sin volver a ejecutar turnos del agente ni desencadenar acciones redundantes de herramientas.
+Los webhooks de Meta reenvían entregas duplicadas si la latencia de red demora la confirmación. `WhatsAppChannel` registra cada ID de mensaje en el session store vinculado (`SessionStore` o `SQLiteSessionStore`) antes de encolar el turno. El TTL es el `dedup_ttl_hours` del store (por defecto 192 horas, 8 días), por ejemplo `SQLiteSessionStore(..., dedup_ttl_hours=192)`. Las cargas útiles de webhooks duplicadas reciben respuestas inmediatas con `HTTP 200` sin volver a ejecutar turnos del agente.
+
+<Callout type="warn" title="Entrega como máximo una vez (at-most-once)">
+El ID del mensaje se registra <em>antes</em> de que se ejecute el turno en segundo plano. Si el proceso falla o se reinicia mientras ese turno se ejecuta, el mensaje se pierde: los reintentos de Meta para ese mensaje se descartan entonces como duplicados.
+</Callout>
+
+`WhatsAppChannel` también acepta un argumento `dedup_ttl_hours` en v0.3.4, pero se almacena y nunca se usa: solo se aplica la configuración del session store.
+
+Para cargas útiles en formato genérico (no de Meta) sin ID de mensaje, v0.3.4 deriva el ID a partir del `hash()` de la carga útil. Por tanto, los mensajes genéricos idénticos del mismo remitente se tratan como duplicados durante todo el TTL, y el ID derivado cambia entre reinicios del proceso.

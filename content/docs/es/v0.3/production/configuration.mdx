@@ -27,12 +27,13 @@ Prioridad 2: Variables de Entorno Específicas del Proveedor
           │ (Cargadas desde os.environ)
           ▼
 Prioridad 3: Preajustes y Valores por Defecto del Framework
-    └── URLs base (https://api.openai.com/v1), modelos por defecto, timeout (60.0s)
+    └── URLs base (https://api.openai.com/v1), modelos por defecto, timeout de petición
+        (60.0s para OpenAIEngine y AnthropicEngine, 30.0s para GeminiEngine)
 ```
 
 ## Referencia de Variables de Entorno
 
-Las siguientes variables de entorno son reconocidas en los distintos componentes del SDK:
+El propio SDK solo lee las variables de proveedores que aparecen a continuación. Las variables de canales de la segunda tabla son una convención de nombres para el código de tu aplicación (pasa tú mismo los valores a los constructores de los canales); el SDK no las lee.
 
 ### Credenciales de Proveedores de LLM
 
@@ -47,6 +48,11 @@ Las siguientes variables de entorno son reconocidas en los distintos componentes
 | `GOOGLE_GEMINI_BASE_URL` | Google Gemini | URL de proxy personalizada disponible **sólo en v0.4.0rc1 prerelease**. | v0.3.4 no la lee |
 | `ANTHROPIC_API_KEY` | Anthropic | Clave de API para la Messages API de Claude (`x-api-key`). | `None` (Requerido para Anthropic) |
 | `OLLAMA_API_KEY` | Ollama | Token opcional para pasarelas autenticadas de Ollama. | `"ollama"` (Clave ficticia segura) |
+| `{PROVIDER}_BASE_URL` | Preajustes compatibles con OpenAI | Anulación de la URL base que `OpenAIEngine` lee para su proveedor, p. ej. `OPENAI_BASE_URL`, `GROQ_BASE_URL`, `OLLAMA_BASE_URL`. Una URL remota no oficial requiere entonces una `api_key` explícita. | URL oficial del preajuste |
+
+<Callout type="info" title="Gemini en Vertex AI en v0.3.4">
+En v0.3.4, <code>GeminiEngine</code> lee <code>GEMINI_API_KEY</code> y la pasa al cliente <code>google-genai</code>. Cualquier otra gestión del entorno, incluida la configuración de Vertex AI (por ejemplo <code>GOOGLE_GENAI_USE_VERTEXAI</code>, <code>GOOGLE_CLOUD_PROJECT</code>, <code>GOOGLE_CLOUD_LOCATION</code>), la realiza el propio <code>google-genai</code>, no chatflow-agent; consulta la documentación de <code>google-genai</code> para la versión que tengas instalada. Vertex AI no es compatible con el motor basado en REST de <VersionBadge version="0.4.0rc1" status="prerelease" />.
+</Callout>
 
 ### Credenciales de Canales de Integración
 
@@ -56,7 +62,7 @@ Las siguientes variables de entorno son reconocidas en los distintos componentes
 | `WHATSAPP_VERIFY_TOKEN` | WhatsApp | Token de verificación para el desafío de suscripción de webhook de Meta. |
 | `WHATSAPP_ACCESS_TOKEN` | WhatsApp | Token de acceso de usuario del sistema con permisos `whatsapp_business_messaging`. |
 | `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp | Identificador de número de teléfono de la Consola de Desarrolladores de Meta. |
-| `META_APP_SECRET` | WhatsApp | Secreto de la aplicación utilizado para verificación HMAC SHA-256 de cargas útiles. |
+| `WHATSAPP_APP_SECRET` | WhatsApp | Secreto de la aplicación de Meta utilizado para la verificación HMAC SHA-256 de cargas útiles (el nombre que sugiere el mensaje de error del SDK). |
 
 ## Ejemplo de Configuración en Producción
 

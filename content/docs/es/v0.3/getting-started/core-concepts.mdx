@@ -18,11 +18,13 @@ Un `Agent` representa un actor autónomo con una identidad definida, instruccion
 # [executable]
 from chatflow_agent import Agent
 
-# Instrucciones estáticas con modelo objetivo
+# Instrucciones estáticas con modelo objetivo.
+# En v0.3.4, los modelos que no son de Gemini necesitan un provider (o engine) explícito.
 agent = Agent(
     name="TriageBot",
     instructions="You are the front desk concierge. Route questions to specialists.",
     model="gpt-4o",
+    provider="openai",
 )
 ```
 
@@ -63,6 +65,8 @@ El `Runner` orquesta el ciclo de vida de la conversación. Se encarga de:
 4. Procesar las llamadas a herramientas, ejecutar las funciones y devolver los resultados al modelo hasta obtener la respuesta final.
 5. Conservar los cambios exitosos o truncar el historial cuando una excepción ordinaria no controlada escapa del turno.
 
+Invocación síncrona, para scripts y herramientas CLI (sin un bucle de eventos en ejecución):
+
 ```python
 from chatflow_agent import Agent, Runner, SessionStore
 
@@ -70,6 +74,7 @@ agent = Agent(
     name="Assistant",
     instructions="Concise scheduling assistant.",
     model="gpt-4o",
+    provider="openai",
 )
 
 store = SessionStore()
@@ -79,17 +84,34 @@ runner = Runner(
     session_store=store,
 )
 
-# Invocación síncrona
 response = runner.run(
     session_id="user_123",
     user_message="Book a meeting tomorrow at 3 PM",
 )
+```
 
-# Invocación asíncrona
-response = await runner.run_async(
-    session_id="user_123",
-    user_message="Book a meeting tomorrow at 3 PM",
-)
+Invocación asíncrona, dentro de un bucle de eventos (servidores web, bots, aplicaciones `asyncio`):
+
+```python
+import asyncio
+
+from chatflow_agent import Agent, Runner
+
+async def main() -> None:
+    agent = Agent(
+        name="Assistant",
+        instructions="Concise scheduling assistant.",
+        model="gpt-4o",
+        provider="openai",
+    )
+    runner = Runner(starting_agent=agent)
+    response = await runner.run_async(
+        session_id="user_123",
+        user_message="Book a meeting tomorrow at 3 PM",
+    )
+    print(response.content)
+
+asyncio.run(main())
 ```
 
 <Callout type="info" title="turn_timeout en v0.4.0rc1">
@@ -100,11 +122,11 @@ En <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>Runner.run_asy
 
 ## 3. Motores de Proveedores (`Engines`)
 
-Toda la comunicación con modelos en `chatflow-agent` está desacoplada tras la interfaz `BaseEngine`. Los motores se comunican mediante REST HTTP asíncrono usando `httpx`, eliminando la necesidad de bibliotecas cliente monolíticas:
+Toda la comunicación con modelos en `chatflow-agent` está desacoplada tras la interfaz `BaseEngine`. En v0.3.4, los motores compatibles con OpenAI y de Anthropic llaman a sus APIs REST con `httpx`, mientras que `GeminiEngine` usa el cliente `google-genai`:
 
 * **`OpenAIEngine`**: Compatible con modelos de OpenAI y cualquier API compatible con OpenAI (Groq, DeepSeek, xAI Grok, Ollama, vLLM) mediante `base_url`.
 * **`AnthropicEngine`**: Integración REST directa con modelos Claude de Anthropic.
-* **`GeminiEngine`**: Integración con Google Gemini. En <VersionBadge version="0.4.0rc1" status="prerelease" />, reescrito íntegramente con llamadas nativas REST.
+* **`GeminiEngine`**: Integración con Google Gemini a través de `google-genai`. En <VersionBadge version="0.4.0rc1" status="prerelease" />, se reescribió para llamar a la API REST de Gemini con `httpx`.
 
 ```python
 from chatflow_agent import Agent, OpenAIEngine
@@ -128,7 +150,7 @@ local_agent = Agent(
 
 ## 4. Herramientas Deterministas (`Tool` y `@tool`)
 
-Las herramientas otorgan a los agentes capacidad de ejecución determinista. Al decorar una función con `@tool`, `chatflow-agent` inspecciona automáticamente las anotaciones de tipos y docstrings de Python para generar esquemas estándar JSON Schema para el LLM:
+Las herramientas otorgan a los agentes capacidad de ejecución determinista. Al decorar una función con `@tool`, `chatflow-agent` construye el esquema de parámetros a partir de las anotaciones de tipos y los valores por defecto de Python. La descripción de la herramienta es el argumento `description=` o, si no se proporciona, el docstring de la función; las secciones del docstring como `Args:` no se procesan como descripciones por parámetro:
 
 ```python
 # [min-version: 0.3.0]
@@ -137,11 +159,7 @@ from chatflow_agent import tool
 
 @tool(name="fetch_user_profile", description="Fetch user metadata from internal database.")
 def fetch_user_profile(user_id: str) -> dict[str, str]:
-    """Retrieve user details.
-
-    Args:
-        user_id: Unique user identifier string.
-    """
+    """Retrieve user details."""
     return {"user_id": user_id, "tier": "enterprise", "status": "active"}
 ```
 
@@ -156,7 +174,8 @@ Se admiten de forma nativa tanto funciones síncronas (`def`) como asíncronas (
 ```python
 from chatflow_agent import SQLiteSessionStore
 
-# Almacenamiento persistente en SQLite con límite de turnos configurable
+# Almacenamiento persistente en SQLite. default_max_turns es una ventana deslizante
+# del historial: conserva los últimos 40 turnos completos de cada sesión.
 store = SQLiteSessionStore(
     db_path="./chat_sessions.db",
     default_max_turns=40,
@@ -176,7 +195,7 @@ Antes de procesar un turno, la versión estable v0.3.4 registra la longitud actu
 
 ## 6. Handoffs Multi-Agente (`Handoffs`)
 
-Los enjambres multi-agente delegan tareas dinámicamente mediante handoffs declarativos. Cuando un agente define `handoffs=[agent_b]`, `chatflow-agent` sintetiza automáticamente una herramienta llamada `transfer_to_agent_b`:
+Los enjambres multi-agente delegan tareas dinámicamente mediante handoffs declarativos. Cuando un agente declara un par en `handoffs=[...]`, `chatflow-agent` sintetiza una herramienta de transferencia nombrada a partir del `name` del par, en minúsculas y saneado: un par llamado `BillingAgent` se convierte en `transfer_to_billingagent`:
 
 ```python
 from chatflow_agent import Agent, Runner
@@ -186,6 +205,7 @@ billing_agent = Agent(
     name="BillingAgent",
     instructions="You specialize in invoices, receipts, and refund requests.",
     model="gpt-4o",
+    provider="openai",
 )
 
 # Agente de triaje inicial
@@ -193,6 +213,7 @@ triage_agent = Agent(
     name="TriageAgent",
     instructions="Greet users. Transfer billing issues to BillingAgent.",
     model="gpt-4o",
+    provider="openai",
     handoffs=[billing_agent],
 )
 
@@ -208,7 +229,7 @@ print(f"Responding agent: {response.active_agent_name}")
 print(f"Message content: {response.content}")
 ```
 
-El `Runner` rastrea automáticamente las delegaciones y el agente final que responde siempre es visible a través de `response.active_agent_name`.
+El agente final que responde es visible a través de `response.active_agent_name`. Las transferencias dentro de un turno están limitadas por `Runner(max_handoffs_per_turn=5)`; no existe una detección de ciclos aparte.
 
 ---
 

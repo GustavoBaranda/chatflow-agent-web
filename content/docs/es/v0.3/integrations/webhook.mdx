@@ -11,7 +11,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 Aunque `chatflow-agent` ofrece canales integrados para Telegram y WhatsApp, los sistemas modernos a menudo requieren conectar enjambres multi-agente con microservicios internos, la API de eventos de Slack, bots de Discord o webhooks de CRMs (Zendesk, Intercom).
 
-A través de la interfaz `BaseChannel` y el extra opcional `webhook` (`fastapi>=0.110.0`, `uvicorn>=0.29.0`), puedes implementar receptores de webhook listos para producción en unas pocas líneas de código.
+`chatflow-agent` no incluye un canal de webhook genérico. El extra opcional `webhook` solo instala `fastapi>=0.110.0` y `uvicorn>=0.29.0`; el endpoint lo escribes tú, ya sea como una subclase de `BaseChannel` (como se muestra a continuación) o llamando a `runner.run_async()` desde una ruta existente. El repositorio del SDK incluye una aplicación de referencia completa en [`examples/webhook_api_service.py`](https://github.com/GustavoBaranda/chatflow-agent/blob/v0.3.4/examples/webhook_api_service.py).
 
 ## La Arquitectura de `BaseChannel`
 
@@ -22,7 +22,7 @@ Todos los canales de comunicación heredan de `BaseChannel`. Establece un ciclo 
            |
            v
 +-------------------------------------------------------------------+
-|                     WebhookChannel Personalizado                  |
+|         Tu canal personalizado (subclase de BaseChannel)          |
 |   1. Autenticar Petición (Clave de API o Firma HMAC)              |
 |   2. Extraer session_id, message y metadata                       |
 |   3. Reenviar vía dispatch_async(session_id, message, metadata)   |
@@ -31,12 +31,12 @@ Todos los canales de comunicación heredan de `BaseChannel`. Establece un ciclo 
                                   v
 +---------------------------------+---------------------------------+
 |                       chatflow-agent Runner                       |
-|   - Bloqueo de Sesión y Recuperación de Memoria                   |
+|   - Recuperación de Sesión (bloqueo solo en sesiones en memoria)  |
 |   - Orquestación Multi-Agente y Llamadas a Herramientas           |
 |   - Persistencia de Estado                                        |
 +---------------------------------+---------------------------------+
                                   |
-                        AgentResponse (text, data)
+               AgentResponse (content, active_agent_name)
                                   |
                                   v
 [ Respuesta HTTP Inmediata o Callback de Webhook Asíncrono ]
@@ -56,9 +56,10 @@ class MyChannel(BaseChannel):
 ```
 
 * `attach(runner: Runner) -> BaseChannel`: Vincula una instancia de Runner al canal.
-* `dispatch_async(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Reenvía el mensaje al runner adjunto de forma asíncrona, asegurando el bloqueo de concurrencia por sesión.
+* `dispatch_async(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Reenvía el mensaje al runner adjunto de forma asíncrona (`runner.run_async`). En v0.3.4, los turnos de una misma sesión solo se serializan con el `SessionStore` en memoria.
 * `dispatch(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Equivalente síncrono para entornos de ejecución bloqueantes.
-* `split_message(text: str, max_len: int = 4096) -> list[str]`: Utilidad para fragmentar respuestas salientes extensas respetando los límites de mensajería.
+
+`split_message(text: str, max_len: int = 4096) -> list[str]` no es un método de `BaseChannel`, sino una función auxiliar a nivel de módulo para fragmentar respuestas salientes extensas: `from chatflow_agent.channels import split_message`.
 
 ## Implementación de una Base Segura para Webhooks con FastAPI
 
@@ -134,6 +135,7 @@ class GenericWebhookChannel(BaseChannel):
 Conecta el canal a tu agente y runner:
 
 ```python
+import os
 from chatflow_agent import Agent, Runner
 from chatflow_agent.core.memory import SQLiteSessionStore
 
@@ -148,7 +150,8 @@ store = SQLiteSessionStore("webhook_sessions.db")
 runner = Runner(starting_agent=assistant, session_store=store)
 
 # 3. Instanciar canal y vincular runner
-channel = GenericWebhookChannel(secret="super-secret-key")
+# Lee el secreto de firma desde el entorno; nunca lo escribas directamente en el código
+channel = GenericWebhookChannel(secret=os.environ["WEBHOOK_SIGNING_SECRET"])
 channel.attach(runner)
 
 if __name__ == "__main__":
@@ -171,7 +174,7 @@ runner = Runner(starting_agent=agent)
 
 def require_authenticated_sender() -> str:
     """Valida la credencial de la solicitud y devuelve su sujeto inmutable."""
-    raise NotImplementedError("Conecta esta dependencia con tu sistema de autenticación")
+    raise NotImplementedError("Connect this dependency to your authentication system")
 
 @app.post("/crm/webhook")
 async def crm_webhook_endpoint(

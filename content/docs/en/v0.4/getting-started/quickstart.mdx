@@ -19,8 +19,9 @@ Create a new file named `quickstart.py`:
 import os
 from chatflow_agent import Agent, Runner
 
-# 1. Define the agent persona, instructions, and target model
-# chatflow-agent automatically routes "gpt-4o" to the OpenAI engine using OPENAI_API_KEY
+# 1. Define the agent persona, instructions, and target model.
+# In v0.4.0rc1 the "gpt-" model prefix selects OpenAIEngine (OPENAI_API_KEY)
+# when the Runner has no explicit engine=.
 agent = Agent(
     name="Assistant",
     instructions="You are a concise and helpful AI technical assistant.",
@@ -63,15 +64,11 @@ Agents become exponentially more powerful when given access to deterministic fun
 import os
 from chatflow_agent import Agent, Runner, tool
 
-# 1. Define a tool with typed parameters and docstrings
+# 1. Define a tool. Parameter schemas come from the type annotations and
+# defaults; description= is the tool description (it overrides the docstring).
 @tool(name="calculate_discount", description="Calculate discounted price from original amount and percentage.")
 def calculate_discount(price: float, discount_percent: float) -> str:
-    """Calculate the final price after applying a percentage discount.
-
-    Args:
-        price: The original price in dollars.
-        discount_percent: The percentage discount to apply (e.g. 15 for 15%).
-    """
+    """Calculate the final price after applying a percentage discount."""
     savings = price * (discount_percent / 100.0)
     final_price = price - savings
     return f"Original: ${price:.2f}, Savings: ${savings:.2f}, Final Price: ${final_price:.2f}"
@@ -146,7 +143,8 @@ Because `chatflow-agent` uses direct REST engines, switching between providers i
 import os
 from chatflow_agent import Agent, OpenAIEngine
 
-# Option 1: Direct model configuration (engines are resolved automatically)
+# Option 1: Direct model configuration. In v0.4.0rc1 the model prefix
+# (gpt-, claude-, gemini-, ...) selects the engine when no provider or engine is set.
 openai_agent = Agent(
     name="OpenAIBot",
     instructions="You are powered by GPT-4o.",

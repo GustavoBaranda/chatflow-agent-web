@@ -1,6 +1,8 @@
 ---
 title: "Patrones de Despliegue en Producción"
 description: "Despliega aplicaciones chatflow-agent en producción, servicios ASGI con FastAPI, patrones de concurrencia en SQLite, contenedorización con Docker y gestión de procesos."
+sourceRevision: "0ca4592"
+sourceHash: "bb096a5ad26523f6719cb0da703c27dcdf1ecbc0fbaf68edffafa4785c3c94a2"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -62,6 +64,7 @@ async def lifespan(app: FastAPI):
     agent = Agent(
         name="ProductionBot",
         model="gpt-4o",
+        provider="openai",  # obligatorio en v0.3.4 para modelos que no son de Gemini
         instructions="Provide concise, accurate enterprise responses.",
     )
     runner = Runner(starting_agent=agent, session_store=store)
@@ -95,11 +98,12 @@ async def health_check():
 
 ## Consideraciones de Concurrencia en SQLite
 
-`SQLiteSessionStore` ofrece persistencia sin infraestructura externa y con cero dependencias ajenas. Al utilizar SQLite en producción, aplica las siguientes configuraciones:
+`SQLiteSessionStore` ofrece persistencia sin infraestructura externa y con cero dependencias ajenas. Ten en cuenta estos puntos al utilizarlo en producción:
 
-1. **Modo WAL (Write-Ahead Logging):** El modo de diario por defecto en SQLite bloquea el archivo completo durante escrituras. El modo WAL permite lectores concurrentes mientras se realiza una escritura.
-2. **Descarga a Hilos de Trabajo:** En `v0.4.0rc1`, `chatflow-agent` delega las operaciones de base de datos a hilos secundarios vía `_run_blocking()`, garantizando que la E/S en disco no bloquee el bucle de eventos asyncio.
-3. **Aislamiento de Procesos:** SQLite no admite escrituras concurrentes de alta frecuencia seguras entre múltiples procesos independientes del sistema operativo (ej. `gunicorn -w 8`). Ejecuta un único proceso worker con alta concurrencia asíncrona (`uvicorn --workers 1`) o segmenta las sesiones por identificador de usuario.
+1. **Modo WAL (Write-Ahead Logging):** El store habilita automáticamente `PRAGMA journal_mode=WAL` y `busy_timeout=10000` en cada conexión; no hay nada que configurar.
+2. **Bloqueo del Bucle de Eventos:** En v0.3.4, las llamadas a SQLite se ejecutan en el hilo del bucle de eventos, por lo que un disco lento o una base de datos bloqueada retrasa todas las peticiones gestionadas por ese bucle. <VersionBadge version="0.4.0rc1" status="prerelease" /> delega las operaciones de SQLite en archivo a hilos de trabajo.
+3. **Orden por Sesión:** En v0.3.4, las peticiones concurrentes para una misma sesión no se serializan con `SQLiteSessionStore` (cada llamada crea su propio objeto de sesión y su propio bloqueo). Si un usuario puede enviar mensajes más rápido de lo que se completan los turnos, encólalos por sesión en tu aplicación.
+4. **Aislamiento de Procesos:** SQLite no admite escrituras concurrentes de alta frecuencia seguras entre múltiples procesos independientes del sistema operativo (ej. `gunicorn -w 8`). Ejecuta un único proceso worker con alta concurrencia asíncrona (`uvicorn --workers 1`) o segmenta las sesiones por identificador de usuario.
 
 ## Contenedorización con Docker
 
@@ -172,7 +176,7 @@ server {
 | :--- | :--- | :--- |
 | **Redes** | Tiempo de Lectura del Proxy | `timeout >= 120s` |
 | **Resiliencia** | Timeouts de Solicitud | Configura timeouts del proveedor o canal en v0.3.4; `turn_timeout` sólo está disponible en v0.4.0rc1 prerelease |
-| **Persistencia** | Modo de Diario en SQLite | `PRAGMA journal_mode=WAL;` |
+| **Persistencia** | Workers de SQLite | Ejecuta un único proceso por archivo SQLite; el store habilita WAL automáticamente |
 | **Seguridad** | Gestión de Secretos | Inyectados vía variables de entorno; nunca en código |
 | **Monitorización** | Comprobación de Estado | Endpoint `/healthz` respondiendo HTTP 200 |
 | **Modelo de Proceso** | Concurrencia | 1 proceso worker por contenedor con concurrencia asíncrona |

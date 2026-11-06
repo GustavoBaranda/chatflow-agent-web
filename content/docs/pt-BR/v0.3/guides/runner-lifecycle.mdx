@@ -1,6 +1,8 @@
 ---
 title: "Runner e Ciclo de Execução"
 description: "Guia detalhado sobre o loop conversacional de múltiplos turnos, resolução de motores, fluxo de execução de ferramentas, limites de tempo e reversão transacional no chatflow-agent."
+sourceRevision: "0ffb562"
+sourceHash: "670fac158ba6fc9828b30a03993dd914ef77df5679816fdfee570b12958f88c2"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -19,7 +21,7 @@ As aplicações interagem com o `Runner` como interface primária: seu código f
 from chatflow_agent import Agent, OpenAIEngine, Runner
 from chatflow_agent.core.memory import SessionStore
 
-starting_agent = Agent(name="Greeter", instructions="Greet users warmly.", model="gpt-4o")
+starting_agent = Agent(name="Greeter", instructions="Greet users warmly.", model="gpt-4o", provider="openai")
 memory_store = SessionStore()
 engine = OpenAIEngine()
 
@@ -54,8 +56,8 @@ Ao ser inicializado, o `Runner` percorre recursivamente o `starting_agent` e cad
 # [executable]
 from chatflow_agent import Agent, Runner
 
-billing = Agent(name="Billing", instructions="Billing", model="gpt-4o")
-support = Agent(name="Support", instructions="Support", handoffs=[billing], model="gpt-4o")
+billing = Agent(name="Billing", instructions="Billing", model="gpt-4o", provider="openai")
+support = Agent(name="Support", instructions="Support", handoffs=[billing], model="gpt-4o", provider="openai")
 
 runner = Runner(starting_agent=support)
 # Ambos os agentes (Support e Billing) são indexados automaticamente
@@ -68,21 +70,26 @@ Caso um agente seja instanciado fora do grafo inicial de handoffs, registre-o ex
 
 ## Ciclo de Vida da Execução do Turno
 
-Cada chamada a `runner.run_async()` segue uma sequência determinística e protegida transacionalmente:
+Cada chamada a `runner.run_async()` segue esta sequência na v0.3.4:
 
 ```
 1. Recuperação da Sessão e Aquisição de Bloqueio
-   └── Obtém ou cria a sessão; adquire session.lock para serializar turnos concorrentes.
+   └── Obtém ou cria a sessão; adquire o session.lock desse objeto de sessão.
+       Com o SessionStore em memória, isso serializa os turnos de uma sessão.
+       Com o SQLiteSessionStore, cada chamada constrói um novo objeto de sessão com
+       seu próprio lock, portanto turnos concorrentes de uma sessão NÃO são serializados.
 
 2. Criação do Ponto de Restauração (Checkpoint)
-   └── Registra checkpoint_len = len(session.history) para proteção de reversão (rollback).
+   └── Registra checkpoint_len = len(session.history) (apenas o tamanho do histórico).
 
 3. Ingestão da Mensagem Recebida
    └── Anexa Message(role=Role.USER, content=user_message) ao histórico.
 
 4. Loop de Execução (Até max_tool_iterations)
    ├── A. Resolve o agente ativo (a partir de session.active_agent)
-   ├── B. Resolve o motor LLM (agent.engine ou runner.engine)
+   ├── B. Resolve o motor LLM: agent.engine → agent.provider → agent.base_url
+   │      → runner.engine (sempre definido; GeminiEngine por padrão)
+   │      Os prefixos do nome do modelo nunca são alcançados via Runner na v0.3.4.
    ├── C. Gera o turno do modelo via engine.generate_turn_async()
    ├── D. Se o Modelo Solicitar Ferramentas:
    │      ├── Anexa Message(role=Role.MODEL, tool_calls=[...])
@@ -94,20 +101,19 @@ Cada chamada a `runner.run_async()` segue uma sequência determinística e prote
           └── Anexa Message(role=Role.MODEL, content=final_text)
           └── Retorna AgentResponse
 
-5. Tratamento de Exceções / Limites de Tempo
-   └── Se ocorrer um erro, session.rollback_to(checkpoint_len) restaura o estado limpo.
+5. Tratamento de Exceções
+   └── Se uma exceção comum escapar, session.rollback_to(checkpoint_len)
+       trunca o histórico. O cancelamento não é tratado (veja abaixo).
 ```
 
 ---
 
-## Integridade Transacional de Estado e Rollback
+## Reversão do Histórico em Exceções
 
-Em sistemas distribuídos e fluxos de IA conversacional, quedas de conexão, limites de taxa de requisições e exceções em ferramentas podem deixar o histórico em um estado inconsistente (como uma chamada de ferramenta sem seu respectivo resultado).
-
-O `chatflow-agent` garante **atomicidade em nível de turno**:
+Quedas de conexão, limites de taxa de requisições e exceções em ferramentas podem deixar o histórico em um estado inconsistente (como uma chamada de ferramenta sem seu respectivo resultado). Na v0.3.4, o `Runner` protege o **histórico da conversa** contra exceções comuns:
 
 * **Ponto de Restauração Pré-Turno:** Antes de anexar a mensagem do usuário, o `Runner` armazena `checkpoint_len = len(session.history)`.
-* **Reversão Automática (Rollback):** Se o motor disparar um `ProviderError`, uma ferramenta falhar com uma exceção não tratada ou ocorrer cancelamento assíncrono:
+* **Reversão Automática do Histórico (Rollback):** Se uma exceção (uma subclasse de `Exception`, por exemplo um `ProviderError` do motor) escapar do turno, o histórico é truncado até o ponto de restauração:
 
 ```python
 try:
@@ -120,7 +126,13 @@ except Exception:
         session.history = session.history[:checkpoint_len]
     raise
 ```
-* **Garantia de Integridade:** O turno que falhou é descartado por completo do histórico, evitando que chamadas de ferramentas órfãs invalidem requisições subsequentes ao provedor.
+* **O que é restaurado:** apenas as mensagens anexadas durante o turno que falhou são removidas, de modo que nenhuma chamada de ferramenta órfã chega à próxima requisição ao provedor.
+* **O que não é restaurado na v0.3.4:**
+  * Uma troca de agente ativo feita por um handoff anteriormente no turno que falhou permanece em vigor (com `SQLiteSessionStore` ela já está gravada no banco de dados).
+  * Os metadados da sessão não são restaurados.
+  * O cancelamento (`asyncio.CancelledError`, levantado por exemplo por `asyncio.wait_for` ao atingir o tempo limite) não é uma `Exception`, portanto um turno cancelado **não** é revertido: as mensagens que ele já anexou permanecem no histórico.
+
+A reversão completa do histórico, do agente ativo e dos metadados, inclusive em cancelamentos e com `turn_timeout`, é um recurso da versão <VersionBadge version="0.4.0rc1" status="prerelease" />.
 
 ---
 
@@ -136,7 +148,7 @@ import asyncio
 from chatflow_agent import Agent, Runner
 
 async def main():
-    agent = Agent(name="Bot", instructions="Concise assistant", model="gpt-4o")
+    agent = Agent(name="Bot", instructions="Concise assistant", model="gpt-4o", provider="openai")
     runner = Runner(starting_agent=agent)
 
     # Processar turno assincronamente
@@ -158,7 +170,7 @@ Um utilitário de conveniência para scripts, REPLs interativos e testes unitár
 # [no-exec: requires LLM engine for turn response]
 from chatflow_agent import Agent, Runner
 
-agent = Agent(name="Bot", instructions="Concise assistant", model="gpt-4o")
+agent = Agent(name="Bot", instructions="Concise assistant", model="gpt-4o", provider="openai")
 runner = Runner(starting_agent=agent)
 
 # Executa o loop de eventos internamente
@@ -167,7 +179,7 @@ print(response.content)
 ```
 
 <Callout type="warn" title="Uso de run() Síncrono em Loops Ativos">
-Não chame <code>runner.run()</code> dentro de um loop de eventos asyncio em execução (como dentro de rotas assíncronas do FastAPI ou tarefas ativas). O Python não permite a execução aninhada de loops de eventos. Em ambientes assíncronos, utilize sempre <code>await runner.run_async()</code>.
+Não chame <code>runner.run()</code> dentro de um loop de eventos asyncio em execução (como dentro de rotas assíncronas do FastAPI ou tarefas ativas). Na v0.3.4 a chamada falha com o <code>RuntimeError</code> genérico do asyncio ("asyncio.run() cannot be called from a running event loop"). Em ambientes assíncronos, utilize sempre <code>await runner.run_async()</code>.
 </Callout>
 
 ---
@@ -178,8 +190,8 @@ O motor de execução do `Runner` recebeu melhorias significativas de desempenho
 
 ### Versão Estável (`v0.3.4`)
 * <VersionBadge version="0.3.4" status="stable" /> Loop multiagente principal com `max_handoffs_per_turn` e `max_tool_iterations`.
-* Travamento de sessão via `session.lock` serializando mensagens por sessão.
-* Reversão baseada em ponto de restauração em exceções de turno.
+* Travamento de sessão via `session.lock`: serializa os turnos de uma sessão com o `SessionStore` em memória (um único loop de eventos); não com o `SQLiteSessionStore`, que cria um novo objeto de sessão e um novo lock a cada chamada.
+* Reversão apenas do histórico quando uma exceção comum escapa de um turno; sem reversão em cancelamentos.
 * Execução assíncrona diretamente via `await runner.run_async(...)`:
 
 ```python
@@ -196,7 +208,7 @@ async def handle_requests():
 ```
 
 <Callout type="info" title="Nota de Prévia: Melhorias da v0.4.0rc1">
-Pool de conexões assíncronas via <code>async with runner:</code>, proteção contra reentrância com <code>ReentrantTurnError</code> e rastreamento de cancelamento de threads foram introduzidos na versão preliminar <strong>v0.4.0rc1</strong>. Na versão estável v0.3.x, execute turnos diretamente na instância compartilhada do runner.
+Pool de conexões assíncronas via <code>async with runner:</code> (para requisições ao Gemini), proteção contra reentrância com <code>ReentrantTurnError</code>, serialização por sessão para stores SQLite, reversão completa do estado inclusive em cancelamentos e rastreamento de cancelamento de threads foram introduzidos na versão preliminar <strong>v0.4.0rc1</strong>. Na versão estável v0.3.4, execute turnos diretamente na instância compartilhada do runner.
 </Callout>
 
 ---
@@ -206,7 +218,7 @@ Pool de conexões assíncronas via <code>async with runner:</code>, proteção c
 ### 1. Reinstanciar o `Runner` a Cada Requisição
 O `Runner` indexa a árvore de agentes e coordena caches de sessão. Crie uma instância única (*singleton*) do `Runner` para o ciclo de vida da aplicação e compartilhe-a entre os manipuladores de requisição:
 ```python
-# [INCORRETO]: Recriar o Runner a cada requisição HTTP reindexa árvores e redefine pools de conexão
+# [INCORRETO]: Recriar o Runner a cada requisição HTTP reindexa a árvore de agentes a cada chamada
 # def handle_post(msg):
 #     runner = Runner(starting_agent=agent)
 #     return runner.run("session", msg)
@@ -219,7 +231,7 @@ async def handle_post(session_id: str, msg: str):
 
 ### 2. Chamar o `run()` Síncrono Dentro de Rotas Assíncronas
 ```python
-# [INCORRETO]: Bloqueia threads de trabalho e falha na v0.4.0rc1
+# [INCORRETO]: Falha com RuntimeError dentro de um loop de eventos em execução (v0.3.4 e v0.4.0rc1)
 # async def api_endpoint(req):
 #     return runner.run(req.session_id, req.message)
 

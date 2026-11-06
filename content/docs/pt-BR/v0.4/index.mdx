@@ -1,6 +1,8 @@
 ---
 title: "Visão Geral da Documentação (v0.4 Prerelease)"
 description: "Documentação preliminar do chatflow-agent v0.4.0rc1: provedores REST nativos, contexto de runner assíncrono e melhorias na memória."
+sourceRevision: "737aa0d"
+sourceHash: "bebce2fcc3ac458da20b96b9c6ced274dd53de0fbe4b43750184ab5d31d814a9"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -8,10 +10,10 @@ import { Card, Cards } from 'fumadocs-ui/components/card';
 import { Callout } from 'fumadocs-ui/components/callout';
 
 <Callout type="warn" title="Documentação de Pré-lançamento (v0.4.0rc1)">
-Você está visualizando a documentação preliminar do <strong>chatflow-agent v0.4.0rc1</strong>. Esta versão introduz pools de conexões (<code>async with runner:</code>), execução nativa do Gemini via REST, SQLite persistente em memória e tempos limite de turno (<code>turn_timeout</code>). Para ambientes de produção, utilize a versão estável <strong>v0.3.4</strong>.
+Você está visualizando a documentação preliminar do <strong>chatflow-agent v0.4.0rc1</strong>, uma versão candidata publicada. Seus recursos ainda podem mudar antes de uma versão final 0.4.0, que não foi publicada. Esta trilha introduz pools de conexões para requisições Gemini (<code>async with runner:</code>), execução nativa do Gemini via REST, stores SQLite em memória (<code>":memory:"</code>) que existem durante o tempo de vida do store e tempos limite de turno (<code>turn_timeout</code>). Para ambientes de produção, utilize a versão estável <strong>v0.3.4</strong>.
 </Callout>
 
-Bem-vindo à documentação preliminar do **chatflow-agent v0.4.x**, com atualizações arquiteturais e de concorrência essenciais.
+Bem-vindo à documentação preliminar do **chatflow-agent v0.4.0rc1**, com atualizações arquiteturais e de concorrência essenciais.
 
 Criado e liderado por **Gustavo Baranda** junto a uma comunidade internacional de código aberto, o `chatflow-agent` foi concebido para eliminar o excesso de dependências e a dependência de fornecedores (*vendor lock-in*), oferecendo concorrência de nível corporativo, memória resiliente e conectividade multicanal.
 
@@ -24,10 +26,10 @@ Criado e liderado por **Gustavo Baranda** junto a uma comunidade internacional d
     Conecta-se a LLMs através de REST HTTP assíncrono puro utilizando `httpx`. Sem necessidade de SDKs pesados de provedores ou dependências desnecessárias em tempo de execução.
   </Card>
   <Card title="Handoffs Multiagente Nativos">
-    Declare enxames colaborativos. Os agentes delegam tarefas dinamicamente usando ferramentas sintetizadas `transfer_to_*` com prevenção automática de ciclos.
+    Declare enxames colaborativos. Os agentes delegam tarefas dinamicamente usando ferramentas sintetizadas `transfer_to_*`, com as transferências por turno limitadas por `max_handoffs_per_turn`.
   </Card>
   <Card title="Memória Transacional e Resiliente">
-    Cada turno realiza uma captura atômica de estado. Em caso de erro ou estouro de tempo limite, o estado é revertido automaticamente. As operações SQLite rodam em pools de threads dedicados.
+    Cada turno cria um checkpoint do histórico, do agente ativo e dos metadados. Se o turno falhar, for cancelado ou atingir seu `turn_timeout`, eles são restaurados. As operações de SQLite baseado em arquivo rodam em um pool dedicado de threads trabalhadoras.
   </Card>
   <Card title="Pronto para Múltiplos Canais">
     Implante seus agentes facilmente em terminais REPL, bots do Telegram ou na API do WhatsApp Business Cloud com verificação de assinatura criptográfica HMAC SHA-256.

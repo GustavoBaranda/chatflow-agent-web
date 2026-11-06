@@ -1,6 +1,8 @@
 ---
 title: "Modelos Locais com Ollama"
 description: "Execute modelos de pesos abertos como Google Gemma 2, Llama 3 e Mistral em hardware local sem custos de nuvem."
+sourceRevision: "3c5ab27"
+sourceHash: "72724ae0cd9cb345ab4932d0b0ac3f94dc8dfe2e9adee958cd7f789f1aaff82d"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -30,15 +32,16 @@ O `chatflow-agent` suporta modelos de linguagem locais por meio de seu mecanismo
   <Step>
     ### Definir um Agente Local
 
-    O `chatflow-agent` roteia automaticamente nomes de modelos iniciados por `gemma`, `llama`, `mistral`, `qwen` ou `phi` para a predefinição do mecanismo Ollama:
+    Defina `provider="ollama"` para usar a predefinição do Ollama (`http://localhost:11434/v1`). Na v0.3.4 isso é obrigatório quando o agente é executado por um `Runner`: nomes de modelos iniciados por `gemma`, `llama`, `mistral`, `qwen` ou `phi` só são reconhecidos quando nenhum motor padrão se aplica, e um `Runner` sempre fornece seu `GeminiEngine` padrão.
 
 ```python
 from chatflow_agent import Agent, Runner
 
-# Roteado automaticamente para http://localhost:11434/v1
+# Roteado para a predefinição do Ollama em http://localhost:11434/v1
 local_agent = Agent(
     name="LocalAssistant",
     model="gemma2:9b",
+    provider="ollama",
     instructions="You are a helpful offline assistant.",
 )
 
@@ -79,17 +82,17 @@ O framework protege suas credenciais de nuvem durante o desenvolvimento local:
 
 1. **Detecção de Loopback:** Quando o `base_url` aponta para `localhost`, `127.0.0.1`, `::1` ou `0.0.0.0`, o `OpenAIEngine` detecta um ambiente local.
 2. **Isolamento de Credenciais:** Ele **nunca enviará seu `OPENAI_API_KEY` ou `ANTHROPIC_API_KEY`** para endpoints locais.
-3. **Chave de Fallback Automática:** Como os servidores locais geralmente não exigem autenticação, mas o cliente HTTP do OpenAI requer um cabeçalho `Authorization` não vazio, o mecanismo fornece automaticamente `"ollama"` como chave fictícia caso nenhuma seja informada.
+3. **Chave Substituta:** Se nenhuma chave for informada, o mecanismo usa `OLLAMA_API_KEY` quando essa variável estiver definida e, caso contrário, a chave substituta `"ollama"`. Servidores locais geralmente a ignoram.
 
 ```python
 from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
 
-# Seguro: utiliza automaticamente a chave dummy "ollama" sem tocar em credenciais de nuvem
+# Seguro: usa OLLAMA_API_KEY se estiver definida; caso contrário, a chave substituta "ollama";
+# as credenciais de nuvem nunca são tocadas
 engine = OpenAIEngine(
     base_url="http://localhost:11434/v1",
     provider="ollama",
 )
-assert engine.api_key == "ollama"
 ```
 
 ## Chamada de Funções com Modelos Locais

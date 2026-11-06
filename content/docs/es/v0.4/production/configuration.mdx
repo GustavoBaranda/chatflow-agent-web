@@ -1,6 +1,8 @@
 ---
 title: "Configuración y Entorno"
 description: "Gestiona variables de entorno, preajustes de proveedores, tiempos de espera y configuración de aplicaciones Doce Factores en implementaciones de chatflow-agent."
+sourceRevision: "db864ef"
+sourceHash: "c250f35fe4385cc9b9f97f767865ced3658ff9631871258f4931d5f784919979"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -27,12 +29,13 @@ Prioridad 2: Variables de Entorno Específicas del Proveedor
           │ (Cargadas desde os.environ)
           ▼
 Prioridad 3: Preajustes y Valores por Defecto del Framework
-    └── URLs base (https://api.openai.com/v1), modelos por defecto, timeout (60.0s)
+    └── URLs base (https://api.openai.com/v1), modelos por defecto, timeout de petición
+        (60.0s para OpenAIEngine y AnthropicEngine, 30.0s para GeminiEngine)
 ```
 
 ## Referencia de Variables de Entorno
 
-Las siguientes variables de entorno son reconocidas a lo largo de los componentes del SDK:
+El propio SDK solo lee las variables de proveedores que se indican a continuación. Las variables de canales de la segunda tabla son una convención de nombres para el código de tu aplicación (tú mismo pasas los valores a los constructores de los canales); el SDK no las lee.
 
 ### Credenciales de Proveedores de LLM
 
@@ -42,11 +45,12 @@ Las siguientes variables de entorno son reconocidas a lo largo de los componente
 | `GROQ_API_KEY` | Groq Cloud | Token Bearer para LPUs de Groq (`provider="groq"`). | `None` (Requerido para Groq) |
 | `DEEPSEEK_API_KEY` | DeepSeek | Token Bearer para API de DeepSeek (`provider="deepseek"`). | `None` (Requerido para DeepSeek) |
 | `XAI_API_KEY` | xAI Grok | Token Bearer para endpoints de xAI Grok (`provider="grok"`). | `None` (Requerido para Grok) |
-| `GEMINI_API_KEY` | Google Gemini | Clave de API para endpoints REST v1beta de Gemini. | `GOOGLE_API_KEY` |
+| `GEMINI_API_KEY` | Google Gemini | Clave de API para los endpoints REST de la Gemini Developer API (Google AI Studio). Vertex AI y las Application Default Credentials no están soportadas en v0.4.0rc1. | `GOOGLE_API_KEY` |
 | `GOOGLE_API_KEY` | Google Gemini | Clave alternativa de respaldo para entornos de Google Cloud. | `None` |
 | `GOOGLE_GEMINI_BASE_URL` | Google Gemini | Anulación de URL base para proxies de Gemini. | `https://generativelanguage.googleapis.com` |
 | `ANTHROPIC_API_KEY` | Anthropic | Clave de API para Messages API de Claude (`x-api-key`). | `None` (Requerido para Anthropic) |
 | `OLLAMA_API_KEY` | Ollama | Token opcional para pasarelas autenticadas de Ollama. | `"ollama"` (Clave ficticia segura) |
+| `{PROVIDER}_BASE_URL` | Preajustes compatibles con OpenAI | Anulación de la URL base que `OpenAIEngine` lee para su proveedor, p. ej. `OPENAI_BASE_URL`, `GROQ_BASE_URL`, `OLLAMA_BASE_URL`. Una URL remota no oficial requiere entonces un `api_key` explícito. | URL oficial del preajuste |
 
 ### Credenciales de Canales de Integración
 
@@ -56,7 +60,7 @@ Las siguientes variables de entorno son reconocidas a lo largo de los componente
 | `WHATSAPP_VERIFY_TOKEN` | WhatsApp | Token de verificación para el desafío de suscripción de webhook de Meta. |
 | `WHATSAPP_ACCESS_TOKEN` | WhatsApp | Token de acceso de System User con permiso `whatsapp_business_messaging`. |
 | `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp | Identificador del número de teléfono en la consola de Meta Developer. |
-| `META_APP_SECRET` | WhatsApp | Secreto de la aplicación utilizado para verificar la firma HMAC SHA-256 de las cargas útiles. |
+| `WHATSAPP_APP_SECRET` | WhatsApp | Secreto de la aplicación de Meta utilizado para verificar la firma HMAC SHA-256 de las cargas útiles (el nombre que sugiere el mensaje de error del SDK). |
 
 ## Ejemplo de Configuración en Producción
 

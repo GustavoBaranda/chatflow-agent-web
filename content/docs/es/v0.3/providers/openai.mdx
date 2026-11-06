@@ -1,6 +1,8 @@
 ---
 title: "OpenAI y Endpoints Compatibles"
 description: "Configuración, preajustes, pasarelas personalizadas y políticas de seguridad para OpenAI, Groq, DeepSeek y xAI Grok."
+sourceRevision: "3c5ab27"
+sourceHash: "f5aef0a3913ca6c7e0b80c44726b72c6398290f3b546a967bf7d35f98d3d9f23"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -32,14 +34,11 @@ import os
 from chatflow_agent import Agent, Runner
 from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
 
-# Opción 1: Resolución implícita mediante el prefijo del nombre del modelo
-analyst = Agent(
-    name="Analyst",
-    model="gpt-4o",
-    instructions="Analyze structured operational data.",
-)
+# En v0.3.4 los prefijos del nombre del modelo no bastan por sí solos: un agente
+# ejecutado mediante un Runner sin provider= ni engine= se envía al GeminiEngine
+# predeterminado del Runner. Usa una de las dos opciones siguientes.
 
-# Opción 2: Asignación explícita del proveedor
+# Opción 1: Asignación explícita del proveedor
 writer = Agent(
     name="Writer",
     provider="openai",
@@ -47,7 +46,7 @@ writer = Agent(
     instructions="Draft concise summaries.",
 )
 
-# Opción 3: Instanciación explícita del motor con parámetros personalizados
+# Opción 2: Instanciación explícita del motor con parámetros personalizados
 custom_engine = OpenAIEngine(
     api_key=os.environ.get("OPENAI_API_KEY"),
     provider="openai",
@@ -63,7 +62,7 @@ senior_agent = Agent(
 
 ## Proveedores de Terceros: Groq, DeepSeek y xAI Grok
 
-Conectarse a proveedores de inferencia de ultra alta velocidad o modelos de razonamiento especializados solo requiere especificar el atributo `provider` o el prefijo de modelo estándar:
+Conectarse a proveedores de inferencia de ultra alta velocidad o modelos de razonamiento especializados solo requiere especificar el atributo `provider` (en v0.3.4, un prefijo de modelo por sí solo no selecciona el proveedor cuando el agente se ejecuta mediante un `Runner`):
 
 <Tabs items={["Groq Cloud", "DeepSeek API", "xAI Grok"]}>
   <Tab value="Groq Cloud">
@@ -111,7 +110,7 @@ reasoning_agent = Agent(
 import os
 from chatflow_agent import Agent
 
-# Se mapea implícitamente al preajuste de xAI mediante el prefijo de modelo 'grok'
+# provider="grok" selecciona el preajuste de xAI (api.x.ai)
 # Requiere la variable de entorno XAI_API_KEY
 grok_agent = Agent(
     name="GrokAgent",

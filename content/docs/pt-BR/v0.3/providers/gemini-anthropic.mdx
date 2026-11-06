@@ -1,6 +1,8 @@
 ---
 title: "Google Gemini e Anthropic Claude"
 description: "Google Gemini por meio do google-genai e Anthropic Claude por meio da Messages API no chatflow-agent v0.3.4."
+sourceRevision: "3c5ab27"
+sourceHash: "8df069a969d2f8a3e8c0e8612bca1e9514624d4583c7bd3b9417ac11c0239cb0"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -36,7 +38,7 @@ import os
 from chatflow_agent import Agent, Runner
 from chatflow_agent.core.engines.gemini import GeminiEngine
 
-# Recomendado: Autenticação segura via cabeçalho HTTP
+# v0.3.4: a chave é repassada ao cliente google-genai
 gemini_engine = GeminiEngine(
     api_key=os.environ.get("GEMINI_API_KEY"),
     timeout_seconds=30.0,
@@ -51,17 +53,19 @@ assistant = Agent(
 )
 ```
 
-### Pool de Conexões e Arquitetura Zero Bloqueio de SDKs
+### Arquitetura do Motor Gemini por Versão
 
 <div className="flex gap-2 my-3">
-  <VersionBadge version="0.4.0rc1" status="prerelease" />
   <VersionBadge version="0.3.4" status="stable" />
+  <VersionBadge version="0.4.0rc1" status="prerelease" />
 </div>
 
 A implementação do Gemini passou por uma evolução arquitetural fundamental entre as versões:
 
-* **Na versão `v0.3.4` (Estável):** O motor importava o SDK oficial `google-genai` do Google (`from google import genai`), exigindo a instalação da biblioteca de cliente externa.
-* **Na versão `v0.4.0rc1` (Pré-lançamento):** O motor foi totalmente reescrito utilizando `httpx` assíncrono nativo contra `https://generativelanguage.googleapis.com/v1beta`. Isso elimina dependências pesadas e habilita o **pool de conexões** compartilhadas entre turnos do agente:
+* **Na versão `v0.3.4` (Estável):** O motor usa o SDK oficial `google-genai` do Google (`from google import genai`), que é instalado automaticamente como dependência principal. Não há pool de conexões.
+* **Na versão `v0.4.0rc1` (Pré-lançamento):** O motor foi reescrito utilizando `httpx` assíncrono nativo contra `https://generativelanguage.googleapis.com/v1beta`. Isso remove a dependência `google-genai` e, dentro de um escopo `async with runner:`, permite que as requisições ao Gemini compartilhem um único cliente HTTP com pool de conexões.
+
+Na v0.3.4, execute os turnos diretamente em um runner compartilhado:
 
 ```python
 # [no-exec: requires real gemini api key]
@@ -131,12 +135,12 @@ editor = Agent(
 
 ### Tentativas Automáticas com Backoff Exponencial
 
-O `AnthropicEngine` trata automaticamente limites de taxa (`429 Too Many Requests`) e erros transitórios de gateway (`500`, `502`, `503`, `504`) usando recuo exponencial (*exponential backoff*):
-* **Tentativas Máximas:** 3 tentativas.
+O `AnthropicEngine` repete automaticamente requisições em caso de limite de taxa (`429 Too Many Requests`), erros transitórios de servidor (`500`, `502`, `503`, `504`), o status de sobrecarga da Anthropic (`529`) e erros de conexão, usando recuo exponencial (*exponential backoff*) com jitter:
+* **Tentativas Máximas:** 3 novas tentativas após a primeira (até 4 requisições).
 * **Atraso Base:** 1.0 segundo.
 * **Atraso Máximo:** 10.0 segundos.
 
-Se uma resposta `429` incluir o cabeçalho `Retry-After`, o motor respeita rigorosamente o intervalo solicitado pelo provedor antes de tentar novamente.
+Esses valores são fixos na v0.3.4; não são parâmetros do construtor. Quando uma resposta repetida inclui um cabeçalho `Retry-After` numérico, esse valor substitui o atraso exponencial, mas a espera continua limitada a 10 segundos, portanto um atraso solicitado maior não é totalmente respeitado.
 
 ---
 

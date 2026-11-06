@@ -29,7 +29,7 @@ Meta WhatsApp Cloud API
 +-------------------------------------------------------------------+
 |                         WhatsAppChannel                           |
 |  1. HMAC SHA-256 Signature Verification (app_secret)              |
-|  2. Message-ID Deduplication (session store, at-most-once)         |
+|  2. Message-ID Deduplication (session store, at-most-once)        |
 |  3. Phone Number Masking in SDK Log Messages (_mask_phone)        |
 |  4. Immediate HTTP 200 Acknowledgement                            |
 +---------------------------------+---------------------------------+
@@ -39,7 +39,7 @@ Meta WhatsApp Cloud API
                                   v
 +---------------------------------+---------------------------------+
 |                       chatflow-agent Runner                       |
-|   - Per-Session Lock (serializes turns with in-memory SessionStore)|
+|   - Per-Session Lock (serializes in-memory SessionStore turns)    |
 |   - Multi-Agent Turn Execution (llm_timeout_seconds=30)           |
 |   - Tool Calling & State Persistence                              |
 +---------------------------------+---------------------------------+

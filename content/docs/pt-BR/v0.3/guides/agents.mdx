@@ -1,6 +1,8 @@
 ---
 title: "Agentes e Instruções Dinâmicas"
 description: "Aprofunde-se na abstração do Agent, callables de instrução dinâmica em tempo de execução, vinculação de ferramentas e parâmetros de configuração no chatflow-agent."
+sourceRevision: "0ffb562"
+sourceHash: "6e638cf75b663b725af86706bb656b2c4c9064ae1fbe010b9ff37835d5992ea1"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -35,13 +37,13 @@ agent = Agent(
 | :--- | :--- | :--- | :--- |
 | `name` | `str` | *Obrigatório* | Nome único que identifica o agente em árvores de handoff e registros de sessão. |
 | `instructions` | `str \| Callable[[], str]` | *Obrigatório* | Instruções do sistema fornecidas como string estática ou função chamável dinâmica. |
-| `model` | `str` | `"gemini-2.5-flash"` | Identificador do modelo (ex.: `gemini-2.5-flash`, `gpt-4o`, `claude-3-5-sonnet-20241022`). |
+| `model` | `str` | `"gemini-2.5-flash"` | Identificador do modelo (ex.: `gemini-2.5-flash`, `gpt-4o`, `claude-3-5-sonnet-20241022`). Na v0.3.4, um modelo que não é Gemini executado por um `Runner` também precisa de `provider` (ou `engine`); o nome do modelo sozinho não seleciona o motor. |
 | `tools` | `list[Tool \| Callable] \| None` | `None` | Lista inicial de instâncias `Tool` ou funções chamáveis comuns do Python. |
 | `handoffs` | `list[Agent] \| None` | `None` | Lista de agentes parceiros de destino para os quais este agente pode delegar o diálogo de forma autônoma. |
 | `provider` | `str \| None` | `None` | Nome explícito do provedor (ex.: `"openai"`, `"anthropic"`, `"gemini"`, `"groq"`). |
 | `base_url` | `str \| None` | `None` | Endpoint de API REST personalizado para gateways compatíveis com OpenAI. |
 | `api_key` | `str \| None` | `None` | Chave de API específica sobrescrevendo variáveis de ambiente para este agente. |
-| `engine` | `BaseEngine \| None` | `None` | Instância de motor pré-configurada para sobrescrever a resolução automática de motor. |
+| `engine` | `Any \| None` | `None` | Instância de motor pré-configurada (espera-se que seja um `BaseEngine`) que sobrescreve a resolução automática de motor. |
 
 <Callout type="info" title="O Modelo Pertence ao Agent, Não ao Engine">
 No <code>chatflow-agent</code>, a string do <code>model</code> é configurada diretamente no <code>Agent</code>, nunca dentro do construtor do <code>Engine</code>. Isso desacopla a camada de conexão de rede das escolhas específicas de modelo, permitindo que diferentes agentes compartilhem uma única instância de motor enquanto consultam modelos de portes distintos.
@@ -123,6 +125,7 @@ support_agent = Agent(
     instructions="Assist enterprise users.",
     tools=[fetch_user_plan],
     model="gpt-4o",
+    provider="openai",
 )
 ```
 
@@ -132,7 +135,7 @@ Adicione ferramentas dinamicamente após a instanciação. Registros duplicados 
 ```python
 from chatflow_agent import Agent, tool
 
-agent = Agent(name="DynamicBot", instructions="Helper", model="gpt-4o")
+agent = Agent(name="DynamicBot", instructions="Helper", model="gpt-4o", provider="openai")
 
 @tool
 def calculate_tax(amount: float, rate: float = 0.21) -> float:
@@ -149,7 +152,7 @@ Registre uma ferramenta diretamente em uma instância de agente. Isso vincula a 
 ```python
 from chatflow_agent import Agent
 
-agent = Agent(name="AnalyticsBot", instructions="Process metrics", model="gpt-4o")
+agent = Agent(name="AnalyticsBot", instructions="Process metrics", model="gpt-4o", provider="openai")
 
 @agent.tool(name="query_active_users", description="Count active sessions in the last N minutes.")
 def query_active_users(minutes: int = 15) -> int:
@@ -166,7 +169,7 @@ assert any(t.name == "query_active_users" for t in agent.tools)
 O `chatflow-agent` mantém consistência mecânica enquanto introduz validações rigorosas e normalização de caracteres em versões mais recentes:
 
 ### Versão Estável (`v0.3.4`)
-* <VersionBadge version="0.3.4" status="stable" /> Validação base na construção de agentes.
+* <VersionBadge version="0.3.4" status="stable" /> O construtor não valida `name`; a única verificação é que `add_handoff()` rejeita um handoff para o próprio agente.
 * Ferramentas sintéticas de handoff são nomeadas no formato `transfer_to_<sanitized_name>`.
 
 ### Melhorias de Pré-lançamento (`v0.4.0rc1`)
@@ -207,8 +210,14 @@ agent = Agent(name="Writer", instructions="...", model="gpt-4o", engine=engine)
 agent.current_user = "user_123"  # Vazará entre sessões concorrentes!
 
 # [CORRETO]: Armazene o estado da conversa nos metadados da sessão
-# Passe metadados para runner.run_async(session_id="s1", metadata={"user_id": "user_123"})
+# await runner.run_async(
+#     session_id="s1",
+#     user_message="Hello",
+#     metadata={"user_id": "user_123"},
+# )
 ```
+
+Na v0.3.4, os `metadata` passados para `run()` / `run_async()` são aplicados somente quando a sessão é criada; chamadas posteriores para a mesma sessão não os atualizam. A mesclagem de metadados a cada turno foi adicionada na versão <VersionBadge version="0.4.0rc1" status="prerelease" />.
 
 ### 3. Registro de Handoff para Si Próprio
 Um agente não pode registrar uma transferência para si mesmo. Fazer isso gera um erro imediato:

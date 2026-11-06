@@ -52,7 +52,7 @@ export const DOC_VERSIONS: Record<DocVersionTrack, DocVersionConfig> = {
     track: 'v0.4',
     sdkVersion: '0.4.0rc1',
     status: 'prerelease',
-    label: 'v0.4.x (Prerelease)',
+    label: 'v0.4.0rc1 (Prerelease)',
     badgeLabel: 'RC1',
     isDefault: false,
     routePrefix: 'v0.4',

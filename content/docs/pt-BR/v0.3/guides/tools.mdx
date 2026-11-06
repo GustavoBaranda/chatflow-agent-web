@@ -1,6 +1,8 @@
 ---
 title: "Ferramentas e Chamada de Funções"
 description: "Guia arquitetural completo sobre chamada de funções, esquemas de tipos de parâmetros, despacho síncrono/assíncrono e isolamento de erros no chatflow-agent."
+sourceRevision: "0ffb562"
+sourceHash: "999f5284505a0e27add8076c0860f32ac04c2d96db49ba72ed2b12477da66ddb"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -9,7 +11,7 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 Ferramentas capacitam agentes a interagir com ambientes externos, executar cálculos, consultar bancos de dados e disparar ações de negócio. No **chatflow-agent**, ferramentas são objetos de primeira classe criados através do decorador `@tool` ou instanciados diretamente com a classe `Tool`.
 
-O framework fornece um motor automatizado de introspecção que converte anotações de tipo nativas e docstrings do Python em declarações compatíveis com OpenAPI e JSON Schema para modelos do Google Gemini, OpenAI e Anthropic, dispensando definições manuais de esquemas.
+O framework faz a introspecção da assinatura de cada ferramenta: os tipos dos parâmetros vêm das anotações de tipo do Python, e os parâmetros opcionais, de seus valores padrão. A descrição da ferramenta é o argumento `description=` ou, quando nenhum é fornecido, a docstring da função. Seções da docstring como `Args:` não são analisadas como descrições por parâmetro. Nenhuma definição manual de esquema é necessária.
 
 ---
 
@@ -68,9 +70,15 @@ Quando uma ferramenta é registrada, o `chatflow-agent` analisa sua assinatura v
 | `bool` | `"BOOLEAN"` | Nenhum valor padrão atribuído |
 | `list` | `"ARRAY"` | Nenhum valor padrão atribuído |
 | `dict` | `"OBJECT"` | Nenhum valor padrão atribuído |
-| *Não anotado* / `Any` | `"STRING"` (Fallback) | Nenhum valor padrão atribuído |
+| `Optional[T]` (`typing.Optional` / `typing.Union[T, None]`) | Tipo de `T` | Nenhum valor padrão atribuído |
+| `T \| None` (união PEP 604) | `"STRING"` (Fallback na v0.3.4) | Nenhum valor padrão atribuído |
+| *Não anotado* / `Any` / outros tipos | `"STRING"` (Fallback) | Nenhum valor padrão atribuído |
 
 Parâmetros com valores padrão (ex.: `rate: float = 0.20`) são marcados como opcionais no esquema, enquanto parâmetros sem valor padrão são incluídos na matriz `required`.
+
+<Callout type="warn" title="Parâmetros opcionais na v0.3.4">
+Na v0.3.4, apenas <code>typing.Union</code> é reconhecido, portanto <code>int | None</code> recai em <code>"STRING"</code>. Escreva <code>Optional[int]</code> para obter um esquema <code>"INTEGER"</code>. Uniões PEP 604 são suportadas na versão <VersionBadge version="0.4.0rc1" status="prerelease" />.
+</Callout>
 
 <Callout type="tip" title="Boas Práticas para Docstrings">
 Os modelos de linguagem decidem se devem acionar uma ferramenta com base em seu nome e descrição. Redija sempre docstrings concisas e inequívocas especificando o propósito exato da função e os argumentos esperados.
@@ -110,7 +118,7 @@ async def async_fetch_status(service_name: str) -> dict:
   * Se chamada sobre uma ferramenta `async def` fora de um loop de eventos, executa-a utilizando `asyncio.run()`.
 
 <Callout type="warn" title="Proteção de Loop de Eventos">
-Chamar <code>tool.execute()</code> de forma síncrona sobre uma ferramenta <code>async def</code> dentro de um loop de eventos já em execução (ex.: dentro de FastAPI, manipuladores do Telegram ou turnos do Runner) não é permitido pelo Python e levantará um <code>RuntimeError</code>. Utilize sempre <code>await tool.execute_async()</code> em código assíncrono.
+Chamar <code>tool.execute()</code> de forma síncrona sobre uma ferramenta <code>async def</code> dentro de um loop de eventos já em execução (ex.: dentro de FastAPI, manipuladores do Telegram ou turnos do Runner) não é suportado. A chamada levanta <code>ToolExecutionError</code>, cujo <code>original_error</code> é um <code>RuntimeError</code>; um bloco <code>except RuntimeError</code> não a captura. Utilize sempre <code>await tool.execute_async()</code> em código assíncrono.
 </Callout>
 
 ---
@@ -143,7 +151,7 @@ def sum_metrics(values: list[float]) -> float:
   * `int | float` é expandido deterministicamente para `"NUMBER"` independentemente da ordem da declaração.
   * Uniões de múltiplos tipos geram uma lista de esquemas `anyOf`.
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **`to_openai_parameters()`:** Gera parâmetros formatados em JSON Schema (nomes de tipos em minúsculas, `type: "null"` e sem o atributo `nullable`) para os motores OpenAI e Anthropic.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`ToolSchemaError`:** Valida assinaturas no momento da definição, levantando um `ToolSchemaError` descritivo caso um tipo não suportado não possa ser mapeado para um esquema válido.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`ToolSchemaError`:** Levantado quando a ferramenta é criada se uma anotação de união contém um membro sem mapeamento de esquema (por exemplo `int | datetime`). Outras anotações desconhecidas continuam recaindo em `"STRING"`.
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Exclusão de Argumentos Variáveis:** `*args` e `**kwargs` são omitidos automaticamente dos esquemas de parâmetros.
 
 ---

@@ -1,6 +1,8 @@
 ---
 title: "Google Gemini y Anthropic Claude"
 description: "Integración de modelos fundacionales de alto rendimiento con Google Gemini REST v1beta y Anthropic Claude Messages API."
+sourceRevision: "82d8ebf"
+sourceHash: "9eb8468fcc81dccbdb8dd2176d913db697901d5f1004fc9f5f1783c132baa0f8"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -24,7 +26,7 @@ Google Gemini y Anthropic Claude representan dos de las familias de modelos de f
 ### Autenticación y Credenciales
 
 El motor lee las credenciales de las siguientes fuentes, en orden de prioridad:
-1. `api_key` pasada directamente a `GeminiEngine(api_key="...")` o `Agent(api_key="...")`.
+1. `api_key` pasada directamente a `GeminiEngine(api_key="...")`, o `Agent(api_key="...")` junto con `provider="gemini"`. Sin un proveedor, un agente con modelo Gemini ejecutado a través de un `Runner` utiliza el motor del Runner (construido a partir de `Runner(api_key=...)` o del entorno), y no se utiliza la `api_key` propia del agente.
 2. Variable de entorno `GEMINI_API_KEY`.
 3. Variable de entorno `GOOGLE_API_KEY`.
 
@@ -68,7 +70,11 @@ La implementación de Gemini experimentó una transformación arquitectónica fu
 import asyncio
 from chatflow_agent import Agent, Runner
 
-agent = Agent(name="Assistant", model="gemini-2.5-flash")
+agent = Agent(
+    name="Assistant",
+    instructions="Provide concise, accurate answers.",
+    model="gemini-2.5-flash",
+)
 runner = Runner(starting_agent=agent)
 
 async def main():
@@ -76,7 +82,7 @@ async def main():
     async with runner:
         res1 = await runner.run_async("session-1", "What is quantum computing?")
         res2 = await runner.run_async("session-1", "Summarize in 3 bullet points.")
-        print(res2.text)
+        print(res2.content)
 
 asyncio.run(main())
 ```
@@ -128,12 +134,12 @@ editor = Agent(
 
 ### Reintentos Automáticos y Retroceso con Jitter
 
-`AnthropicEngine` gestiona automáticamente la limitación de tasa (`429 Too Many Requests`) y errores temporales de pasarela (`500`, `502`, `503`, `504`) mediante un retroceso exponencial (*exponential backoff*):
-* **Reintentos Máximos:** 3 intentos.
+`AnthropicEngine` reintenta automáticamente ante limitación de tasa (`429 Too Many Requests`), errores temporales del servidor (`500`, `502`, `503`, `504`), el estado de sobrecarga de Anthropic (`529`) y errores de conexión, mediante un retroceso exponencial (*exponential backoff*) con jitter:
+* **Reintentos Máximos:** 3 reintentos tras el primer intento (hasta 4 peticiones).
 * **Demora Base:** 1.0 segundo.
 * **Demora Máxima:** 10.0 segundos.
 
-Si una respuesta `429` incluye un encabezado `Retry-After`, el motor respeta con precisión el tiempo de espera solicitado por el proveedor antes de reintentar.
+Estos valores son fijos en v0.4.0rc1; no son parámetros del constructor. Cuando una respuesta reintentada incluye un encabezado `Retry-After` numérico, ese valor sustituye a la demora exponencial, pero la espera sigue limitada a 10 segundos, por lo que una demora solicitada mayor no se respeta por completo.
 
 ---
 

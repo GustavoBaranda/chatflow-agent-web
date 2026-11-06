@@ -1,6 +1,8 @@
 ---
 title: "Herramientas y Llamadas a Funciones"
 description: "Guía arquitectónica completa sobre llamadas a funciones, esquemas de tipos de parámetros, despacho síncrono/asíncrono y aislamiento de errores en chatflow-agent."
+sourceRevision: "0ffb562"
+sourceHash: "999f5284505a0e27add8076c0860f32ac04c2d96db49ba72ed2b12477da66ddb"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -9,7 +11,7 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 Las herramientas permiten a los agentes interactuar con entornos externos, realizar cómputos, consultar bases de datos y ejecutar acciones de negocio. En **chatflow-agent**, las herramientas son objetos de primer nivel creados mediante el decorador `@tool` o instanciados directamente con la clase `Tool`.
 
-El framework proporciona un motor de introspección automática que traduce anotaciones de tipos nativas y docstrings de Python a declaraciones conformes con OpenAPI y JSON Schema para modelos de Google Gemini, OpenAI y Anthropic sin requerir definiciones manuales de esquemas.
+El framework inspecciona la firma de cada herramienta: los tipos de los parámetros provienen de las anotaciones de tipos de Python, y los parámetros opcionales de sus valores predeterminados. La descripción de la herramienta es el argumento `description=` o, si no se proporciona, el docstring de la función. Las secciones del docstring como `Args:` no se procesan como descripciones por parámetro. No se requieren definiciones manuales de esquemas.
 
 ---
 
@@ -68,9 +70,15 @@ Cuando se registra una herramienta, `chatflow-agent` inspecciona su firma median
 | `bool` | `"BOOLEAN"` | No tiene valor predeterminado asignado |
 | `list` | `"ARRAY"` | No tiene valor predeterminado asignado |
 | `dict` | `"OBJECT"` | No tiene valor predeterminado asignado |
-| *Sin anotar* / `Any` | `"STRING"` (Alternativa) | No tiene valor predeterminado asignado |
+| `Optional[T]` (`typing.Optional` / `typing.Union[T, None]`) | Tipo de `T` | No tiene valor predeterminado asignado |
+| `T \| None` (unión PEP 604) | `"STRING"` (Alternativa en v0.3.4) | No tiene valor predeterminado asignado |
+| *Sin anotar* / `Any` / otros tipos | `"STRING"` (Alternativa) | No tiene valor predeterminado asignado |
 
 Los parámetros con valores predeterminados (ej. `rate: float = 0.20`) se marcan como opcionales en el esquema, mientras que aquellos sin valor predeterminado se colocan en el arreglo `required`.
+
+<Callout type="warn" title="Parámetros opcionales en v0.3.4">
+En v0.3.4 solo se reconoce <code>typing.Union</code>, por lo que <code>int | None</code> recurre a <code>"STRING"</code>. Escribe <code>Optional[int]</code> para obtener un esquema <code>"INTEGER"</code>. Las uniones PEP 604 son compatibles en <VersionBadge version="0.4.0rc1" status="prerelease" />.
+</Callout>
 
 <Callout type="tip" title="Buena Práctica para Docstrings">
 Los modelos de lenguaje deciden si invocar una herramienta basándose en su nombre y descripción. Escribe siempre docstrings concisos e inequívocos que especifiquen el propósito exacto y los argumentos esperados.
@@ -110,7 +118,7 @@ async def async_fetch_status(service_name: str) -> dict:
   * Si se invoca sobre una herramienta `async def` fuera de un bucle de eventos, la ejecuta utilizando `asyncio.run()`.
 
 <Callout type="warn" title="Protección del Bucle de Eventos">
-Invocar <code>tool.execute()</code> de manera síncrona sobre una herramienta <code>async def</code> desde dentro de un bucle de eventos en ejecución (por ejemplo, dentro de FastAPI, handlers de Telegram o turnos del Runner) no está permitido en Python y generará un <code>RuntimeError</code>. Utiliza siempre <code>await tool.execute_async()</code> en código asíncrono.
+Invocar <code>tool.execute()</code> de manera síncrona sobre una herramienta <code>async def</code> desde dentro de un bucle de eventos en ejecución (por ejemplo, dentro de FastAPI, handlers de Telegram o turnos del Runner) no está soportado. La llamada lanza <code>ToolExecutionError</code>, cuyo <code>original_error</code> es un <code>RuntimeError</code>; un bloque <code>except RuntimeError</code> no lo captura. Utiliza siempre <code>await tool.execute_async()</code> en código asíncrono.
 </Callout>
 
 ---
@@ -143,7 +151,7 @@ def sum_metrics(values: list[float]) -> float:
   * `int | float` se amplía de manera determinista a `"NUMBER"` sin importar el orden de declaración.
   * Uniones de múltiples tipos generan una lista de esquemas `anyOf`.
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **`to_openai_parameters()`:** Genera parámetros formateados en JSON Schema (nombres de tipo en minúsculas, `type: "null"` y sin la palabra clave `nullable`) para motores OpenAI y Anthropic.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`ToolSchemaError`:** Valida firmas en tiempo de definición, generando un error descriptivo `ToolSchemaError` si un tipo no soportado no puede mapearse a un esquema válido.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`ToolSchemaError`:** Se lanza al crear la herramienta si una anotación de unión contiene un miembro sin mapeo de esquema (por ejemplo `int | datetime`). Las demás anotaciones desconocidas siguen recurriendo a `"STRING"`.
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Exclusión de Argumentos Variables:** `*args` y `**kwargs` se omiten automáticamente de los esquemas de parámetros.
 
 ---

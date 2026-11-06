@@ -24,13 +24,13 @@ pip install "chatflow-agent[whatsapp]"
 ```
 Meta WhatsApp Cloud API
          |
-         |  POST /webhook (Encrypted JSON + X-Hub-Signature-256)
+         |  POST /webhook (Signed JSON + X-Hub-Signature-256)
          v
 +-------------------------------------------------------------------+
 |                         WhatsAppChannel                           |
 |  1. HMAC SHA-256 Signature Verification (app_secret)              |
-|  2. Message-ID Deduplication (dedup_ttl_hours = 192)              |
-|  3. Phone Number Masking in Logs (_mask_phone)                    |
+|  2. Message-ID Deduplication (session store, at-most-once)        |
+|  3. Phone Number Masking in SDK Log Messages (_mask_phone)        |
 |  4. Immediate HTTP 200 Acknowledgement                            |
 +---------------------------------+---------------------------------+
                                   |
@@ -85,12 +85,14 @@ customer_service = Agent(
 store = SQLiteSessionStore("whatsapp_sessions.db", dedup_ttl_hours=192)
 runner = Runner(starting_agent=customer_service, session_store=store)
 
-# Inicializar o Canal do WhatsApp
+# Inicializar o Canal do WhatsApp. Leia todas as credenciais do ambiente sem
+# valor de fallback: assim, uma variável ausente falha na inicialização em vez
+# de rodar com um segredo publicamente conhecido.
 whatsapp = WhatsAppChannel(
-    verify_token=os.environ.get("WHATSAPP_VERIFY_TOKEN", "my-verify-token"),
-    access_token=os.environ.get("WHATSAPP_ACCESS_TOKEN", "EAAB..."),
-    phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "1029384756"),
-    app_secret=os.environ.get("META_APP_SECRET", "secret-key"),
+    verify_token=os.environ["WHATSAPP_VERIFY_TOKEN"],
+    access_token=os.environ["WHATSAPP_ACCESS_TOKEN"],
+    phone_number_id=os.environ["WHATSAPP_PHONE_NUMBER_ID"],
+    app_secret=os.environ["WHATSAPP_APP_SECRET"],
     verify_signature=True,
 )
 
@@ -116,39 +118,63 @@ if __name__ == "__main__":
 A Meta assina toda carga útil de webhook POST recebida utilizando o seu App Secret e anexa a assinatura no cabeçalho `X-Hub-Signature-256`.
 
 <Callout type="warn" title="Política com Falha Segura (Fail-Closed)">
-Se `verify_signature=True` (o padrão) e `app_secret` for omitido ou inválido, o `WhatsAppChannel` bloqueia imediatamente a requisição com `HTTP 403 Forbidden`. Nunca desative a verificação de assinatura em implantações públicas de produção.
+Se `verify_signature=True` (o padrão), omitir `app_secret` lança `ValueError` quando o canal é construído. Após a construção, um cabeçalho `X-Hub-Signature-256` ausente, malformado ou inválido é rejeitado com `HTTP 403 Forbidden`. Nunca desative a verificação de assinatura em implantações públicas de produção.
 </Callout>
+
+### Validação de Requisições e Códigos de Status HTTP
+
+Antes que qualquer turno seja executado, o endpoint `POST /webhook` aplica estas verificações:
+
+| Condição | Resposta |
+| :--- | :--- |
+| Cabeçalho `Content-Length` ausente | `411 Length Required` |
+| Valor de `Content-Length` inválido, corpo que não é JSON válido ou JSON que não é um objeto | `400 Bad Request` |
+| `Content-Length` ou corpo maior que `max_body_size` (padrão 1 MB) | `413` |
+| `X-Hub-Signature-256` ausente, malformado ou inválido (com `verify_signature=True`) | `403 Forbidden` |
+| Requisição válida, incluindo entregas duplicadas e eventos `reaction` / `system` ignorados | `200 OK` |
+
+`GET /webhook` responde ao desafio de subscrição da Meta com uma comparação do verify token em tempo constante, e `GET /health` retorna um status de saúde. As rotas de documentação do FastAPI (`/docs`, `/redoc`, `/openapi.json`) ficam desabilitadas, a menos que você passe `enable_docs=True`.
+
+As requisições devem trazer um cabeçalho `Content-Length`; verifique se nenhum proxy à frente do servidor reenvia o corpo com codificação de transferência *chunked*.
 
 ### Proteção de PII e Mascaramento de Números de Telefone
 
-Para cumprir regulamentações de privacidade de dados (LGPD, GDPR), o `WhatsAppChannel` mascara automaticamente os números de telefone dos usuários em todos os registros de log:
+O `WhatsAppChannel` mascara números de telefone nas mensagens de log do próprio SDK, mantendo os quatro primeiros e os três últimos caracteres. A Meta envia o número do remetente apenas com dígitos:
 
 ```python
-# Telefone original recebido: "+1 (415) 555-2671"
-# Saída registrada no log:   "+1415****71"
+# Telefone original recebido: "14155552671"
+# Saída registrada no log:   "1415***671"
 ```
+
+O mascaramento se aplica somente a essas linhas de log. O número original ainda aparece:
+
+* no corpo da resposta JSON do webhook (campo `"sender"`);
+* no ID de sessão e nos metadados do turno (`"phone"`) e, portanto, no armazenamento de sessões;
+* no argumento passado para `on_24h_window_expired`;
+* nas respostas de erro da Meta, que são registradas no log tal como recebidas.
+
+Trate os logs, o banco de dados de sessões e quaisquer logs de acesso HTTP como dados pessoais.
 
 ## Concorrência, Timeouts e Prazos Limite
 
-Em canais de mensagens com alto volume, requisições recebidas exigem limites estritos de tempo:
+A confirmação do webhook é imediata; em seguida, o turno é executado em segundo plano com dois limites distintos:
 
 | Parâmetro | Padrão | Finalidade |
 | :--- | :--- | :--- |
-| `queue_timeout_seconds` | `120.0` | Tempo máximo que um turno pode aguardar na fila atrás de turnos anteriores para o mesmo número de telefone. |
-| `llm_timeout_seconds` | `120.0` | Prazo limite estrito para avaliação do modelo, execução de ferramentas e transferências. |
-| `max_concurrent_tasks` | `50` | Quantidade máxima de tarefas concorrentes de processamento de webhook executadas em paralelo. |
+| `queue_timeout_seconds` | `120.0` | Espera máxima atrás de turnos anteriores da mesma sessão (número de telefone). Deve ser um número positivo e finito. Se expirar, o usuário recebe a `fallback_message` e o turno nunca é executado, portanto não é adicionado ao histórico. |
+| `llm_timeout_seconds` | `120.0` | Limite para o próprio turno (chamadas ao modelo, ferramentas, transferências), contado a partir do momento em que o turno detém a sessão. Ao expirar, o turno é cancelado e revertido, e a `fallback_message` é enviada. `None` ou `inf` não define limite. |
 
-Quando um turno ultrapassa o prazo limite, a tarefa em execução é cancelada, as alterações de sessão sofrem reversão (*rollback*) e o usuário recebe a `fallback_message` configurada.
+Uma resposta pode, portanto, levar até `queue_timeout_seconds + llm_timeout_seconds`. Não existe nenhuma configuração que limite quantos turnos de webhook são executados simultaneamente.
 
 ## Rastreamento da Janela de Atendimento de 24 Horas
 
 A Meta restringe estritamente o envio de mensagens livres para o intervalo de **24 horas após a última mensagem recebida do usuário**. Tentar enviar texto livre fora dessa janela retorna o código de erro `131047` da API da Meta.
 
-O `WhatsAppChannel` inclui um hook de callback dedicado chamado `on_24h_window_expired`:
+O `WhatsAppChannel` inclui um hook de callback dedicado chamado `on_24h_window_expired`. Ele é chamado com um único argumento, o número de telefone do destinatário (sem máscara). Na v0.4.0rc1, ele deve ser uma função `async def` ou uma função comum; outros invocáveis que retornam uma corrotina (como um objeto com um `async __call__`) não são aguardados. Exceções lançadas pelo hook são registradas no log e não interrompem o canal:
 
 ```python
-async def handle_expired_window(phone_number: str, response):
-    """Acionado quando a resposta não pode ser entregue via mensagem livre."""
+async def handle_expired_window(phone_number: str) -> None:
+    """Acionado quando uma resposta não pode ser entregue como mensagem livre."""
     print(f"24h window closed for {phone_number}. Queuing template notification...")
     # Disparar mensagem de modelo aprovada do WhatsApp, ticket de CRM ou fallback por email
 
@@ -163,4 +189,12 @@ whatsapp = WhatsAppChannel(
 
 ## Deduplicação de Mensagens (TTL)
 
-Os webhooks da Meta frequentemente reenviam requisições HTTP duplicadas caso a latência da rede atrase a confirmação de recebimento. O `WhatsAppChannel` coordena com o `SQLiteSessionStore(dedup_ttl_hours=192)` (8 dias) o rastreamento dos IDs de mensagens. Cargas úteis duplicadas recebem respostas imediatas de `HTTP 200` sem reexecutar turnos dos agentes ou disparar ações redundantes de ferramentas.
+Os webhooks da Meta frequentemente reenviam requisições HTTP duplicadas caso a latência da rede atrase a confirmação de recebimento. O `WhatsAppChannel` registra cada ID de mensagem no armazenamento de sessões vinculado (`SessionStore` ou `SQLiteSessionStore`) antes de enfileirar o turno. O TTL é o `dedup_ttl_hours` do store (padrão de 192 horas, 8 dias), por exemplo `SQLiteSessionStore(..., dedup_ttl_hours=192)`. Com SQLite, a verificação e o registro são uma única instrução atômica (requer SQLite 3.24 ou posterior). Cargas úteis duplicadas recebem respostas imediatas de `HTTP 200` sem reexecutar turnos dos agentes.
+
+<Callout type="warn" title="Entrega no máximo uma vez (at-most-once)">
+O ID da mensagem é registrado <em>antes</em> de o turno em segundo plano ser executado. Se o processo falhar ou reiniciar enquanto esse turno está em execução, a mensagem é perdida: as novas tentativas da Meta para ela são então descartadas como duplicatas.
+</Callout>
+
+O `WhatsAppChannel` também aceita um argumento `dedup_ttl_hours` na v0.4.0rc1, mas ele é armazenado e nunca utilizado: apenas a configuração do armazenamento de sessões se aplica.
+
+Os IDs de mensagem são obtidos da carga útil. Uma mensagem no formato da Meta sem `id` recebe um ID derivado do `hash()` do Python sobre a mensagem, que muda entre reinicializações do processo. Uma carga útil genérica (não Meta) sem ID recebe um ID aleatório, de modo que nunca é tratada como duplicata.

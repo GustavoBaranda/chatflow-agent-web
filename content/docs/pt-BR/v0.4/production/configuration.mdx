@@ -27,12 +27,13 @@ Priority 2: Provider-Specific Environment Variables
           │ (Loaded from os.environ)
           ▼
 Priority 3: Framework Presets & Defaults
-    └── Base URLs (https://api.openai.com/v1), default models, timeout (60.0s)
+    └── Base URLs (https://api.openai.com/v1), default models, request timeout
+        (60.0s for OpenAIEngine and AnthropicEngine, 30.0s for GeminiEngine)
 ```
 
 ## Referência de Variáveis de Ambiente
 
-As seguintes variáveis de ambiente são reconhecidas pelos componentes do SDK:
+O próprio SDK lê apenas as variáveis de provedores abaixo. As variáveis de canais da segunda tabela são uma convenção de nomenclatura para o código da sua aplicação (passe você mesmo os valores aos construtores dos canais); o SDK não as lê.
 
 ### Credenciais de Provedores de LLM
 
@@ -42,11 +43,12 @@ As seguintes variáveis de ambiente são reconhecidas pelos componentes do SDK:
 | `GROQ_API_KEY` | Groq Cloud | Token Bearer para LPUs da Groq (`provider="groq"`). | `None` (Obrigatório para Groq) |
 | `DEEPSEEK_API_KEY` | DeepSeek | Token Bearer para a API DeepSeek (`provider="deepseek"`). | `None` (Obrigatório para DeepSeek) |
 | `XAI_API_KEY` | xAI Grok | Token Bearer para endpoints da xAI Grok (`provider="grok"`). | `None` (Obrigatório para Grok) |
-| `GEMINI_API_KEY` | Google Gemini | Chave de API para endpoints Gemini REST v1beta. | `GOOGLE_API_KEY` |
+| `GEMINI_API_KEY` | Google Gemini | Chave de API para os endpoints REST da Gemini Developer API (Google AI Studio). Vertex AI e Application Default Credentials não são suportados na v0.4.0rc1. | `GOOGLE_API_KEY` |
 | `GOOGLE_API_KEY` | Google Gemini | Chave de fallback alternativa para ambientes Google Cloud. | `None` |
 | `GOOGLE_GEMINI_BASE_URL` | Google Gemini | URL base customizada para proxies do Gemini. | `https://generativelanguage.googleapis.com` |
 | `ANTHROPIC_API_KEY` | Anthropic | Chave de API para a Claude Messages API (`x-api-key`). | `None` (Obrigatório para Anthropic) |
 | `OLLAMA_API_KEY` | Ollama | Token opcional para gateways autenticados do Ollama. | `"ollama"` (Chave simulada segura) |
+| `{PROVIDER}_BASE_URL` | Presets compatíveis com OpenAI | Substituição da URL base lida pelo `OpenAIEngine` para seu provedor, por exemplo `OPENAI_BASE_URL`, `GROQ_BASE_URL`, `OLLAMA_BASE_URL`. Uma URL remota não oficial passa então a exigir um `api_key` explícito. | URL oficial do preset |
 
 ### Credenciais de Canais de Integração
 
@@ -56,7 +58,7 @@ As seguintes variáveis de ambiente são reconhecidas pelos componentes do SDK:
 | `WHATSAPP_VERIFY_TOKEN` | WhatsApp | Token de verificação para o desafio de subscrição do webhook da Meta. |
 | `WHATSAPP_ACCESS_TOKEN` | WhatsApp | Token de acesso de Usuário do Sistema com `whatsapp_business_messaging`. |
 | `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp | Identificador do número de telefone no Console de Desenvolvedores da Meta. |
-| `META_APP_SECRET` | WhatsApp | App Secret utilizado para verificação de carga útil via HMAC SHA-256. |
+| `WHATSAPP_APP_SECRET` | WhatsApp | App secret da Meta utilizado para verificação de carga útil via HMAC SHA-256 (o nome sugerido pela mensagem de erro do SDK). |
 
 ## Exemplo de Configuração para Produção
 

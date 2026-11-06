@@ -11,7 +11,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 Operar enxames multiagente em produção requer visibilidade completa. Quando um agente transfere uma conversa, invoca APIs externas ou aciona fallbacks, os operadores precisam de logs estruturados e IDs de correlação para diagnosticar latências, investigar anomalias e auditar decisões.
 
-O `chatflow-agent` expõe loggers estruturados da biblioteca padrão do Python em todas as camadas da arquitetura, desde webhooks de canais até requisições de rede dos motores.
+O `chatflow-agent` v0.4.0rc1 usa loggers da biblioteca padrão do Python para o runner, as ferramentas, os armazenamentos de sessão, os motores de provedores e as integrações de canais. As aplicações podem anexar seu próprio formatador estruturado.
 
 ## Hierarquia de Loggers
 
@@ -19,16 +19,18 @@ Todos os loggers estão organizados sob o namespace `chatflow_agent`. Você pode
 
 ```text
 chatflow_agent
-├── chatflow_agent.runner      (Turn execution, handoffs, tool calls, checkpoints)
-├── chatflow_agent.tools       (Schema generation, tool execution, argument validation)
-├── chatflow_agent.memory      (Session creation, SQLite I/O, deduplication TTL)
+├── chatflow_agent.runner      (Tool execution failures with trace_id; failed rollbacks)
+├── chatflow_agent.tools       (Tool schema warnings, e.g. unresolved annotations)
+├── chatflow_agent.memory      (Session deleted or modified during a turn)
 ├── chatflow_agent.engine
-│   ├── chatflow_agent.engine.openai     (OpenAI/Groq/DeepSeek payloads and latency)
-│   ├── chatflow_agent.engine.gemini     (REST v1beta requests, model turns)
-│   └── chatflow_agent.engine.anthropic  (Messages API headers, token counts)
-├── chatflow_agent.telegram    (Update polling, admin authorization, chunking)
-└── chatflow_agent.whatsapp    (HMAC validation, deduplication, phone masking)
+│   ├── chatflow_agent.engine.openai     (Retry warnings: HTTP status and connect errors)
+│   ├── chatflow_agent.engine.gemini     (Retry warnings for REST requests; API key redacted)
+│   └── chatflow_agent.engine.anthropic  (Retry warnings: HTTP status and connect errors)
+├── chatflow_agent.telegram    (Polling start, /reset permission errors, message errors)
+└── chatflow_agent.whatsapp    (Signature rejections, duplicates, timeouts, outbound delivery)
 ```
+
+O SDK não emite métricas nem traces, e os loggers dos motores não registram cargas úteis de requisições, latência ou contagens de tokens. Adicione essa instrumentação na sua aplicação, se precisar dela.
 
 ## Configurando Logging Estruturado
 
@@ -79,13 +81,15 @@ if __name__ == "__main__":
 Quando uma ferramenta falha durante a execução, o `Runner` gera automaticamente um UUID `trace_id` aleatório e o anexa tanto ao registro de log interno quanto à mensagem entregue ao agente:
 
 ```text
-[ERROR] 2026-10-30T18:22:15Z chatflow_agent.runner: Tool execution failed [trace_id: 3c9b7e41-0f2d-4e92-bc12-f71e549d8802] - Tool: 'query_database' on agent 'BillingAgent': Connection timed out to db.internal.corp:5432
+[ERROR] 2026-10-30T18:22:15Z chatflow_agent.runner: Tool execution failed [trace_id: 3c9b7e41-0f2d-4e92-bc12-f71e549d8802] - Tool: 'query_database' on agent 'BillingAgent': Error executing tool 'query_database': Connection timed out to db.internal.corp:5432
 ```
+
+O registro é emitido com `exc_info=True`, portanto seu handler também recebe o stack trace.
 
 ### Por Que a Correlação é Fundamental
 
-1. **Privacidade do Usuário:** O usuário final não visualiza stack traces brutos ou endereços IP internos.
-2. **Triagem Determinística:** Quando um usuário relata *"Minha consulta falhou às 18:22"*, engenheiros de suporte podem pesquisar diretamente por `trace_id: 3c9b7e41...` nos logs para inspecionar o rastreamento completo e os parâmetros de entrada.
+1. **Privacidade do Usuário:** O modelo e, portanto, o usuário final recebem apenas a mensagem genérica com o `trace_id`, não o texto da exceção nem endereços internos.
+2. **Triagem Determinística:** Quando um usuário relata *"Minha consulta falhou às 18:22"*, engenheiros de suporte podem pesquisar diretamente por `trace_id: 3c9b7e41...` nos logs para inspecionar a exceção e seu stack trace. Os argumentos da ferramenta não são registrados no log.
 
 ## Inspecionando a Telemetria da Resposta
 
@@ -140,6 +144,6 @@ if session:
         print(f"[{msg.role.value}] {msg.content}")
 ```
 
-<Callout type="info" title="Zero Registro de Chaves de API">
-Os loggers do `chatflow-agent` ocultam automaticamente tokens de API e cabeçalhos bearer. Cabeçalhos de autorização em logs HTTP são exibidos como `Bearer sk-****` ou omitidos de query strings, assegurando total conformidade com auditorias SOC 2 e LGPD/GDPR.
+<Callout type="warn" title="Dados Sensíveis nos Logs">
+O <code>chatflow-agent</code> não instala nenhum filtro de log. Seus motores não registram cabeçalhos de requisição, o <code>GeminiEngine</code> remove sua chave de API das mensagens de erro e dos logs, e o <code>WhatsAppChannel</code> mascara números de telefone em suas próprias mensagens. Outros conteúdos ainda podem chegar aos seus logs: mensagens de exceção de ferramentas, corpos de erro de provedores incluídos em <code>ProviderError</code> (com tamanho limitado) e respostas de erro da Meta. O logging por si só não torna uma implantação conforme com SOC 2, LGPD/GDPR ou frameworks semelhantes; adicione filtros de redação e políticas de retenção adequados aos seus requisitos.
 </Callout>

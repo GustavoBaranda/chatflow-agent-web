@@ -24,7 +24,7 @@ O `GeminiEngine` suporta a **Gemini Developer API** (chaves de API do Google AI 
 ### Autenticação e Credenciais
 
 O motor lê as credenciais das seguintes fontes, em ordem de prioridade:
-1. `api_key` passada diretamente para `GeminiEngine(api_key="...")` ou `Agent(api_key="...")`.
+1. `api_key` passada diretamente para `GeminiEngine(api_key="...")`, ou `Agent(api_key="...")` junto com `provider="gemini"`. Sem um provider, um agente com modelo Gemini executado através de um `Runner` usa o motor do Runner (criado a partir de `Runner(api_key=...)` ou do ambiente), e a `api_key` do próprio agente não é utilizada.
 2. Variável de ambiente `GEMINI_API_KEY`.
 3. Variável de ambiente `GOOGLE_API_KEY`.
 
@@ -68,7 +68,11 @@ A implementação do Gemini passou por uma reformulação arquitetural significa
 import asyncio
 from chatflow_agent import Agent, Runner
 
-agent = Agent(name="Assistant", model="gemini-2.5-flash")
+agent = Agent(
+    name="Assistant",
+    instructions="Provide concise, accurate answers.",
+    model="gemini-2.5-flash",
+)
 runner = Runner(starting_agent=agent)
 
 async def main():
@@ -76,7 +80,7 @@ async def main():
     async with runner:
         res1 = await runner.run_async("session-1", "What is quantum computing?")
         res2 = await runner.run_async("session-1", "Summarize in 3 bullet points.")
-        print(res2.text)
+        print(res2.content)
 
 asyncio.run(main())
 ```
@@ -128,12 +132,12 @@ editor = Agent(
 
 ### Tentativas Automáticas e Backoff com Jitter
 
-O `AnthropicEngine` lida automaticamente com restrições de taxa (`429 Too Many Requests`) e erros temporários de gateway (`500`, `502`, `503`, `504`) aplicando recuo exponencial com jitter:
-* **Tentativas Máximas:** 3 tentativas.
+O `AnthropicEngine` repete automaticamente requisições em caso de restrições de taxa (`429 Too Many Requests`), erros temporários de servidor (`500`, `502`, `503`, `504`), o status de sobrecarga da Anthropic (`529`) e erros de conexão, aplicando recuo exponencial com jitter:
+* **Tentativas Máximas:** 3 novas tentativas após a primeira (até 4 requisições).
 * **Intervalo Base:** 1.0 segundo.
 * **Intervalo Máximo:** 10.0 segundos.
 
-Se uma resposta `429` incluir o cabeçalho `Retry-After`, o motor respeita a pausa solicitada pelo provedor antes da nova tentativa.
+Esses valores são fixos na v0.4.0rc1; não são parâmetros do construtor. Quando uma resposta repetida inclui um cabeçalho `Retry-After` numérico, esse valor substitui o intervalo exponencial, mas a espera continua limitada a 10 segundos, de modo que um intervalo solicitado mais longo não é totalmente respeitado.
 
 ---
 

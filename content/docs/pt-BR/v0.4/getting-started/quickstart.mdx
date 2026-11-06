@@ -19,8 +19,9 @@ Crie um novo arquivo chamado `quickstart.py`:
 import os
 from chatflow_agent import Agent, Runner
 
-# 1. Definir a persona do agente, instruções e modelo alvo
-# O chatflow-agent roteia automaticamente "gpt-4o" para o motor OpenAI usando OPENAI_API_KEY
+# 1. Definir a persona do agente, instruções e modelo alvo.
+# Na v0.4.0rc1, o prefixo de modelo "gpt-" seleciona o OpenAIEngine (OPENAI_API_KEY)
+# quando o Runner não tem um engine= explícito.
 agent = Agent(
     name="Assistant",
     instructions="You are a concise and helpful AI technical assistant.",
@@ -63,15 +64,11 @@ Os agentes tornam-se exponencialmente mais poderosos quando recebem acesso a fun
 import os
 from chatflow_agent import Agent, Runner, tool
 
-# 1. Definir uma ferramenta com parâmetros tipados e docstrings
+# 1. Definir uma ferramenta. Os schemas de parâmetros vêm das anotações de tipo e
+# dos valores padrão; description= é a descrição da ferramenta (substitui a docstring).
 @tool(name="calculate_discount", description="Calculate discounted price from original amount and percentage.")
 def calculate_discount(price: float, discount_percent: float) -> str:
-    """Calculate the final price after applying a percentage discount.
-
-    Args:
-        price: The original price in dollars.
-        discount_percent: The percentage discount to apply (e.g. 15 for 15%).
-    """
+    """Calculate the final price after applying a percentage discount."""
     savings = price * (discount_percent / 100.0)
     final_price = price - savings
     return f"Original: ${price:.2f}, Savings: ${savings:.2f}, Final Price: ${final_price:.2f}"
@@ -146,7 +143,8 @@ Como o `chatflow-agent` implementa motores diretos sobre REST, alternar entre pr
 import os
 from chatflow_agent import Agent, OpenAIEngine
 
-# Opção 1: Configuração direta por modelo (motores são resolvidos automaticamente)
+# Opção 1: Configuração direta por modelo. Na v0.4.0rc1, o prefixo do modelo
+# (gpt-, claude-, gemini-, ...) seleciona o motor quando nenhum provider ou engine está definido.
 openai_agent = Agent(
     name="OpenAIBot",
     instructions="You are powered by GPT-4o.",

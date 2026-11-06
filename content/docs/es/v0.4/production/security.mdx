@@ -19,17 +19,19 @@ Los agentes de IA autónomos con capacidad para invocar herramientas, consultar 
 Entrada No Confiable (Webhooks / Canales de Chat)
           │
           ▼
-1. Seguridad de Transporte y Autenticación (HMAC SHA-256 / Bearer Tokens / Chequeo de Admin)
+1. Autenticación de Entrada (HMAC SHA-256 de WhatsApp / Verify Token / Chequeo de Admin en Telegram)
           │
           ▼
-2. Bloqueo de Sesión y Protección contra Reentrancia (ReentrantTurnError / Bloqueo de Sesión)
+2. Bloqueo de Sesión y Protección contra Reentrancia (Bloqueo de Sesión / ReentrantTurnError)
           │
           ▼
-3. Fronteras del Agente y Sandboxing de Herramientas (Validación / Tipado / Límites de Iteración)
+3. Fronteras del Agente (Herramientas Acotadas por Agente / Límites de Iteración y de Transferencias)
           │
           ▼
 4. Aislamiento de Credenciales y Control de Salida (ValueError en Host Personalizado / Sin Fugas de API Key)
 ```
+
+El SDK no aísla las herramientas en un sandbox: se ejecutan en el proceso de la aplicación con todos sus privilegios y, en v0.4.0rc1, los argumentos de herramientas proporcionados por el modelo se pasan a la función sin validación en tiempo de ejecución. La autenticación de entrada para canales personalizados, como los Bearer tokens, la implementa tu aplicación.
 
 ## Protección de Credenciales y Control de Salida
 
@@ -49,16 +51,16 @@ internal_engine = OpenAIEngine(
     api_key="internal-bearer-token",
 )
 
-# [SEGURO] Inferencia local fuera de línea con clave ficticia
+# [SEGURO] Inferencia local fuera de línea: no se requiere clave. El motor usa
+# OLLAMA_API_KEY si está definida; en caso contrario, la clave provisional "ollama".
 local_engine = OpenAIEngine(
     base_url="http://localhost:11434/v1",
     provider="ollama",
 )
-assert local_engine.api_key == "ollama"
 ```
 
 <Callout type="warn" title="Protección Automática con ValueError">
-Si especificas una `base_url` personalizada sin suministrar una `api_key` explícita, `OpenAIEngine` se niega a reutilizar `OPENAI_API_KEY` del entorno y lanza un `ValueError`. Esto previene la exfiltración accidental de credenciales hacia proxies no confiables.
+Si especificas una `base_url` remota personalizada sin suministrar una `api_key` explícita, `OpenAIEngine` se niega a reutilizar `OPENAI_API_KEY` (o la clave de cualquier otro proveedor) del entorno y lanza un `ValueError`. Esto previene la exfiltración accidental de credenciales hacia proxies no confiables. Los hosts de loopback (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`) quedan exentos y reciben en su lugar una clave provisional. En v0.4.0rc1, `GeminiEngine` además nunca sigue redirecciones HTTP y elimina la clave de API de sus mensajes de error.
 </Callout>
 
 ## Protocolos de Seguridad en Canales
@@ -75,17 +77,19 @@ from chatflow_agent.channels import WhatsAppChannel
 
 # Habilitar siempre la verificación de firmas en producción
 channel = WhatsAppChannel(
-    verify_token=os.environ.get("WHATSAPP_VERIFY_TOKEN", ""),
-    access_token=os.environ.get("WHATSAPP_ACCESS_TOKEN", ""),
-    phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID", ""),
-    app_secret=os.environ.get("META_APP_SECRET", ""),
-    verify_signature=True,  # Rechaza intentos no autenticados con HTTP 403
+    verify_token=os.environ["WHATSAPP_VERIFY_TOKEN"],
+    access_token=os.environ["WHATSAPP_ACCESS_TOKEN"],
+    phone_number_id=os.environ["WHATSAPP_PHONE_NUMBER_ID"],
+    app_secret=os.environ["WHATSAPP_APP_SECRET"],
+    verify_signature=True,  # Las peticiones con firma ausente o inválida reciben HTTP 403
 )
 ```
 
+Con `verify_signature=True` (el valor predeterminado), construir el canal sin un `app_secret` lanza `ValueError`. Lee los secretos sin valores de respaldo: un marcador no vacío como `"secret"` superaría esa comprobación y permitiría a cualquiera que lo conozca falsificar peticiones firmadas.
+
 ### Enmascaramiento Automático de Números Telefónicos
 
-Los números telefónicos de clientes recibidos vía WhatsApp se clasifican como Información de Identificación Personal (PII). `WhatsAppChannel` enmascara automáticamente los números en la salida de registros (`+1415****71`) a través de su saneador interno `_mask_phone`, previniendo la fuga de PII hacia plataformas de monitoreo de logs.
+Los números telefónicos de clientes recibidos vía WhatsApp son Información de Identificación Personal (PII). `WhatsAppChannel` enmascara los valores en sus propios mensajes de log conservando los cuatro primeros y los tres últimos caracteres de entrada; por ejemplo, el remitente de Meta `14155552671` se convierte en `1415***671`. El número sin procesar sigue apareciendo en la respuesta JSON del webhook (`"sender"`), en el ID de sesión y los metadatos almacenados por el almacén de sesiones, en el argumento que se pasa a `on_24h_window_expired` y en las respuestas de error de Meta, que se registran tal como se reciben. Las aplicaciones y las herramientas externas deben aplicar sus propias políticas de ocultación.
 
 ### Administración en Chats Grupales de Telegram
 
@@ -100,19 +104,16 @@ La inyección de prompts ocurre cuando entradas de usuarios no confiables induce
 Para mitigar riesgos de inyección de prompts:
 
 1. **Principio de Menor Privilegio:** Concede a cada agente especializado exclusivamente las herramientas que requiere de forma estricta. Un `BillingAgent` no debe tener acceso a herramientas de eliminación de bases de datos o reinicio de servidores.
-2. **Validación Determinista de Argumentos:** Valida todos los parámetros de herramientas frente a sugerencias explícitas de tipos y validaciones en tiempo de ejecución:
+2. **Valida los Argumentos Dentro de Cada Herramienta:** v0.4.0rc1 no valida ni convierte en tiempo de ejecución los argumentos proporcionados por el modelo; las sugerencias de tipo solo determinan el esquema que ve el modelo. Comprueba cada entrada dentro de la herramienta antes de actuar en consecuencia:
 
 ```python
 from chatflow_agent import tool
 
 @tool
 def update_email(user_id: int, new_email: str) -> str:
-    """Update a user's verified email address.
-
-    Args:
-        user_id: Numeric user identifier.
-        new_email: Valid email address.
-    """
+    """Update a user's verified email address."""
+    if not isinstance(user_id, int):
+        raise ValueError("user_id must be an integer.")
     if "@" not in new_email or "." not in new_email:
         raise ValueError("Invalid email format.")
     # Ejecutar actualización
@@ -125,6 +126,11 @@ def update_email(user_id: int, new_email: str) -> str:
 
 <VersionBadge version="0.4.0rc1" status="prerelease" />
 
-A partir de `v0.4.0rc1`, `Runner` protege las sesiones frente a turnos concurrentes reentrantes:
-- Si una herramienta ejecuta código que invoca `runner.run_async` sobre la misma sesión mientras el bloqueo está activo, `Runner` lanza `ReentrantTurnError`.
-- Esto previene condiciones de carrera, recursiones infinitas y mutaciones concurrentes del historial.
+A partir de `v0.4.0rc1`, `Runner` protege las sesiones frente a turnos reentrantes:
+- Si código iniciado por un turno en curso (una herramienta, o una tarea o hilo que esta inicie: `create_task`, `gather`, `wait_for`, `TaskGroup`, `asyncio.to_thread`) invoca `runner.run_async` o `runner.run` para la misma sesión, `Runner` lanza `ReentrantTurnError` de inmediato en lugar de provocar un interbloqueo. Utiliza `Runner.spawn_turn()` para encolar un turno posterior.
+- Las peticiones independientes para la misma sesión se serializan mediante el bloqueo de sesión (por instancia de almacén, ID de sesión y bucle de eventos).
+
+Limitaciones conocidas en v0.4.0rc1:
+- No se proporciona serialización entre instancias de almacén sobre el mismo archivo, entre procesos ni entre hilos que ejecutan sus propios bucles de eventos.
+- Una herramienta que espera trabajo realizado por una tarea que no se inició desde el turno aún puede provocar un interbloqueo si ese trabajo ejecuta un turno de la misma sesión; esperar con await una tarea de `spawn_turn()` dentro del turno que la lanzó también provoca un interbloqueo.
+- `clear_history()` y `delete()` (y, por tanto, el `/reset` de Telegram) no se coordinan con los turnos en curso más allá de las garantías de reversión y de `SessionDeletedError`.

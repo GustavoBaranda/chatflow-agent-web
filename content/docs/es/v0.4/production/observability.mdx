@@ -11,7 +11,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 Operar enjambres multi-agente en producción requiere visibilidad integral. Cuando un agente transfiere una conversación, invoca APIs externas o activa respuestas de respaldo, los operadores necesitan registros estructurados e identificadores de correlación para diagnosticar latencias, investigar anomalías y auditar decisiones.
 
-`chatflow-agent` expone loggers estructurados basados en la biblioteca estándar de Python a lo largo de cada capa arquitectónica, desde los webhooks de canales hasta las solicitudes de red de los motores.
+`chatflow-agent` v0.4.0rc1 utiliza loggers de la biblioteca estándar de Python para el runner, las herramientas, los almacenes de sesiones, los motores de proveedores y las integraciones de canales. Las aplicaciones pueden asociar su propio formateador estructurado.
 
 ## Jerarquía de Loggers
 
@@ -19,16 +19,18 @@ Todos los loggers se organizan bajo el espacio de nombres `chatflow_agent`. Pued
 
 ```text
 chatflow_agent
-├── chatflow_agent.runner      (Ejecución de turnos, transferencias, llamadas a herramientas, puntos de control)
-├── chatflow_agent.tools       (Generación de esquemas, ejecución de herramientas, validación de argumentos)
-├── chatflow_agent.memory      (Creación de sesiones, E/S en SQLite, TTL de deduplicación)
+├── chatflow_agent.runner      (Fallos de ejecución de herramientas con trace_id; reversiones fallidas)
+├── chatflow_agent.tools       (Advertencias de esquemas de herramientas, p. ej. anotaciones no resueltas)
+├── chatflow_agent.memory      (Sesión eliminada o modificada durante un turno)
 ├── chatflow_agent.engine
-│   ├── chatflow_agent.engine.openai     (Cargas útiles y latencia de OpenAI/Groq/DeepSeek)
-│   ├── chatflow_agent.engine.gemini     (Peticiones REST v1beta, turnos del modelo)
-│   └── chatflow_agent.engine.anthropic  (Encabezados de Messages API, recuento de tokens)
-├── chatflow_agent.telegram    (Sondeo de actualizaciones, autorización de administradores, fragmentación)
-└── chatflow_agent.whatsapp    (Validación HMAC, deduplicación, enmascaramiento de teléfonos)
+│   ├── chatflow_agent.engine.openai     (Advertencias de reintento: estado HTTP y errores de conexión)
+│   ├── chatflow_agent.engine.gemini     (Advertencias de reintento de peticiones REST; clave de API ocultada)
+│   └── chatflow_agent.engine.anthropic  (Advertencias de reintento: estado HTTP y errores de conexión)
+├── chatflow_agent.telegram    (Inicio del sondeo, errores de permiso de /reset, errores de mensajes)
+└── chatflow_agent.whatsapp    (Rechazos de firma, duplicados, tiempos límite, entrega saliente)
 ```
+
+El SDK no emite métricas ni trazas, y los loggers de los motores no registran cargas útiles de las peticiones, latencias ni recuentos de tokens. Añade esa instrumentación en tu aplicación si la necesitas.
 
 ## Configuración de Registros Estructurados
 
@@ -79,13 +81,15 @@ if __name__ == "__main__":
 Cuando una herramienta falla durante la ejecución, `Runner` genera automáticamente un `trace_id` aleatorio en formato UUID y lo adjunta tanto al registro interno como al mensaje entregado al agente:
 
 ```text
-[ERROR] 2026-10-30T18:22:15Z chatflow_agent.runner: Tool execution failed [trace_id: 3c9b7e41-0f2d-4e92-bc12-f71e549d8802] - Tool: 'query_database' on agent 'BillingAgent': Connection timed out to db.internal.corp:5432
+[ERROR] 2026-10-30T18:22:15Z chatflow_agent.runner: Tool execution failed [trace_id: 3c9b7e41-0f2d-4e92-bc12-f71e549d8802] - Tool: 'query_database' on agent 'BillingAgent': Error executing tool 'query_database': Connection timed out to db.internal.corp:5432
 ```
+
+El registro se emite con `exc_info=True`, por lo que tu manejador también recibe el stack trace.
 
 ### Por Qué Importa la Correlación
 
-1. **Privacidad del Usuario:** El usuario final nunca ve trazas de error en crudo ni direcciones IP internas.
-2. **Triaje Determinista:** Cuando un cliente reporta *"Mi consulta falló a las 18:22"*, los ingenieros de soporte pueden buscar directamente `trace_id: 3c9b7e41...` en los registros para inspeccionar el stack trace completo y los parámetros de entrada.
+1. **Privacidad del Usuario:** El modelo, y por tanto el usuario final, recibe únicamente el mensaje genérico con el `trace_id`, no el texto de la excepción ni direcciones internas.
+2. **Triaje Determinista:** Cuando un cliente reporta *"Mi consulta falló a las 18:22"*, los ingenieros de soporte pueden buscar directamente `trace_id: 3c9b7e41...` en los registros para inspeccionar la excepción y su stack trace. Los argumentos de la herramienta no se registran.
 
 ## Inspección de Telemetría de Respuesta
 
@@ -140,6 +144,6 @@ if session:
         print(f"[{msg.role.value}] {msg.content}")
 ```
 
-<Callout type="info" title="Cero Registro de Claves de API">
-Los loggers de `chatflow-agent` redactan automáticamente tokens de API y encabezados de autorización. Los encabezados de autorización en logs HTTP aparecen como `Bearer sk-****` o se omiten de las cadenas de consulta, garantizando el cumplimiento de normas de auditoría SOC 2 y RGPD.
+<Callout type="warn" title="Datos Sensibles en los Logs">
+<code>chatflow-agent</code> no instala ningún filtro de logs. Sus motores no registran los encabezados de las peticiones, <code>GeminiEngine</code> elimina su clave de API de los mensajes de error y de los logs, y <code>WhatsAppChannel</code> enmascara los números de teléfono en sus propios mensajes. Otros contenidos aún pueden llegar a tus logs: mensajes de excepción de las herramientas, cuerpos de error del proveedor incluidos en <code>ProviderError</code> (de tamaño acotado) y respuestas de error de Meta. El registro de logs por sí solo no hace que un despliegue cumpla con SOC 2, RGPD u otros marcos similares; añade filtros de ocultación y políticas de retención acordes a tus requisitos.
 </Callout>

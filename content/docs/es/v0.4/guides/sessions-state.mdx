@@ -43,8 +43,8 @@ assert session.metadata["channel"] == "whatsapp"
 | `max_turns` | Número máximo de turnos conversacionales completos retenidos en memoria antes de la poda. |
 | `history` | Lista de objetos tipados `Message` (`Role.SYSTEM`, `Role.USER`, `Role.MODEL`, `Role.TOOL`). |
 | `metadata` | Diccionario libre para contexto de usuario, tokens de autenticación, cabeceras y feature flags. |
-| `lock` | Instancia asíncrona de `asyncio.Lock` que serializa el procesamiento de mensajes por sesión. |
-| `rollback_to(len)` | Trunca atómicamente el historial a un punto de control previo en caso de fallo. |
+| `lock` | Instancia asíncrona de `asyncio.Lock` que el `Runner` mantiene durante un turno. En v0.4.0rc1 se comparte por almacén, ID de sesión y bucle de eventos en ambos almacenes, de modo que los turnos de una sesión se ejecutan de uno en uno. |
+| `rollback_to(len)` | Trunca el historial hasta la longitud de un punto de control previo. El propio `Runner` revierte los turnos con `restore_history(...)`, que además restaura el agente activo y los metadatos. |
 
 ---
 
@@ -70,7 +70,7 @@ El truncamiento ingenuo de historiales (como conservar los últimos $N$ mensajes
 `chatflow-agent` incluye dos backends de almacenamiento integrados que heredan de `BaseSessionStore`:
 
 ### 1. Almacenamiento en Memoria (`SessionStore`)
-Un backend basado en diccionarios en memoria rápido y thread-safe. Óptimo para pruebas unitarias, utilidades CLI y microservicios sin estado donde el ciclo de vida de la sesión es breve:
+Un backend rápido basado en diccionarios en memoria. Serializa los turnos de una sesión dentro de un único bucle de eventos asyncio, pero el almacén en sí no es thread-safe y no debe compartirse entre hilos o procesos sin sincronización externa. Óptimo para pruebas unitarias, utilidades CLI y microservicios sin estado donde el ciclo de vida de la sesión es breve:
 
 ```python
 from chatflow_agent import Agent, Runner, SessionStore
@@ -98,14 +98,14 @@ sqlite_store = SQLiteSessionStore(
 ```
 
 <Callout type="info" title="Parámetros Exactos de SQLiteSessionStore">
-<code>SQLiteSessionStore</code> acepta <code>db_path</code> y <code>default_max_turns</code>. No admite parámetros como <code>busy_timeout</code>; la concurrencia de conexiones y el modo de diario WAL son administrados internamente por el framework.
+<code>SQLiteSessionStore</code> acepta <code>db_path</code> (predeterminado <code>"chatflow.db"</code>; <code>":memory:"</code> conserva los datos durante la vida del almacén), <code>default_max_turns</code> (predeterminado <code>40</code>) y <code>dedup_ttl_hours</code> (predeterminado <code>192</code>). Libera sus recursos con <code>store.close()</code> o <code>with SQLiteSessionStore(...) as store:</code>. No admite parámetros como <code>busy_timeout</code>; la concurrencia de conexiones y el modo de diario WAL son administrados internamente por el framework.
 </Callout>
 
 ### Esquema Relacional de la Base de Datos
 Al inicializarse, `SQLiteSessionStore` crea e indexa automáticamente tres tablas relacionales:
 
 * `chatflow_sessions`: Almacena `session_id`, `active_agent_name`, `metadata_json` y marcas temporales.
-* `chatflow_messages`: Almacena mensajes serializados en JSON con eliminación en cascada por clave foránea (`ON DELETE CASCADE`).
+* `chatflow_messages`: Almacena mensajes individuales del diálogo serializados en JSON. El esquema declara `ON DELETE CASCADE`, pero SQLite solo lo aplica con `PRAGMA foreign_keys=ON`, que el almacén no activa; en su lugar, `delete()` y `clear_history()` eliminan explícitamente las filas de mensajes.
 * `chatflow_processed_messages`: Registra identificadores de mensajes procesados y marcas de tiempo para garantizar deduplicación idempotente en webhooks.
 
 ---
@@ -129,7 +129,11 @@ runner = Runner(starting_agent=support, session_store=store)
 
 # Si se cargan sesiones de forma independiente fuera del Runner:
 store.set_agent_resolver(lambda name: billing if name == "Billing" else support)
+
+# get() devuelve None cuando la sesión todavía no existe
 session = store.get("session-101")
+if session is None:
+    session = store.get_or_create("session-101", default_agent=support)
 assert session.active_agent.name in ["Billing", "Support"]
 ```
 
@@ -150,9 +154,14 @@ assert DEFAULT_DEDUP_TTL_HOURS == 192
 store = SessionStore()
 
 msg_id = "wamid.HBgLMjAyNjEwMzAA"
-if not store.is_message_processed(msg_id):
-    store.mark_message_processed(msg_id)
-    # Procesar el turno de forma segura sin ejecuciones duplicadas
+
+# record_processed_message() comprueba y registra el ID en un único paso atómico:
+# True significa que el ID es nuevo; False, que ya se vio dentro del TTL.
+if store.record_processed_message(msg_id):
+    # Procesar el mensaje recién registrado
+    pass
+else:
+    print(f"Skipping duplicate message: {msg_id}")
 ```
 
 ---
@@ -162,19 +171,22 @@ if not store.is_message_processed(msg_id):
 La gestión de sesiones introduce optimizaciones avanzadas de concurrencia en versiones recientes:
 
 ### Versión Estable (`v0.3.4`)
-* <VersionBadge version="0.3.4" status="stable" /> `SessionContext` con poda por agrupación de turnos y reversión atómica.
+* <VersionBadge version="0.3.4" status="stable" /> `SessionContext` con poda por agrupación de turnos y reversión solo del historial ante excepciones ordinarias.
 * `SessionStore` en memoria y persistente con `SQLiteSessionStore`.
 * TTL de deduplicación de mensajes de 8 días (`DEFAULT_DEDUP_TTL_HOURS = 192`).
 
 ### Mejoras de la Versión Preliminar (`v0.4.0rc1`)
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Grupo Dedicado de Hilos para E/S Bloqueante:** Para bases de datos en archivo de `SQLiteSessionStore`, las lecturas y escrituras en disco se delegan a un pool privado de 4 hilos (`_BLOCKING_IO_WORKERS = 4`) vía `_run_blocking`. Esto previene que la latencia del disco o bloqueos de archivos congelen el bucle de eventos asíncrono.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`SessionDeletedError`:** Si una tarea en ejecución intenta confirmar o leer datos de una sesión eliminada mediante `store.delete(session_id)`, `chatflow-agent` lanza un error explícito `SessionDeletedError`.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`SessionDeletedError`:** Si un turno en ejecución almacena un mensaje después de que su sesión SQLite haya sido eliminada mediante `store.delete(session_id)`, el turno falla con `SessionDeletedError` en lugar de escribir filas huérfanas. Las lecturas no lo lanzan, y un turno que todavía esperaba el bloqueo de la sesión inicia en su lugar una sesión nueva y vacía.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Serialización por Sesión en SQLite:** Los turnos de una misma sesión SQLite comparten un bloqueo por bucle de eventos y se ejecutan de uno en uno; con un almacén respaldado en archivo, se inician en orden de llegada. Tras adquirir el bloqueo, el `Runner` invoca `session.refresh()`, que recarga el historial, el agente activo y los metadatos confirmados por turnos anteriores (no tiene efecto en sesiones en memoria).
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Ciclo de Vida del Almacén:** `SQLiteSessionStore.close()` y `with SQLiteSessionStore(...) as store:` liberan las conexiones y los hilos de trabajo del almacén.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Metadatos en Cada Turno:** los `metadata` pasados a `run_async()` se fusionan con la sesión en cada turno (en v0.3.4 solo inicializaban las sesiones nuevas).
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Validación Estricta de Parámetros:** Pasar `max_turns <= 0` o `default_max_turns <= 0` genera inmediatamente un `ValueError`.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Detección de SQLite Efímero:** El almacenamiento detecta automáticamente URIs `:memory:` y en memoria compartida, manteniéndolas directamente en el bucle de eventos para maximizar el rendimiento sin sobrecarga de hilos.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **SQLite en Memoria:** `SQLiteSessionStore(db_path=":memory:")` conserva sus datos durante la vida del almacén mediante una única conexión compartida y protegida por bloqueo, y sus llamadas permanecen en el bucle de eventos. Solo la cadena exacta `":memory:"` recibe este tratamiento; cualquier otra ruta, incluida una URI `file:...?mode=memory`, utiliza los hilos de trabajo.
 
 ---
 
-## Ejemplo Completo: Sesión Persistente de Webhook
+## Ejemplo Completo: Sesión de Webhook con Deduplicación
 
 ```python
 # [min-version: 0.4.0rc1]
@@ -194,16 +206,16 @@ agent = Agent(
     model="gemini-2.5-flash",
 )
 
-store = SQLiteSessionStore(db_path=":memory:", default_max_turns=30)
+# Usa una ruta de archivo para que las sesiones y los registros de deduplicación sobrevivan a los reinicios.
+# ":memory:" solo los conservaría durante la vida de este objeto de almacén.
+store = SQLiteSessionStore(db_path="webhook_sessions.db", default_max_turns=30)
 runner = Runner(starting_agent=agent, session_store=store)
 
 async def handle_inbound_webhook(user_phone: str, message_text: str, webhook_msg_id: str):
-    # 1. Protección contra duplicados
-    if store.is_message_processed(webhook_msg_id):
+    # 1. Protección contra duplicados: registra el ID de forma atómica y omite si ya se vio
+    if not store.record_processed_message(webhook_msg_id):
         print(f"Skipping duplicate webhook: {webhook_msg_id}")
         return None
-
-    store.mark_message_processed(webhook_msg_id)
 
     # 2. Ejecutar turno con sesión persistente
     response = await runner.run_async(
@@ -227,8 +239,8 @@ print("Webhook Response:", res)
 # [INCORRECTO]: "busy_timeout" no es un parámetro aceptado
 # store = SQLiteSessionStore(db_path="app.db", busy_timeout=5000)  # TypeError!
 
-# [CORRECTO]: Pasa exclusivamente db_path y default_max_turns
-store = SQLiteSessionStore(db_path="app.db", default_max_turns=50)
+# [CORRECTO]: Pasa exclusivamente db_path, default_max_turns y dedup_ttl_hours
+store = SQLiteSessionStore(db_path="app.db", default_max_turns=50, dedup_ttl_hours=192)
 ```
 
 ### 2. Recortar el Historial de la Conversación Manualmente

@@ -19,8 +19,9 @@ Crea un archivo nuevo llamado `quickstart.py`:
 import os
 from chatflow_agent import Agent, Runner
 
-# 1. Define la personalidad del agente, sus instrucciones y el modelo objetivo
-# chatflow-agent enruta automáticamente "gpt-4o" al motor de OpenAI utilizando OPENAI_API_KEY
+# 1. Define la personalidad del agente, sus instrucciones y el modelo objetivo.
+# En v0.4.0rc1 el prefijo de modelo "gpt-" selecciona OpenAIEngine (OPENAI_API_KEY)
+# cuando el Runner no tiene un engine= explícito.
 agent = Agent(
     name="Assistant",
     instructions="You are a concise and helpful AI technical assistant.",
@@ -63,15 +64,11 @@ Los agentes aumentan exponencialmente sus capacidades cuando se les otorga acces
 import os
 from chatflow_agent import Agent, Runner, tool
 
-# 1. Define una herramienta con parámetros tipados y docstring
+# 1. Define una herramienta. Los esquemas de parámetros provienen de las anotaciones
+# de tipo y los valores por defecto; description= es la descripción de la herramienta (tiene prioridad sobre el docstring).
 @tool(name="calculate_discount", description="Calculate discounted price from original amount and percentage.")
 def calculate_discount(price: float, discount_percent: float) -> str:
-    """Calculate the final price after applying a percentage discount.
-
-    Args:
-        price: The original price in dollars.
-        discount_percent: The percentage discount to apply (e.g. 15 for 15%).
-    """
+    """Calculate the final price after applying a percentage discount."""
     savings = price * (discount_percent / 100.0)
     final_price = price - savings
     return f"Original: ${price:.2f}, Savings: ${savings:.2f}, Final Price: ${final_price:.2f}"
@@ -146,7 +143,8 @@ Dado que `chatflow-agent` implementa motores directos sobre REST, alternar entre
 import os
 from chatflow_agent import Agent, OpenAIEngine
 
-# Opción 1: Configuración directa por modelo (los motores se resuelven automáticamente)
+# Opción 1: Configuración directa por modelo. En v0.4.0rc1 el prefijo del modelo
+# (gpt-, claude-, gemini-, ...) selecciona el motor cuando no se define un proveedor ni un motor.
 openai_agent = Agent(
     name="OpenAIBot",
     instructions="You are powered by GPT-4o.",

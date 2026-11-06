@@ -9,7 +9,7 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 Las herramientas permiten a los agentes interactuar con entornos externos, realizar cálculos, consultar bases de datos y desencadenar acciones de negocio. En **chatflow-agent**, las herramientas son objetos de primer nivel creados mediante el decorador `@tool` o instanciados directamente con la clase `Tool`.
 
-El framework proporciona un motor automatizado de introspección que traduce las anotaciones de tipo nativas de Python y los docstrings a declaraciones estándar en JSON Schema y OpenAPI para modelos de Google Gemini, OpenAI y Anthropic, sin necesidad de redactar esquemas manuales.
+El framework inspecciona la firma de cada herramienta y genera el esquema que necesita cada proveedor (declaraciones de Gemini, y JSON Schema para OpenAI y Anthropic): los tipos de los parámetros provienen de las anotaciones de tipo de Python, y los parámetros opcionales, de sus valores por defecto. La descripción de la herramienta es el argumento `description=`, o el docstring de la función cuando no se proporciona. Las secciones del docstring como `Args:` no se procesan para generar descripciones por parámetro. No es necesario redactar esquemas manuales.
 
 ---
 
@@ -110,7 +110,7 @@ async def async_fetch_status(service_name: str) -> dict:
   * Si se invoca sobre una herramienta `async def` fuera de un bucle de eventos, la ejecuta utilizando `asyncio.run()`.
 
 <Callout type="warn" title="Protección del Bucle de Eventos">
-Invocar <code>tool.execute()</code> de forma síncrona sobre una herramienta <code>async def</code> desde dentro de un bucle de eventos en ejecución (ej. en FastAPI, manejadores de Telegram o turnos del Runner) no está permitido por Python y lanzará <code>RuntimeError</code>. Utiliza siempre <code>await tool.execute_async()</code> en código asíncrono.
+Invocar <code>tool.execute()</code> de forma síncrona sobre una herramienta <code>async def</code> desde dentro de un bucle de eventos en ejecución (ej. en FastAPI, manejadores de Telegram o turnos del Runner) no está soportado. La llamada lanza <code>ToolExecutionError</code>, cuyo <code>original_error</code> es un <code>RuntimeError</code>; un bloque <code>except RuntimeError</code> no lo captura. Utiliza siempre <code>await tool.execute_async()</code> en código asíncrono.
 </Callout>
 
 ---
@@ -143,7 +143,7 @@ def sum_metrics(values: list[float]) -> float:
   * `int | float` se amplía de forma determinista a `"NUMBER"` sin importar el orden de declaración.
   * Uniones de múltiples tipos generan una lista de esquemas `anyOf`.
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **`to_openai_parameters()`:** Genera parámetros con formato JSON Schema (nombres de tipo en minúsculas, `type: "null"` y sin la clave `nullable`) para motores de OpenAI y Anthropic.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`ToolSchemaError`:** Valida las firmas de las funciones en el momento de su definición, lanzando un `ToolSchemaError` descriptivo si un tipo no soportado no puede mapearse en un esquema válido.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`ToolSchemaError`:** Se lanza al crear la herramienta si una anotación de unión contiene un miembro sin mapeo de esquema (por ejemplo, `int | datetime`). Las demás anotaciones desconocidas, y los parámetros sin anotar, siguen recurriendo a `"STRING"`.
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Exclusión de Argumentos Variables:** `*args` y `**kwargs` se omiten automáticamente de los esquemas de parámetros.
 
 ---
@@ -158,9 +158,9 @@ En producción, las herramientas pueden experimentar tiempos de espera de red, c
 2. El `Runner` captura la falla e inyecta un `ToolResult` en el historial de la conversación marcado con `is_error=True`:
    ```python
    # Inyectado en el historial de mensajes para el LLM:
-   # ToolResult(tool_call_id="call_123", name="query_db", content="Database connection timeout", is_error=True)
+   # ToolResult(tool_call_id="call_123", name="query_db", content="Tool execution failed [trace_id: ...]. Please try a different approach or inform the user.", is_error=True)
    ```
-3. En lugar de interrumpir abruptamente la conversación completa del usuario, el agente activo recibe el resultado de error y puede explicárselo al usuario, reintentar con parámetros alternativos o transferir a un agente de soporte humano.
+3. La excepción original se escribe en el log `chatflow_agent.runner` con el mismo `trace_id`; no se expone al modelo. En lugar de interrumpir la conversación, el agente activo recibe únicamente el error genérico y puede intentar otro enfoque, informar al usuario o transferir a una cola de soporte humano. Si el modelo necesita una explicación específica, haz que la herramienta **devuelva** un mensaje breve y seguro para el usuario en lugar de lanzar una excepción.
 
 ---
 

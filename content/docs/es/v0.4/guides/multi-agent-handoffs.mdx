@@ -126,7 +126,7 @@ Cuando `runner.run_async()` procesa un turno:
 ```
 
 1. **Invocación de Herramienta:** El LLM genera una llamada para `transfer_to_billingspecialist`.
-2. **Verificación en el Registro:** El `Runner` comprueba que `BillingSpecialist` exista en su registro interno de agentes. Si no está registrado, lanza `AgentHandoffError`.
+2. **Comprobación de Autorización:** En v0.4.0rc1, el destino debe estar declarado en los `handoffs` del **agente actual**; no basta con que esté registrado en el `Runner`. En caso contrario, se lanza `AgentHandoffError` (`"Agent 'X' is not authorized to hand off to 'Y'."`). Los pares añadidos con `add_handoff()` después de crear el `Runner` se registran automáticamente la primera vez que se utilizan.
 3. **Intercambio del Agente Activo:** El `Runner` actualiza `session.set_active_agent(target_agent)`.
 4. **Inyección del Resultado:** Se anexa al historial un `ToolResult` con `status: "HANDOFF_SUCCESS"` y el motivo de la transferencia.
 5. **Continuación Inmediata del Turno:** Dentro de la misma llamada a `runner.run()`, el nuevo agente activo recibe el historial actualizado para formular su respuesta.
@@ -138,10 +138,9 @@ Cuando `runner.run_async()` procesa un turno:
 Transferencias descontroladas entre agentes podrían ocasionar bucles infinitos si las instrucciones son ambiguas. `chatflow-agent` protege tu ejecución mediante límites integrados:
 
 * **`max_handoffs_per_turn` (Predeterminado: 5):**
-  Número máximo de transferencias permitidas dentro del turno de un único mensaje de usuario. Si se supera este límite, el runner detiene transferencias posteriores e inyecta un resultado de error:
-  `"Maximum agent transfers exceeded for a single turn."`
+  Número máximo de transferencias permitidas dentro del turno de un único mensaje de usuario. En v0.4.0rc1, el límite se comprueba antes de cambiar de agente: la transferencia que lo excedería no se aplica, su llamada recibe el resultado de error `"Maximum agent transfers exceeded for a single turn."`, y cada llamada restante de ese mensaje del modelo recibe un resultado "Tool skipped".
 * **`max_tool_iterations` (Predeterminado: 10):**
-  Límite global de ejecuciones de herramientas por turno, garantizando una finalización controlada incluso si las herramientas encadenan llamadas reiteradas.
+  Número máximo de rondas modelo/herramientas por turno. Una ronda es una generación del modelo más todas las llamadas a herramientas que solicitó, por lo que una ronda puede ejecutar varias herramientas. Al alcanzar el límite, el turno termina con una respuesta de respaldo "Execution iteration limit reached".
 
 ```python
 from chatflow_agent import Agent, Runner
@@ -171,7 +170,8 @@ La generación y sanitización de transferencias incorporan mejoras fundamentale
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Fallbacks Deterministas por Hash:** Nombres de agentes en escrituras no latinas (ej. japonés, árabe, cirílico) o con emojis generan un prefijo hash SHA-256 determinista (`transfer_to_u<hash>`) para garantizar una sintaxis válida de identificador.
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Desambiguación ante Colisiones:** Si dos agentes producen nombres sanitizados en conflicto, se añaden sufijos numéricos (`_2`, `_3`) automáticamente para evitar sobreescrituras en el esquema.
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Límite de Longitud:** Los identificadores de herramientas de transferencia se limitan a 60 caracteres para cumplir con las restricciones de los proveedores.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Envío de Actualizaciones de Contexto:** `session.set_active_agent(agent, context_updates)` permite propagar modificaciones de estado de metadatos junto con el evento de handoff.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Envío de Actualizaciones de Contexto:** `session.set_active_agent(agent, context_updates)` almacena `Handoff.context_updates` en los metadatos de la sesión cuando ocurre la transferencia. Las herramientas integradas `transfer_to_*` nunca rellenan `context_updates`; solo puede hacerlo una herramienta personalizada que devuelva su propio `Handoff`.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Nombres de Agente Únicos (cambio incompatible):** Construir un `Runner` cuyo grafo de handoffs contenga dos instancias distintas de `Agent` con el mismo `name` lanza `ValueError` (`"Duplicate agent name 'Billing': distinct Agent instances cannot share a name in one Runner tree."`). La misma comprobación se aplica a los pares añadidos posteriormente con `add_handoff()`. En v0.3.4, la segunda instancia se ignoraba silenciosamente. Los nombres vacíos o formados solo por espacios lanzan `ValueError` al crear el `Agent`.
 
 ---
 
@@ -241,11 +241,11 @@ print("Handoff:", response.handoff)
 
 ## Errores Comunes y Buenas Prácticas
 
-### 1. Agentes Inalcanzables en el Registro
-El `Runner` indexa automáticamente a todos los agentes accesibles a través del árbol de handoffs desde `starting_agent`. Si un agente no está vinculado en dicho grafo, debe registrarse explícitamente:
+### 1. Los Destinos de Transferencia Deben Declararse en el Agente Actual
+El `Runner` indexa automáticamente a todos los agentes accesibles a través del árbol de handoffs desde `starting_agent`. En v0.4.0rc1, registrar un agente con `runner.register_agent(...)` **no** lo convierte en destino de transferencia: un agente solo puede transferir a los pares de sus propios `handoffs`. Para añadir un destino dinámicamente, decláralo en el agente que transferirá hacia él; el `Runner` lo registra en su primer uso:
 ```python
-# Si un agente se incorpora de forma dinámica:
-runner.register_agent(specialist_agent)
+# Hacer que specialist_agent sea accesible desde triage_agent en tiempo de ejecución:
+triage_agent.add_handoff(specialist_agent)
 ```
 
 ### 2. Instrucciones de Handoff Demasiado Genéricas

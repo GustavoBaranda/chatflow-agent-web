@@ -62,27 +62,38 @@ runner = Runner(starting_agent=support)
 assert "Billing" in runner._agents_registry
 ```
 
-Si un agente se instancia fuera del grafo de handoffs inicial, regístralo explícitamente mediante `runner.register_agent(agent)`.
+Si un agente se instancia fuera del grafo de handoffs inicial, puedes registrarlo con `runner.register_agent(agent)`, pero en v0.4.0rc1 eso no lo convierte en destino de transferencia: un agente solo puede transferir a los pares de sus propios `handoffs`. Los pares añadidos posteriormente con `add_handoff()` se registran automáticamente en su primer uso.
+
+La indexación también valida los nombres. En v0.4.0rc1, dos instancias distintas de `Agent` con el mismo `name` en cualquier punto del grafo de handoffs lanzan `ValueError` al crear el `Runner` (un cambio incompatible respecto a v0.3.4, que conservaba silenciosamente la primera).
 
 ---
 
 ## Ciclo de Vida de Ejecución del Turno
 
-Cada invocación a `runner.run_async()` sigue una secuencia determinista protegida transaccionalmente:
+Cada invocación a `runner.run_async()` sigue una secuencia determinista protegida transaccionalmente en v0.4.0rc1:
 
 ```
-1. Recuperación de Sesión y Adquisición de Bloqueo
-   └── Obtiene o crea la sesión; adquiere session.lock para serializar turnos concurrentes.
+1. Adquisición del Bloqueo de Sesión y Actualización
+   ├── Rechaza turnos anidados de la misma sesión (ReentrantTurnError).
+   ├── Adquiere el bloqueo de la sesión (compartido por almacén, ID de sesión y
+   │   bucle de eventos, tanto para SessionStore como para SQLiteSessionStore).
+   │   La espera aquí no cuenta para turn_timeout.
+   └── session.refresh() recarga el historial, el agente activo y los metadatos
+       confirmados por turnos anteriores.
 
-2. Creación del Punto de Control (Checkpoint)
-   └── Registra checkpoint_len = len(session.history) para protección ante reversiones.
+2. Creación del Punto de Control (Checkpoint) y Fusión de Metadatos
+   ├── Guarda como punto de control una copia del historial, el agente activo
+   │   y una copia profunda de los metadatos.
+   └── Fusiona en la sesión los metadatos pasados a run_async().
 
 3. Ingestión del Mensaje Entrante
    └── Añade Message(role=Role.USER, content=user_message) al historial.
 
 4. Bucle de Ejecución (Hasta max_tool_iterations)
    ├── A. Resuelve el agente activo (desde session.active_agent)
-   ├── B. Resuelve el motor (agent.engine o runner.engine)
+   ├── B. Resuelve el motor: agent.engine → agent.provider → agent.base_url
+   │      → Runner(engine=...) explícito → prefijo del nombre del modelo
+   │      → GeminiEngine predeterminado del Runner
    ├── C. Genera el turno del modelo mediante engine.generate_turn_async()
    ├── D. Si el Modelo Solicita Herramientas:
    │      ├── Añade Message(role=Role.MODEL, tool_calls=[...])
@@ -94,33 +105,54 @@ Cada invocación a `runner.run_async()` sigue una secuencia determinista protegi
           └── Añade Message(role=Role.MODEL, content=final_text)
           └── Retorna AgentResponse
 
-5. Gestión de Excepciones / Tiempos Límite
-   └── Si ocurre un error, session.rollback_to(checkpoint_len) restaura el estado anterior.
+5. Gestión de Excepciones / Cancelaciones / Tiempos Límite
+   └── Ante una excepción, una cancelación o turn_timeout, el punto de control
+       se restaura (session.restore_history) antes de propagar el error.
 ```
 
 ---
 
 ## Seguridad Transaccional de Estado y Reversión (Rollback)
 
-En sistemas distribuidos y de IA conversacional, interrupciones de red, límites de cuota y excepciones en herramientas pueden dejar el historial conversacional en un estado inconsistente (como una llamada a herramienta huérfana sin su resultado correspondiente).
+Las interrupciones de red, los límites de cuota y las excepciones en herramientas pueden dejar el estado conversacional corrupto (como una llamada a herramienta huérfana sin su resultado correspondiente). En v0.4.0rc1, el `Runner` hace que cada turno sea de todo o nada:
 
-`chatflow-agent` garantiza **atomicidad a nivel de turno**:
+* **Punto de Control Previo al Turno:** Tras adquirir el bloqueo y actualizar la sesión, el `Runner` guarda como punto de control una copia del historial, el agente activo y una copia profunda de los metadatos.
+* **Reversión Automática:** Si una excepción escapa del turno (por ejemplo, un `ProviderError` o un error inesperado de una herramienta), el turno se cancela (`asyncio.CancelledError`) o expira `turn_timeout`, el `Runner` restaura los tres mediante `session.restore_history(...)` y luego vuelve a lanzar la excepción. Con SQLite, se permite que una escritura ya en curso termine primero, de modo que la reversión nunca se solapa con ella.
+* **Garantía de Integridad:** El historial, el agente activo y los metadatos vuelven a su estado previo al turno, por lo que las llamadas huérfanas a herramientas nunca llegan a solicitudes posteriores al proveedor. Una reversión que falla se notifica como error, nunca como éxito.
+* **Límites:** Una reversión no puede deshacer los efectos secundarios externos de una herramienta (pagos, correos electrónicos, llamadas a APIs). Una herramienta síncrona que sigue ejecutándose en un hilo de trabajo tras un tiempo límite continúa ejecutándose; los turnos posteriores de la misma sesión esperan a que termine.
 
-* **Punto de Control Previo al Turno:** Antes de añadir el mensaje del usuario, el `Runner` registra `checkpoint_len = len(session.history)`.
-* **Reversión Automática:** Si el motor lanza un `ProviderError`, una herramienta falla con una excepción inesperada o se cancela una tarea asíncrona:
+### Parámetros de `run_async()` y `spawn_turn()`
+
+| Método | Firma | Notas |
+| :--- | :--- | :--- |
+| `run_async` | `run_async(session_id, user_message, metadata=None, *, turn_timeout=None)` | `turn_timeout` solo se acepta como argumento con nombre (*keyword-only*) y debe ser un número finito positivo. Empieza a contar cuando el turno obtiene el bloqueo de la sesión. Al expirar, el turno se revierte y se lanza `TimeoutError` (`asyncio.TimeoutError`). |
+| `run` | `run(session_id, user_message, metadata=None)` | Envoltorio síncrono; lanza `RuntimeError` si se invoca desde un bucle de eventos en ejecución. |
+| `spawn_turn` | `spawn_turn(session_id, user_message, metadata=None) -> asyncio.Task[AgentResponse]` | Inicia un turno como tarea independiente, por ejemplo un turno posterior encolado por una herramienta para su propia sesión. Se ejecuta después de que termine el turno actual; no lo esperes con `await` dentro de ese turno (provocaría un interbloqueo). |
 
 ```python
-try:
-    # Lógica de ejecución del turno
-    pass
-except Exception:
-    if hasattr(session, "rollback_to"):
-        session.rollback_to(checkpoint_len)
-    else:
-        session.history = session.history[:checkpoint_len]
-    raise
+# [min-version: 0.4.0rc1]
+# [no-exec: requires a live model provider]
+import asyncio
+
+from chatflow_agent import Agent, Runner
+
+agent = Agent(name="Bot", instructions="Concise assistant", model="gemini-2.5-flash")
+
+async def main() -> None:
+    async with Runner(starting_agent=agent) as runner:
+        try:
+            response = await runner.run_async(
+                session_id="user-1",
+                user_message="Summarize the latest report.",
+                turn_timeout=45.0,
+            )
+            print(response.content)
+        except asyncio.TimeoutError:
+            # El turno se revirtió; la sesión está como antes.
+            print("The turn took too long.")
+
+asyncio.run(main())
 ```
-* **Garantía de Integridad:** El turno fallido se descarta íntegramente del historial, impidiendo que llamadas huérfanas a herramientas invaliden solicitudes posteriores al proveedor.
 
 ---
 
@@ -182,7 +214,7 @@ El motor de ejecución `Runner` incorpora mejoras críticas de concurrencia y re
 * Reversión transaccional basada en puntos de control ante excepciones del turno.
 
 ### Mejoras de la Versión Preliminar (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Grupo de Conexiones (`async with runner:`):** Abre un pool de cliente HTTP persistente a lo largo de múltiples turnos para reutilizar conexiones TCP subyacentes:
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Grupo de Conexiones (`async with runner:`):** Dentro del ámbito, las peticiones a Gemini que el runner realiza en ese bucle de eventos comparten un único cliente `httpx` agrupado, que se cierra al salir del ámbito. `OpenAIEngine` y `AnthropicEngine` siguen abriendo un cliente por cada intento de petición. `Runner.run()`, `TelegramChannel.run()` y la aplicación de `WhatsAppChannel` abren este ámbito automáticamente:
 ```python
 # [min-version: 0.4.0rc1]
 # [no-exec: illustrative async connection pool pattern]
@@ -221,7 +253,7 @@ async def handle_post(session_id: str, msg: str):
 
 ### 2. Invocar `run()` Síncrono Dentro de Controladores Asíncronos
 ```python
-# [INCORRECTO]: Bloquea hilos de trabajo y falla en v0.4.0rc1
+# [INCORRECTO]: Lanza RuntimeError dentro de un bucle de eventos en ejecución
 # async def api_endpoint(req):
 #     return runner.run(req.session_id, req.message)
 

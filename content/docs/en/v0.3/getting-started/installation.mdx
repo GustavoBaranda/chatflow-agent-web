@@ -13,7 +13,7 @@ Before installing `chatflow-agent`, ensure your system meets the minimum Python 
 
 * **Python Version:** Python `>=3.10` (tested on 3.10, 3.11, 3.12, and 3.13).
 * **Package Manager:** `pip`, `uv`, or `poetry`.
-* **Operating Systems:** Linux, macOS, and Windows (x86_64, arm64).
+* **Operating Systems:** the SDK's CI runs on Linux (Ubuntu) and Windows. The package is pure Python, so macOS and arm64 are expected to work, but they are not part of the CI matrix.
 
 Verify your local Python version in your terminal:
 
@@ -26,7 +26,7 @@ python --version
 
 ## Installing the Core Package
 
-`chatflow-agent` provides a lightweight core with zero heavy provider dependencies. Choose between the stable production release or the prerelease candidate:
+`chatflow-agent` keeps its core dependencies small: in v0.3.4 they are `google-genai` (used by `GeminiEngine`), `pydantic`, and `httpx`. Choose between the stable release or the prerelease candidate:
 
 <Tabs items={['pip', 'uv', 'poetry']}>
   <Tab value="pip">
@@ -34,9 +34,8 @@ python --version
 # Install current stable release (v0.3.4 - recommended for production)
 pip install chatflow-agent
 
-# Or install the prerelease candidate (v0.4.0rc1+)
-pip install --pre chatflow-agent
-# or: pip install "chatflow-agent==0.4.0rc1"
+# Or install the prerelease candidate (v0.4.0rc1, the only published 0.4 release)
+pip install "chatflow-agent==0.4.0rc1"
 ```
   </Tab>
   <Tab value="uv">
@@ -45,8 +44,7 @@ pip install --pre chatflow-agent
 uv add chatflow-agent
 
 # Or install the prerelease candidate
-uv add --prerelease=allow chatflow-agent
-# or: uv add "chatflow-agent==0.4.0rc1"
+uv add "chatflow-agent==0.4.0rc1"
 ```
   </Tab>
   <Tab value="poetry">
@@ -60,8 +58,8 @@ poetry add chatflow-agent@0.4.0rc1
   </Tab>
 </Tabs>
 
-<Callout type="info" title="Zero-SDK Lock-In & Core Dependencies">
-In **v0.3.4**, core dependencies are strictly limited to `google-genai>=0.1.1`, `pydantic>=2.6.0`, and `httpx>=0.27.0`. In **v0.4.0rc1+**, `google-genai` is no longer required: all Gemini and OpenAI-compatible communication executes directly over asynchronous REST via `httpx`. SQLite persistence uses Python's built-in `sqlite3` library without requiring third-party database drivers.
+<Callout type="info" title="Core Dependencies">
+In **v0.3.4**, core dependencies are `google-genai>=0.1.1`, `pydantic>=2.6.0`, and `httpx>=0.27.0`; `google-genai` is installed automatically. In the **v0.4.0rc1** prerelease, `google-genai` is no longer a dependency: Gemini, Anthropic, and OpenAI-compatible engines all communicate over REST via `httpx`. SQLite persistence uses Python's built-in `sqlite3` library without requiring third-party database drivers.
 </Callout>
 
 ---
@@ -72,9 +70,9 @@ In **v0.3.4**, core dependencies are strictly limited to `google-genai>=0.1.1`, 
 
 | Extra Name | Description | Key Dependencies Added | Command |
 | :--- | :--- | :--- | :--- |
-| `[telegram]` | Telegram Bot integration via polling or webhooks | `python-telegram-bot>=21.0` | `pip install "chatflow-agent[telegram]"` |
-| `[whatsapp]` | Meta WhatsApp Cloud API webhooks & webhook listener | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[whatsapp]"` |
-| `[webhook]` | Generic HTTP webhook server for external integrations | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[webhook]"` |
+| `[telegram]` | Telegram Bot integration via long polling (`TelegramChannel`) | `python-telegram-bot>=21.0` | `pip install "chatflow-agent[telegram]"` |
+| `[whatsapp]` | Meta WhatsApp Cloud API webhook server (`WhatsAppChannel`) | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[whatsapp]"` |
+| `[webhook]` | Installs FastAPI and Uvicorn for building your own HTTP endpoint. There is no built-in generic webhook channel; see the [Custom Webhooks guide](/en/docs/v0.3/integrations/webhook) | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[webhook]"` |
 | `[all]` | Installs all channel dependencies simultaneously | `telegram`, `whatsapp`, `webhook` | `pip install "chatflow-agent[all]"` |
 | `[dev]` | Tools for running unit and integration test suites | `pytest>=8.0.0`, `pytest-asyncio`, `ruff`, `mypy` | `pip install "chatflow-agent[dev]"` |
 
@@ -98,17 +96,26 @@ Expected output:
 
 ## Provider API Keys Configuration
 
-To interact with LLMs, export the API key for your chosen provider as an environment variable in your shell or `.env` file:
+To interact with LLMs, export the API key for your chosen provider as an environment variable in your shell or `.env` file. Each provider reads its own variable, and only when the request goes to that provider's official endpoint; `OPENAI_API_KEY` is never sent to another provider or host:
 
 ```bash
-# OpenAI or OpenAI-compatible providers (Groq, xAI, DeepSeek, Ollama)
+# OpenAI
 export OPENAI_API_KEY="sk-..."
+
+# xAI Grok (provider="grok" or provider="xai")
+export XAI_API_KEY="xai-..."
+
+# DeepSeek and Groq
+export DEEPSEEK_API_KEY="sk-..."
+export GROQ_API_KEY="gsk_..."
 
 # Anthropic Claude models
 export ANTHROPIC_API_KEY="sk-ant-..."
 
 # Google Gemini models
 export GEMINI_API_KEY="AIzaSy..."
+
+# A local Ollama server needs no key. OLLAMA_API_KEY is only used if you set it.
 ```
 
 On Windows PowerShell:

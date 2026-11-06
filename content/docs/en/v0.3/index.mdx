@@ -13,7 +13,7 @@ You are viewing the official stable documentation for <strong>chatflow-agent v0.
 
 Welcome to the official documentation for **chatflow-agent**, a lightweight, async-first Python framework engineered for building modular conversational agents and multi-agent swarms with native, type-safe handoffs.
 
-Created and led by **Gustavo Baranda**, `chatflow-agent` focuses on a compact Python API, per-session async turn serialization, persistent SQLite sessions, and multi-channel connectivity.
+Created and led by **Gustavo Baranda**, `chatflow-agent` focuses on a compact Python API, per-session async turn serialization for in-memory sessions, persistent SQLite sessions, and multi-channel connectivity.
 
 ---
 
@@ -24,7 +24,7 @@ Created and led by **Gustavo Baranda**, `chatflow-agent` focuses on a compact Py
     Uses `google-genai` for Gemini in stable v0.3.4 and dedicated HTTP clients for Anthropic and OpenAI-compatible providers. REST-only Gemini is a v0.4.0rc1 prerelease feature.
   </Card>
   <Card title="Native Multi-Agent Handoffs">
-    Declare collaborative swarms. Agents delegate tasks dynamically using synthesized `transfer_to_*` tools with automatic cycle prevention.
+    Declare collaborative swarms. Agents delegate tasks dynamically using synthesized `transfer_to_*` tools, with transfers per turn capped by `max_handoffs_per_turn`.
   </Card>
   <Card title="Session Memory">
     Persists conversations with in-memory or SQLite stores. For ordinary exceptions, v0.3.4 restores conversation history length; it does not promise full-state or cancellation rollback. SQLite thread-pool offloading is a v0.4.0rc1 prerelease feature.

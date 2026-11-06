@@ -18,11 +18,13 @@ An `Agent` represents an autonomous actor with an explicit persona, system promp
 # [executable]
 from chatflow_agent import Agent
 
-# Static prompt instructions with target model
+# Static prompt instructions with target model.
+# In v0.3.4, non-Gemini models need an explicit provider (or engine).
 agent = Agent(
     name="TriageBot",
     instructions="You are the front desk concierge. Route questions to specialists.",
     model="gpt-4o",
+    provider="openai",
 )
 ```
 
@@ -63,6 +65,8 @@ The `Runner` orchestrates the conversation lifecycle. It handles:
 4. Parsing tool calls, executing the corresponding functions, and feeding results back to the model until a final response is generated.
 5. Keeping successful changes, or truncating history when an ordinary unhandled exception escapes the turn.
 
+Synchronous invocation, for scripts and CLI tools (no event loop running):
+
 ```python
 from chatflow_agent import Agent, Runner, SessionStore
 
@@ -70,6 +74,7 @@ agent = Agent(
     name="Assistant",
     instructions="Concise scheduling assistant.",
     model="gpt-4o",
+    provider="openai",
 )
 
 store = SessionStore()
@@ -79,17 +84,34 @@ runner = Runner(
     session_store=store,
 )
 
-# Synchronous invocation
 response = runner.run(
     session_id="user_123",
     user_message="Book a meeting tomorrow at 3 PM",
 )
+```
 
-# Asynchronous invocation
-response = await runner.run_async(
-    session_id="user_123",
-    user_message="Book a meeting tomorrow at 3 PM",
-)
+Asynchronous invocation, inside an event loop (web servers, bots, `asyncio` apps):
+
+```python
+import asyncio
+
+from chatflow_agent import Agent, Runner
+
+async def main() -> None:
+    agent = Agent(
+        name="Assistant",
+        instructions="Concise scheduling assistant.",
+        model="gpt-4o",
+        provider="openai",
+    )
+    runner = Runner(starting_agent=agent)
+    response = await runner.run_async(
+        session_id="user_123",
+        user_message="Book a meeting tomorrow at 3 PM",
+    )
+    print(response.content)
+
+asyncio.run(main())
 ```
 
 <Callout type="info" title="turn_timeout in v0.4.0rc1">
@@ -100,11 +122,11 @@ In <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>Runner.run_asy
 
 ## 3. Provider Engines (`Engines`)
 
-All model communication in `chatflow-agent` is decoupled behind the `BaseEngine` interface. Engines communicate over asynchronous HTTP REST using `httpx`, eliminating the need for monolithic vendor client libraries:
+All model communication in `chatflow-agent` is decoupled behind the `BaseEngine` interface. In v0.3.4, the OpenAI-compatible and Anthropic engines call their REST APIs with `httpx`, while `GeminiEngine` uses the `google-genai` client:
 
 * **`OpenAIEngine`**: Supports OpenAI models and any OpenAI-compatible API (Groq, DeepSeek, xAI Grok, Ollama, vLLM) via `base_url`.
 * **`AnthropicEngine`**: Direct REST integration with Anthropic Claude models.
-* **`GeminiEngine`**: Google Gemini integration. In <VersionBadge version="0.4.0rc1" status="prerelease" />, completely rewritten with native REST calls.
+* **`GeminiEngine`**: Google Gemini integration through `google-genai`. In <VersionBadge version="0.4.0rc1" status="prerelease" />, it was rewritten to call the Gemini REST API with `httpx`.
 
 ```python
 from chatflow_agent import Agent, OpenAIEngine
@@ -128,7 +150,7 @@ local_agent = Agent(
 
 ## 4. Deterministic Tools (`Tool` & `@tool`)
 
-Tools give agents deterministic execution power. When decorated with `@tool`, `chatflow-agent` automatically parses Python type annotations and docstrings to generate standard JSON Schema specifications for the LLM:
+Tools give agents deterministic execution power. When decorated with `@tool`, `chatflow-agent` builds the parameter schema from the Python type annotations and default values. The tool description is the `description=` argument, or the function docstring when no description is given; docstring sections such as `Args:` are not parsed into per-parameter descriptions:
 
 ```python
 # [min-version: 0.3.0]
@@ -137,11 +159,7 @@ from chatflow_agent import tool
 
 @tool(name="fetch_user_profile", description="Fetch user metadata from internal database.")
 def fetch_user_profile(user_id: str) -> dict[str, str]:
-    """Retrieve user details.
-
-    Args:
-        user_id: Unique user identifier string.
-    """
+    """Retrieve user details."""
     return {"user_id": user_id, "tier": "enterprise", "status": "active"}
 ```
 
@@ -156,7 +174,8 @@ Both synchronous (`def`) and asynchronous (`async def`) tool functions are nativ
 ```python
 from chatflow_agent import SQLiteSessionStore
 
-# Persistent SQLite session store with configurable turn limit
+# Persistent SQLite session store. default_max_turns is a sliding history
+# window: it keeps the last 40 complete turns of each session.
 store = SQLiteSessionStore(
     db_path="./chat_sessions.db",
     default_max_turns=40,
@@ -176,7 +195,7 @@ Before processing a turn, stable v0.3.4 records the current history length. If a
 
 ## 6. Multi-Agent Handoffs (`Handoffs`)
 
-Multi-agent swarms delegate tasks dynamically using declarative handoffs. When an agent defines `handoffs=[agent_b]`, `chatflow-agent` automatically synthesizes a tool named `transfer_to_agent_b`:
+Multi-agent swarms delegate tasks dynamically using declarative handoffs. When an agent declares a peer in `handoffs=[...]`, `chatflow-agent` synthesizes a transfer tool named after the peer's `name`, lowercased and sanitized: a peer named `BillingAgent` becomes `transfer_to_billingagent`:
 
 ```python
 from chatflow_agent import Agent, Runner
@@ -186,6 +205,7 @@ billing_agent = Agent(
     name="BillingAgent",
     instructions="You specialize in invoices, receipts, and refund requests.",
     model="gpt-4o",
+    provider="openai",
 )
 
 # Frontline Triage Agent
@@ -193,6 +213,7 @@ triage_agent = Agent(
     name="TriageAgent",
     instructions="Greet users. Transfer billing issues to BillingAgent.",
     model="gpt-4o",
+    provider="openai",
     handoffs=[billing_agent],
 )
 
@@ -208,7 +229,7 @@ print(f"Responding agent: {response.active_agent_name}")
 print(f"Message content: {response.content}")
 ```
 
-The `Runner` automatically traces delegations, and the final responding agent is always visible via `response.active_agent_name`.
+The final responding agent is visible via `response.active_agent_name`. Transfers within one turn are capped by `Runner(max_handoffs_per_turn=5)`; there is no separate cycle detection.
 
 ---
 

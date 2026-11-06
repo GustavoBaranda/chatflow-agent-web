@@ -21,7 +21,7 @@ Cada sessão de conversa é encapsulada por um objeto `SessionContext`:
 from chatflow_agent import Agent
 from chatflow_agent.core.memory import SessionContext
 
-agent = Agent(name="Assistant", instructions="Helpful bot", model="gpt-4o")
+agent = Agent(name="Assistant", instructions="Helpful bot", model="gpt-4o", provider="openai")
 
 session = SessionContext(
     session_id="user-session-1001",
@@ -43,8 +43,8 @@ assert session.metadata["channel"] == "whatsapp"
 | `max_turns` | Número máximo de turnos conversacionais completos retidos na memória antes da poda. |
 | `history` | Lista de objetos tipados `Message` (`Role.SYSTEM`, `Role.USER`, `Role.MODEL`, `Role.TOOL`). |
 | `metadata` | Dicionário arbitrário para contexto do usuário, tokens, cabeçalhos de canal e flags. |
-| `lock` | Instância assíncrona de `asyncio.Lock` que serializa o processamento de mensagens por sessão. |
-| `rollback_to(len)` | Trunca atomicamente o histórico de volta a um ponto de restauração anterior em caso de falha. |
+| `lock` | Instância assíncrona de `asyncio.Lock` mantida pelo `Runner` durante um turno. Ela serializa os turnos de uma sessão com o `SessionStore` em memória; na v0.3.4, o `SQLiteSessionStore` cria um novo contexto (e um novo lock) a cada chamada, portanto não os serializa. |
+| `rollback_to(len)` | Trunca o histórico de volta ao tamanho de um ponto de restauração anterior em caso de falha (apenas o histórico). |
 
 ---
 
@@ -76,7 +76,7 @@ Um mecanismo rápido baseado em dicionário em memória. Ele serializa os turnos
 from chatflow_agent import Agent, Runner, SessionStore
 
 store = SessionStore(default_max_turns=40)
-agent = Agent(name="Bot", instructions="Assistant", model="gpt-4o")
+agent = Agent(name="Bot", instructions="Assistant", model="gpt-4o", provider="openai")
 runner = Runner(starting_agent=agent, session_store=store)
 
 # As sessões são criadas sob demanda
@@ -105,7 +105,7 @@ sqlite_store = SQLiteSessionStore(
 Ao ser inicializado, o `SQLiteSessionStore` cria e indexa automaticamente três tabelas:
 
 * `chatflow_sessions`: Armazena `session_id`, `active_agent_name`, `metadata_json` e marcas temporais (*timestamps*).
-* `chatflow_messages`: Armazena mensagens individuais serializadas em JSON com exclusão em cascata por chave estrangeira (`ON DELETE CASCADE`).
+* `chatflow_messages`: Armazena mensagens individuais serializadas em JSON. O esquema declara `ON DELETE CASCADE`, mas o SQLite só o aplica com `PRAGMA foreign_keys=ON`, que o store não habilita; em vez disso, `delete()` e `clear_history()` removem as linhas de mensagens explicitamente.
 * `chatflow_processed_messages`: Rastreia IDs de mensagens processadas e marcas temporais para garantir deduplicação idempotente de webhooks.
 
 ---
@@ -119,8 +119,8 @@ Para revincular a sessão persistida à instância Python real do `Agent` (com s
 ```python
 from chatflow_agent import Agent, Runner, SQLiteSessionStore
 
-billing = Agent(name="Billing", instructions="Billing specialist", model="gpt-4o")
-support = Agent(name="Support", instructions="Support", handoffs=[billing], model="gpt-4o")
+billing = Agent(name="Billing", instructions="Billing specialist", model="gpt-4o", provider="openai")
+support = Agent(name="Support", instructions="Support", handoffs=[billing], model="gpt-4o", provider="openai")
 
 store = SQLiteSessionStore(db_path="agents.db")
 
@@ -129,7 +129,11 @@ runner = Runner(starting_agent=support, session_store=store)
 
 # Se você carregar sessões de forma isolada fora do Runner:
 store.set_agent_resolver(lambda name: billing if name == "Billing" else support)
+
+# get() retorna None quando a sessão ainda não existe
 session = store.get("session-101")
+if session is None:
+    session = store.get_or_create("session-101", default_agent=support)
 assert session.active_agent.name in ["Billing", "Support"]
 ```
 
@@ -155,7 +159,7 @@ if store.record_processed_message(msg_id):
     pass
 else:
     # Duplicata dentro do TTL configurado
-    print(f"Ignorando mensagem duplicada: {msg_id}")
+    print(f"Skipping duplicate message: {msg_id}")
 ```
 
 ---
@@ -203,7 +207,7 @@ runner = Runner(starting_agent=agent, session_store=store)
 async def handle_inbound_webhook(user_phone: str, message_text: str, webhook_msg_id: str):
     # 1. Proteção de deduplicação
     if not store.record_processed_message(webhook_msg_id):
-        print(f"Ignorando webhook duplicado: {webhook_msg_id}")
+        print(f"Skipping duplicate webhook: {webhook_msg_id}")
         return None
 
     # 2. Executar turno com sessão persistida

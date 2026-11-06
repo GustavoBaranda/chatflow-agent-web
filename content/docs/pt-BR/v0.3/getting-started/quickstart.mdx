@@ -19,12 +19,14 @@ Crie um novo arquivo chamado `quickstart.py`:
 import os
 from chatflow_agent import Agent, Runner
 
-# 1. Definir a persona do agente, instruções e modelo de destino
-# O chatflow-agent direciona automaticamente "gpt-4o" para o motor OpenAI usando OPENAI_API_KEY
+# 1. Definir a persona do agente, instruções, modelo de destino e provedor.
+# Na v0.3.4, defina provider="openai" explicitamente: sem ele, o Runner envia o
+# agente ao seu GeminiEngine padrão. A OPENAI_API_KEY é lida do ambiente.
 agent = Agent(
     name="Assistant",
     instructions="You are a concise and helpful AI technical assistant.",
     model="gpt-4o",
+    provider="openai",
 )
 
 # 2. Inicializar o Runner com seu agente inicial
@@ -48,7 +50,7 @@ python quickstart.py
 ```
 
 <Callout type="info" title="Proteção de Loop de Eventos (Event Loop Guard)">
-<code>runner.run()</code> é um método síncrono de conveniência projetado para scripts e utilitários de linha de comando (CLI). Se você estiver dentro de um loop de eventos assíncrono existente (como FastAPI, Jupyter Notebook ou asyncio), utilize <code>await runner.run_async()</code>. Chamar <code>runner.run()</code> dentro de um loop ativo gera um erro <code>RuntimeError</code> explícito.
+<code>runner.run()</code> é um método síncrono de conveniência projetado para scripts e utilitários de linha de comando (CLI). Se você estiver dentro de um loop de eventos assíncrono existente (como FastAPI, Jupyter Notebook ou asyncio), utilize <code>await runner.run_async()</code>. Na v0.3.4, chamar <code>runner.run()</code> dentro de um loop ativo falha com o <code>RuntimeError</code> genérico do asyncio ("asyncio.run() cannot be called from a running event loop"); a mensagem explícita que aponta para <code>run_async()</code> foi adicionada na versão <VersionBadge version="0.4.0rc1" status="prerelease" />.
 </Callout>
 
 ---
@@ -63,15 +65,11 @@ Os agentes tornam-se exponencialmente mais poderosos quando recebem acesso a fun
 import os
 from chatflow_agent import Agent, Runner, tool
 
-# 1. Definir uma ferramenta com parâmetros tipados e docstrings
+# 1. Definir uma ferramenta. Os schemas de parâmetros vêm das anotações de tipo e
+# dos valores padrão; description= é a descrição da ferramenta (sobrepõe a docstring).
 @tool(name="calculate_discount", description="Calculate discounted price from original amount and percentage.")
 def calculate_discount(price: float, discount_percent: float) -> str:
-    """Calculate the final price after applying a percentage discount.
-
-    Args:
-        price: The original price in dollars.
-        discount_percent: The percentage discount to apply (e.g. 15 for 15%).
-    """
+    """Calculate the final price after applying a percentage discount."""
     savings = price * (discount_percent / 100.0)
     final_price = price - savings
     return f"Original: ${price:.2f}, Savings: ${savings:.2f}, Final Price: ${final_price:.2f}"
@@ -81,6 +79,7 @@ agent = Agent(
     name="SalesBot",
     instructions="You help customers with purchase calculations. Always use calculate_discount for math.",
     model="gpt-4o",
+    provider="openai",
     tools=[calculate_discount],
 )
 
@@ -120,6 +119,7 @@ async def main() -> None:
         name="AsyncBot",
         instructions="Provide concise answers.",
         model="gpt-4o",
+        provider="openai",
     )
 
     runner = Runner(starting_agent=agent)
@@ -140,23 +140,29 @@ if __name__ == "__main__":
 
 ## 4. Flexibilidade com Múltiplos Provedores
 
-Como o `chatflow-agent` utiliza motores REST diretos, alternar entre provedores é instantâneo, sem necessidade de alterar a lógica do seu agente:
+Todos os motores implementam a mesma interface `BaseEngine`, portanto alternar entre provedores não altera a lógica do seu agente:
 
 ```python
+# [min-version: 0.3.0]
+# [executable]
 import os
 from chatflow_agent import Agent, OpenAIEngine
 
-# Opção 1: Configuração direta do modelo (os motores são resolvidos automaticamente)
+# Opção 1: Informar o provedor no agente. Na v0.3.4 isso é obrigatório para
+# modelos que não são Gemini executados por um Runner: seu GeminiEngine padrão é
+# usado antes que os prefixos do nome do modelo sejam considerados.
 openai_agent = Agent(
     name="OpenAIBot",
     instructions="You are powered by GPT-4o.",
     model="gpt-4o",
+    provider="openai",
 )
 
 claude_agent = Agent(
     name="ClaudeBot",
     instructions="You are powered by Claude 3.5 Sonnet.",
     model="claude-3-5-sonnet-20241022",
+    provider="anthropic",
 )
 
 gemini_agent = Agent(

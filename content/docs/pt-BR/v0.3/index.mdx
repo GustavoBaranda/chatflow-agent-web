@@ -13,7 +13,7 @@ Você está visualizando a documentação oficial estável do <strong>chatflow-a
 
 Bem-vindo à documentação oficial do **chatflow-agent**, um framework assíncrono e leve em Python projetado para construir agentes conversacionais modulares e enxames multiagente com transferências (*handoffs*) nativas e fortemente tipadas.
 
-Criado e liderado por **Gustavo Baranda**, o `chatflow-agent` concentra-se em uma API Python compacta, serialização assíncrona de turnos por sessão, sessões persistentes em SQLite e conectividade multicanal.
+Criado e liderado por **Gustavo Baranda**, o `chatflow-agent` concentra-se em uma API Python compacta, serialização assíncrona de turnos por sessão para sessões em memória, sessões persistentes em SQLite e conectividade multicanal.
 
 ---
 
@@ -24,7 +24,7 @@ Criado e liderado por **Gustavo Baranda**, o `chatflow-agent` concentra-se em um
     Usa `google-genai` para Gemini na versão estável v0.3.4 e clientes HTTP dedicados para Anthropic e provedores compatíveis com OpenAI. Gemini somente por REST é recurso da v0.4.0rc1 prerelease.
   </Card>
   <Card title="Handoffs Multiagente Nativos">
-    Declare enxames colaborativos. Os agentes delegam tarefas dinamicamente usando ferramentas sintetizadas `transfer_to_*` com prevenção automática de ciclos.
+    Declare enxames colaborativos. Os agentes delegam tarefas dinamicamente usando ferramentas sintetizadas `transfer_to_*`, com as transferências por turno limitadas por `max_handoffs_per_turn`.
   </Card>
   <Card title="Memória de Sessão">
     Persiste conversas em memória ou SQLite. Para exceções comuns, a v0.3.4 restaura o tamanho do histórico; não garante rollback de todo o estado nem em cancelamentos. O pool de threads para SQLite pertence à v0.4.0rc1 prerelease.

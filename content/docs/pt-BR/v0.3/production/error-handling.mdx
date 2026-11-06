@@ -1,6 +1,6 @@
 ---
 title: "Tratamento de Erros e Recuperação"
-description: "Estratégias de tratamento de erros em produção no chatflow-agent, hierarquia de exceções do SDK, autocorreção de ferramentas e reversão transacional de turnos."
+description: "Estratégias de tratamento de erros em produção no chatflow-agent v0.3.4, a hierarquia de exceções do SDK, o isolamento de erros de ferramentas e a reversão do histórico em turnos que falham."
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -11,7 +11,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 Construir sistemas multiagente resilientes exige tolerância a falhas estruturada. Indisponibilidades de provedores de LLM, timeouts de rede, argumentos inválidos de ferramentas e exceções imprevistas devem ser tratados adequadamente sem corromper o estado da conversa.
 
-O `chatflow-agent` implementa um modelo de recuperação em camadas: falhas não fatais de ferramentas são retornadas ao LLM para autocorreção autônoma, enquanto falhas fatais no turno disparam reversões atômicas de estado (rollbacks).
+O `chatflow-agent` implementa um modelo de recuperação em camadas: erros de ferramentas são informados ao LLM como um resultado de erro genérico para que o turno possa continuar, enquanto uma exceção comum que escapa do turno trunca o histórico da conversa até o tamanho anterior ao turno (a v0.3.4 não restaura o agente ativo nem os metadados, e não reverte turnos cancelados).
 
 ## Hierarquia de Exceções do SDK
 
@@ -21,8 +21,8 @@ Todas as exceções no `chatflow-agent` herdam de `ChatFlowError`. Isso permite 
 ChatFlowError (Base)
 ├── DependencyError (Dependências opcionais ausentes de canais)
 ├── ToolExecutionError (Erro não capturado durante a execução de ferramenta)
-├── ToolSchemaError (Anotação de tipo de parâmetro inválida) [v0.4.0rc1]
-├── AgentHandoffError (Destino de handoff desconhecido ou loop de transferências)
+├── ToolSchemaError (Anotação de união com um membro não mapeável) [v0.4.0rc1]
+├── AgentHandoffError (Destino de handoff desconhecido)
 ├── ProviderError (Erro de status de API de LLM, falha de rede ou timeout)
 ├── ReentrantTurnError (Turno aninhado da mesma sessão iniciado por um turno ativo) [v0.4.0rc1]
 └── SessionDeletedError (Mensagem despachada para uma sessão excluída) [v0.4.0rc1]
@@ -34,16 +34,16 @@ ChatFlowError (Base)
 | :--- | :--- | :--- | :--- |
 | `ChatFlowError` | `Exception` | Classe base para todas as exceções do SDK. | Tratar nos pontos de entrada das requisições. |
 | `DependencyError` | `ChatFlowError` | Um extra opcional de canal (ex.: `[telegram]`, `[whatsapp]`) não está instalado. | Instalar o extra necessário com `pip install "chatflow-agent[extra]"`. |
-| `ToolExecutionError` | `ChatFlowError` | Uma função de ferramenta lança uma exceção não tratada durante a execução. | Encapsulada em `ToolResult(is_error=True)` para que o agente possa se autocorrigir. |
-| `ToolSchemaError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Argumentos de função de ferramenta carecem de anotações de tipo Python válidas. | Corrigir assinaturas de tipo da função em tempo de desenvolvimento. |
-| `AgentHandoffError` | `ChatFlowError` | O agente de destino não existe no registro do `Runner` ou o turno ultrapassa `max_handoffs_per_turn`. | Verificar destinos de handoff e condições de loop de transferência. |
+| `ToolExecutionError` | `ChatFlowError` | Uma função de ferramenta lança uma exceção não tratada durante a execução. | Dentro de um turno, o `Runner` a registra nos logs e retorna ao modelo um `ToolResult(is_error=True)` genérico. |
+| `ToolSchemaError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Uma ferramenta é criada com uma anotação de união que contém um membro sem mapeamento de esquema. Parâmetros sem anotação são permitidos. | Corrigir assinaturas de tipo da função em tempo de desenvolvimento. |
+| `AgentHandoffError` | `ChatFlowError` | O agente de destino do handoff não existe no registro do `Runner`. Exceder `max_handoffs_per_turn` não levanta exceção: em vez disso, adiciona um resultado de erro de ferramenta. | Verificar destinos de handoff. |
 | `ProviderError` | `ChatFlowError` | O provedor upstream do modelo retorna um código de erro HTTP (ex.: 429, 500, 503). | Implementar retentativas com backoff exponencial ou fallback para outro motor. |
 | `ReentrantTurnError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError`, `RuntimeError` | Código executando dentro de um turno inicia outro turno na mesma sessão. | Utilizar filas de processamento em segundo plano ou despachantes sequenciais. |
 | `SessionDeletedError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Uma mensagem é processada para uma sessão expurgada durante a execução. | Recriar a sessão ou orientar o usuário a reiniciar o fluxo. |
 
 ## Autocorreção Autônoma de Ferramentas
 
-Quando uma ferramenta registrada lança uma exceção ou recebe argumentos que falham na validação de esquema, o `Runner` captura a falha e retorna um erro estruturado ao modelo, em vez de interromper o turno:
+Quando uma ferramenta registrada lança uma exceção, incluindo um `TypeError` causado por argumentos que a função não aceita, o `Runner` captura a falha e retorna um erro estruturado ao modelo, em vez de interromper o turno. A v0.3.4 não valida os argumentos das ferramentas contra o esquema antes de chamar a função:
 
 ```python
 import logging
@@ -68,6 +68,7 @@ def process_refund(order_id: str, amount: float) -> str:
 agent = Agent(
     name="RefundBot",
     model="gpt-4o",
+    provider="openai",
     tools=[process_refund],
     instructions="Process refunds accurately. If an order ID format is invalid, clarify with the user.",
 )
@@ -179,5 +180,5 @@ async def run_with_external_timeout(runner: Runner):
 
 - **Trate `ChatFlowError`:** Intercepte exceções do framework antes de permitir que propaguem para os endpoints HTTP.
 - **Defina Limites de Iterações:** Nunca configure `max_tool_iterations` ou `max_handoffs_per_turn` com valores ilimitados.
-- **Retorne Erros Descritivos nas Ferramentas:** Lance mensagens de `ValueError` ou `KeyError` claras dentro das ferramentas para que o agente compreenda o erro e se autocorrija.
+- **Retorne Erros Descritivos nas Ferramentas:** O modelo nunca vê o texto de uma exceção lançada por uma ferramenta, apenas um erro genérico com um `trace_id`. Se o modelo deve reagir a um problema específico (por exemplo, um ID de pedido malformado), faça a ferramenta **retornar** uma mensagem de erro curta e segura para o usuário, em vez de lançar uma exceção.
 - **Registre IDs de Rastreamento:** Capture o `trace_id` gerado nos logs do `Runner` para correlacionar chamados de suporte com traces internos do sistema.

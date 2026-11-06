@@ -15,6 +15,8 @@ import { DEFAULT_STABLE_TRACK } from '@/config/docs-versions';
 import { resolveDocSeo, createSocialMetadata } from '@/config/docs-seo';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { getDocStructuredData } from '@/lib/structured-data';
+import { getAuthoritativeSourceHash, isTranslationOutdated } from '@/lib/translation-freshness';
+import { DEFAULT_LOCALE } from '@/config/languages';
 import type { Metadata } from 'next';
 
 const customMdxComponents = {
@@ -121,6 +123,10 @@ export default async function Page({ params }: PageProps) {
 
   const MDX = page.data.body;
   const cleanNoticeSlug = targetSlug.join('/');
+  const isOutdatedTranslation =
+    locale !== DEFAULT_LOCALE &&
+    !isFallback &&
+    isTranslationOutdated(page.data.sourceHash, getAuthoritativeSourceHash(cleanNoticeSlug));
 
   return (
     <>
@@ -131,6 +137,10 @@ export default async function Page({ params }: PageProps) {
 
         {isFallback && (
           <TranslationNotice targetLocale={locale} slug={cleanNoticeSlug} />
+        )}
+
+        {isOutdatedTranslation && (
+          <OutdatedNotice sourceRevision={page.data.sourceRevision} slug={cleanNoticeSlug} />
         )}
 
         {track === 'v0.4' && (

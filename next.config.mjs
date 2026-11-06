@@ -12,6 +12,11 @@ const nextConfig = {
   experimental: {
     cpus: 1,
   },
+  // The docs route reads the English MDX sources at request time to detect outdated
+  // translations (src/lib/translation-freshness.ts); include them in its server bundle.
+  outputFileTracingIncludes: {
+    '/[locale]/docs/[[...slug]]': ['./content/docs/en/**/*.mdx'],
+  },
   webpack: (config) => {
     // Disable Webpack filesystem cache to prevent Windows EPERM mkdir file-lock races in sandbox
     config.cache = false;

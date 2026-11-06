@@ -1,6 +1,8 @@
 ---
 title: "Boas Práticas de Segurança"
 description: "Diretrizes de defesa em profundidade para o chatflow-agent, isolamento de credenciais, mitigação de injeção de prompt, assinaturas de webhook e privacidade de dados."
+sourceRevision: "db864ef"
+sourceHash: "aea7854566fe5d152b97bdb37381177103fb6fe008adc25fe7fbd9b9ae34a3fb"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -19,17 +21,19 @@ O `chatflow-agent` incorpora mecanismos de defesa diretamente em seus motores ce
 Untrusted Input (Webhooks / Chat Channels)
           │
           ▼
-1. Transport Security & Authentication (HMAC SHA-256 / Bearer Tokens / Admin Check)
+1. Inbound Authentication (WhatsApp HMAC SHA-256 / Verify Token / Telegram Admin Check)
           │
           ▼
-2. Session Concurrency & Reentrancy Guards (ReentrantTurnError / Session Lock)
+2. Session Concurrency & Reentrancy Guards (Session Lock / ReentrantTurnError)
           │
           ▼
-3. Agent Boundaries & Tool Sandboxing (Validation / Type Check / Iteration Limits)
+3. Agent Boundaries (Per-Agent Tool Scoping / Iteration and Handoff Limits)
           │
           ▼
 4. Credential Isolation & Egress Guards (ValueError on Custom Host / No API Key Leak)
 ```
+
+O SDK não isola as ferramentas em sandbox: elas rodam no processo da aplicação com todos os seus privilégios, e na v0.4.0rc1 os argumentos de ferramentas fornecidos pelo modelo são passados à função sem validação em tempo de execução. A autenticação de entrada para canais customizados, como tokens Bearer, é implementada pela sua aplicação.
 
 ## Proteção de Credenciais e Bloqueio de Exfiltração
 
@@ -49,16 +53,16 @@ internal_engine = OpenAIEngine(
     api_key="internal-bearer-token",
 )
 
-# [SAFE] Inferência offline local com chave simulada
+# [SAFE] Inferência offline local: nenhuma chave é necessária. O motor usa
+# OLLAMA_API_KEY se estiver definida; caso contrário, a chave provisória "ollama".
 local_engine = OpenAIEngine(
     base_url="http://localhost:11434/v1",
     provider="ollama",
 )
-assert local_engine.api_key == "ollama"
 ```
 
 <Callout type="warn" title="Proteção Automática com ValueError">
-Se você fornecer uma `base_url` customizada sem uma `api_key` explícita, o `OpenAIEngine` se recusa a reutilizar a `OPENAI_API_KEY` do ambiente e levanta um `ValueError`. Isso impede a exfiltração acidental de credenciais para proxies não confiáveis.
+Se você fornecer uma `base_url` remota customizada sem uma `api_key` explícita, o `OpenAIEngine` se recusa a reutilizar a `OPENAI_API_KEY` (ou qualquer outra chave de provedor) do ambiente e levanta um `ValueError`. Isso impede a exfiltração acidental de credenciais para proxies não confiáveis. Hosts de loopback (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`) são isentos e recebem uma chave provisória. Na v0.4.0rc1, o `GeminiEngine` também nunca segue redirecionamentos HTTP e remove a chave de API de suas mensagens de erro.
 </Callout>
 
 ## Protocolos de Segurança em Canais
@@ -75,17 +79,19 @@ from chatflow_agent.channels import WhatsAppChannel
 
 # Sempre mantenha a verificação de assinatura ativada em produção
 channel = WhatsAppChannel(
-    verify_token=os.environ.get("WHATSAPP_VERIFY_TOKEN", ""),
-    access_token=os.environ.get("WHATSAPP_ACCESS_TOKEN", ""),
-    phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID", ""),
-    app_secret=os.environ.get("META_APP_SECRET", ""),
-    verify_signature=True,  # Rejeita tentativas forjadas não autenticadas com HTTP 403
+    verify_token=os.environ["WHATSAPP_VERIFY_TOKEN"],
+    access_token=os.environ["WHATSAPP_ACCESS_TOKEN"],
+    phone_number_id=os.environ["WHATSAPP_PHONE_NUMBER_ID"],
+    app_secret=os.environ["WHATSAPP_APP_SECRET"],
+    verify_signature=True,  # Assinaturas de requisição ausentes/inválidas recebem HTTP 403
 )
 ```
 
+Com `verify_signature=True` (o padrão), construir o canal sem um `app_secret` lança `ValueError`. Leia os segredos sem valores de fallback: um valor provisório não vazio, como `"secret"`, passaria nessa verificação e permitiria que qualquer pessoa que o conhecesse forjasse requisições assinadas.
+
 ### Mascaramento Automático de Números de Telefone
 
-Números de telefone de clientes recebidos via WhatsApp são classificados como Dados Pessoais Sensíveis / Informações Pessoalmente Identificáveis (PII). O `WhatsAppChannel` mascara automaticamente números de telefone nos logs (`+1415****71`) através do seu sanitizador interno `_mask_phone`, prevenindo vazamento de dados para plataformas de monitoramento.
+Números de telefone de clientes recebidos via WhatsApp são Informações Pessoalmente Identificáveis (PII). O `WhatsAppChannel` mascara os valores em suas próprias mensagens de log mantendo os quatro primeiros e os três últimos caracteres da entrada; por exemplo, o remetente da Meta `14155552671` torna-se `1415***671`. O número original ainda aparece na resposta JSON do webhook (`"sender"`), no ID de sessão e nos metadados armazenados pelo armazenamento de sessões, no argumento passado para `on_24h_window_expired` e nas respostas de erro da Meta que são registradas no log tal como recebidas. Aplicações e ferramentas externas devem aplicar suas próprias políticas de redação.
 
 ### Administração de Chats em Grupo no Telegram
 
@@ -100,19 +106,16 @@ A injeção de prompt ocorre quando entradas de usuários não confiáveis manip
 Para mitigar riscos de injeção de prompt:
 
 1. **Princípio do Menor Privilégio:** Conceda a cada agente especializado somente as ferramentas estritamente necessárias. Um `BillingAgent` não deve ter acesso a ferramentas de deleção de banco de dados ou reinicialização de servidores.
-2. **Validação Determinística de Argumentos:** Valide todas as entradas das ferramentas com anotações de tipo explícitas e validações em tempo de execução:
+2. **Valide os Argumentos Dentro de Cada Ferramenta:** A v0.4.0rc1 não valida nem converte em tempo de execução os argumentos fornecidos pelo modelo; as anotações de tipo apenas moldam o esquema que o modelo vê. Verifique cada entrada dentro da ferramenta antes de agir com base nela:
 
 ```python
 from chatflow_agent import tool
 
 @tool
 def update_email(user_id: int, new_email: str) -> str:
-    """Update a user's verified email address.
-
-    Args:
-        user_id: Numeric user identifier.
-        new_email: Valid email address.
-    """
+    """Update a user's verified email address."""
+    if not isinstance(user_id, int):
+        raise ValueError("user_id must be an integer.")
     if "@" not in new_email or "." not in new_email:
         raise ValueError("Invalid email format.")
     # Executar a atualização
@@ -125,6 +128,11 @@ def update_email(user_id: int, new_email: str) -> str:
 
 <VersionBadge version="0.4.0rc1" status="prerelease" />
 
-A partir da `v0.4.0rc1`, o `Runner` protege as sessões contra turnos reentrantes concorrentes:
-- Se uma ferramenta disparar código que chame `runner.run_async` na mesma sessão enquanto a trava estiver retida, o `Runner` levanta `ReentrantTurnError`.
-- Isso previne condições de corrida (*race conditions*), recursão infinita e mutações concorrentes no histórico.
+A partir da `v0.4.0rc1`, o `Runner` protege as sessões contra turnos reentrantes:
+- Se código iniciado por um turno em execução (uma ferramenta, ou uma task ou thread que ela inicia: `create_task`, `gather`, `wait_for`, `TaskGroup`, `asyncio.to_thread`) chamar `runner.run_async` ou `runner.run` para a mesma sessão, o `Runner` levanta `ReentrantTurnError` imediatamente em vez de causar um deadlock. Use `Runner.spawn_turn()` para enfileirar um turno de acompanhamento.
+- Requisições independentes para a mesma sessão são serializadas pela trava da sessão (por instância de store, ID de sessão e event loop).
+
+Limitações conhecidas na v0.4.0rc1:
+- Não há serialização entre instâncias de store sobre o mesmo arquivo, entre processos ou entre threads que executam seus próprios event loops.
+- Uma ferramenta que aguarda um trabalho feito por uma task que não foi iniciada a partir do turno ainda pode causar deadlock se esse trabalho executar um turno da mesma sessão; aguardar uma task de `spawn_turn()` dentro do turno que a criou também causa deadlock.
+- `clear_history()` e `delete()` (e, portanto, o `/reset` do Telegram) não são coordenados com turnos em execução além das garantias de reversão e de `SessionDeletedError`.

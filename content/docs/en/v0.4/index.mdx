@@ -8,10 +8,10 @@ import { Card, Cards } from 'fumadocs-ui/components/card';
 import { Callout } from 'fumadocs-ui/components/callout';
 
 <Callout type="warn" title="Prerelease Documentation (v0.4.0rc1)">
-You are viewing the preview documentation for <strong>chatflow-agent v0.4.0rc1</strong>. This track introduces connection pooling (<code>async with runner:</code>), REST-native Gemini execution, persistent in-memory SQLite, and turn timeouts. For production environments, use the <strong>v0.3.4</strong> stable release.
+You are viewing the preview documentation for <strong>chatflow-agent v0.4.0rc1</strong>, a published release candidate. Its features may still change before a final 0.4.0 release, which has not been published. This track introduces connection pooling for Gemini requests (<code>async with runner:</code>), REST-native Gemini execution, in-memory SQLite stores (<code>":memory:"</code>) that live for the store's lifetime, and turn timeouts. For production environments, use the <strong>v0.3.4</strong> stable release.
 </Callout>
 
-Welcome to the preview documentation for **chatflow-agent v0.4.x**, featuring major concurrency and architectural upgrades.
+Welcome to the preview documentation for **chatflow-agent v0.4.0rc1**, featuring major concurrency and architectural upgrades.
 
 Created and led by **Gustavo Baranda** alongside an international open-source community, `chatflow-agent` is designed to eliminate framework bloat and vendor lock-in while providing enterprise-grade concurrency, resilient memory, and multi-channel connectivity.
 
@@ -24,10 +24,10 @@ Created and led by **Gustavo Baranda** alongside an international open-source co
     Connects to LLMs over pure, asynchronous HTTP REST using `httpx`. No monolithic vendor SDKs or heavy runtime dependencies required.
   </Card>
   <Card title="Native Multi-Agent Handoffs">
-    Declare collaborative swarms. Agents delegate tasks dynamically using synthesized `transfer_to_*` tools with automatic cycle prevention.
+    Declare collaborative swarms. Agents delegate tasks dynamically using synthesized `transfer_to_*` tools, with transfers per turn capped by `max_handoffs_per_turn`.
   </Card>
   <Card title="Transactional Resilient Memory">
-    Every turn takes an atomic snapshot. If an error or timeout occurs, state automatically rolls back. SQLite operations run in dedicated thread pools.
+    Every turn checkpoints history, active agent, and metadata. If the turn fails, is cancelled, or reaches its `turn_timeout`, they are restored. File-backed SQLite operations run in a dedicated worker-thread pool.
   </Card>
   <Card title="Multi-Channel Readiness">
     Deploy your agents seamlessly to terminal REPLs, Telegram bots, or WhatsApp Business Cloud API with HMAC SHA-256 signature verification.

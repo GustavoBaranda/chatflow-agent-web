@@ -30,15 +30,16 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
   <Step>
     ### Define a Local Agent
 
-    `chatflow-agent` automatically routes model names starting with `gemma`, `llama`, `mistral`, `qwen`, or `phi` to the Ollama engine preset:
+    Set `provider="ollama"` to use the Ollama preset (`http://localhost:11434/v1`). In v0.3.4 this is required when the agent runs through a `Runner`: model names starting with `gemma`, `llama`, `mistral`, `qwen`, or `phi` are only matched when no default engine applies, and a `Runner` always supplies its default `GeminiEngine`.
 
 ```python
 from chatflow_agent import Agent, Runner
 
-# Automatically routed to http://localhost:11434/v1
+# Routed to the Ollama preset at http://localhost:11434/v1
 local_agent = Agent(
     name="LocalAssistant",
     model="gemma2:9b",
+    provider="ollama",
     instructions="You are a helpful offline assistant.",
 )
 
@@ -79,17 +80,17 @@ The framework protects your cloud credentials when developing locally:
 
 1. **Loopback Detection:** When `base_url` points to `localhost`, `127.0.0.1`, `::1`, or `0.0.0.0`, `OpenAIEngine` detects a local environment.
 2. **Credential Isolation:** It will **never send your `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`** to local endpoints.
-3. **Automatic Fallback Key:** Because local servers typically do not enforce authentication but the OpenAI HTTP client requires a non-empty `Authorization` header, the engine automatically supplies `"ollama"` as a dummy key if none is provided.
+3. **Placeholder Key:** If no key is passed, the engine uses `OLLAMA_API_KEY` when that variable is set, and otherwise the placeholder `"ollama"`. Local servers usually ignore it.
 
 ```python
 from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
 
-# Safe: automatically uses "ollama" dummy key without touching cloud credentials
+# Safe: uses OLLAMA_API_KEY if set, otherwise the "ollama" placeholder;
+# cloud credentials are never touched
 engine = OpenAIEngine(
     base_url="http://localhost:11434/v1",
     provider="ollama",
 )
-assert engine.api_key == "ollama"
 ```
 
 ## Function Calling with Local Models

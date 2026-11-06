@@ -1,6 +1,8 @@
 ---
 title: "Visión General de la Documentación"
 description: "Documentación oficial estable para chatflow-agent v0.3.4: un framework liviano y asíncrono para agentes múltiples con handoffs nativos en Python."
+sourceRevision: "8be3a1c"
+sourceHash: "1b0c12671cb8775947f81d4dbced1d0723d898753da30b01ea566751bd6a7b4a"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -13,21 +15,21 @@ Estás visualizando la documentación oficial estable de <strong>chatflow-agent 
 
 Bienvenido a la documentación oficial de **chatflow-agent**, un framework asíncrono y ligero en Python diseñado para construir agentes conversacionales modulares y enjambres multi-agente con transferencias (handoffs) nativas y fuertemente tipadas.
 
-Creado y liderado por **Gustavo Baranda** junto con una comunidad internacional de código abierto, `chatflow-agent` está diseñado para eliminar la sobrecarga de frameworks monolíticos y la dependencia cautiva de proveedores (vendor lock-in), ofreciendo concurrencia de nivel empresarial, memoria resiliente y conectividad multicanal.
+Creado y liderado por **Gustavo Baranda**, `chatflow-agent` se centra en una API compacta de Python, serialización asíncrona de turnos por sesión para sesiones en memoria, sesiones persistentes en SQLite y conectividad multicanal.
 
 ---
 
 ## Aspectos Destacados de la Arquitectura
 
 <Cards>
-  <Card title="Cero Dependencia Cautiva de SDKs">
-    Se conecta a modelos LLM mediante REST HTTP asíncrono puro usando `httpx`. No requiere SDKs monolíticos de proveedores ni dependencias pesadas en tiempo de ejecución.
+  <Card title="Motores para Múltiples Proveedores">
+    Usa `google-genai` para Gemini en la versión estable v0.3.4 y clientes HTTP dedicados para Anthropic y proveedores compatibles con OpenAI. Gemini sólo REST pertenece a v0.4.0rc1 prerelease.
   </Card>
   <Card title="Handoffs Multi-Agente Nativos">
-    Declara enjambres colaborativos. Los agentes delegan tareas dinámicamente mediante herramientas sintetizadas `transfer_to_*` con prevención automática de ciclos.
+    Declara enjambres colaborativos. Los agentes delegan tareas dinámicamente mediante herramientas sintetizadas `transfer_to_*`, con las transferencias por turno limitadas por `max_handoffs_per_turn`.
   </Card>
-  <Card title="Memoria Resiliente Transaccional">
-    Cada turno genera una captura atómica de estado. Si ocurre un error o tiempo límite, el estado se revierte automáticamente. Las operaciones de SQLite se ejecutan en pools de subprocesos dedicados.
+  <Card title="Memoria de Sesión">
+    Persiste conversaciones en memoria o SQLite. Ante excepciones ordinarias, v0.3.4 restaura la longitud del historial; no garantiza rollback de todo el estado ni ante cancelación. El pool de threads para SQLite pertenece a v0.4.0rc1 prerelease.
   </Card>
   <Card title="Preparado para Múltiples Canales">
     Despliega tus agentes sin complicaciones en terminales REPL, bots de Telegram o en la API de WhatsApp Business Cloud con verificación criptográfica HMAC SHA-256.

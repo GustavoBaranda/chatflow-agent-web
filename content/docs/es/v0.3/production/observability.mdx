@@ -1,6 +1,8 @@
 ---
 title: "Observabilidad y Depuración"
 description: "Registro estructurado en producción, telemetría, IDs de correlación, trazado de herramientas e inspección en sistemas chatflow-agent."
+sourceRevision: "0ca4592"
+sourceHash: "8c6848ae8c57e48134df0598aa1a92be6f13eb896bf81342e8766a0f252b6d44"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -11,7 +13,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 Operar enjambres multi-agente en entornos de producción exige una visibilidad exhaustiva. Cuando un agente transfiere una conversación, invoca APIs externas o activa mecanismos de respaldo, los operadores requieren registros estructurados e IDs de correlación para diagnosticar latencias, investigar anomalías y auditar decisiones.
 
-`chatflow-agent` expone loggers estructurados de la biblioteca estándar de Python a lo largo de cada capa arquitectónica, desde los webhooks de canales hasta las peticiones de red de los motores.
+`chatflow-agent` v0.3.4 utiliza loggers de la biblioteca estándar de Python para el runner, los motores de proveedores y las integraciones de canales. La aplicación puede conectar su propio formateador estructurado.
 
 ## Jerarquía de Loggers
 
@@ -19,16 +21,20 @@ Todos los loggers se organizan bajo el espacio de nombres `chatflow_agent`. Pued
 
 ```text
 chatflow_agent
-├── chatflow_agent.runner      (Ejecución de turnos, handoffs, llamadas a herramientas, checkpoints)
-├── chatflow_agent.tools       (Generación de esquemas, ejecución de herramientas, validación de argumentos)
-├── chatflow_agent.memory      (Creación de sesiones, E/S de SQLite, TTL de deduplicación)
+├── chatflow_agent.runner      (Fallos de ejecución de herramientas, con trace_id)
 ├── chatflow_agent.engine
-│   ├── chatflow_agent.engine.openai     (Cargas útiles y latencias de OpenAI/Groq/DeepSeek)
-│   ├── chatflow_agent.engine.gemini     (Peticiones REST v1beta, turnos del modelo)
-│   └── chatflow_agent.engine.anthropic  (Cabeceras de Messages API, recuento de tokens)
-├── chatflow_agent.telegram    (Polling de actualizaciones, autorización de administradores, fragmentación)
-└── chatflow_agent.whatsapp    (Validación HMAC, deduplicación, enmascaramiento de teléfonos)
+│   ├── chatflow_agent.engine.openai     (Avisos de reintento: estado HTTP y errores de conexión)
+│   ├── chatflow_agent.engine.gemini     (Avisos de reintento por errores transitorios de google-genai)
+│   └── chatflow_agent.engine.anthropic  (Avisos de reintento: estado HTTP y errores de conexión)
+├── chatflow_agent.telegram    (Inicio del polling, errores de permisos de /reset, errores de mensajes)
+└── chatflow_agent.whatsapp    (Rechazos de firma, duplicados, tiempos límite, entrega saliente)
 ```
+
+El SDK no emite métricas ni trazas, y los loggers de los motores no registran cargas útiles de las peticiones, latencias ni recuentos de tokens. Añade esa instrumentación en tu aplicación si la necesitas.
+
+<Callout type="info" title="Loggers adicionales en prerelease">
+<VersionBadge version="0.4.0rc1" status="prerelease" /> agrega `chatflow_agent.tools` y `chatflow_agent.memory`. La versión estable v0.3.4 no los emite.
+</Callout>
 
 ## Configuración de Registros Estructurados
 
@@ -79,13 +85,15 @@ if __name__ == "__main__":
 Cuando una herramienta falla durante la ejecución, el `Runner` genera automáticamente un UUID `trace_id` y lo adjunta tanto al registro interno como al mensaje entregado al agente:
 
 ```text
-[ERROR] 2026-10-30T18:22:15Z chatflow_agent.runner: Tool execution failed [trace_id: 3c9b7e41-0f2d-4e92-bc12-f71e549d8802] - Tool: 'query_database' on agent 'BillingAgent': Connection timed out to db.internal.corp:5432
+[ERROR] 2026-10-30T18:22:15Z chatflow_agent.runner: Tool execution failed [trace_id: 3c9b7e41-0f2d-4e92-bc12-f71e549d8802] - Tool: 'query_database' on agent 'BillingAgent': Error executing tool 'query_database': Connection timed out to db.internal.corp:5432
 ```
+
+El registro se emite con `exc_info=True`, por lo que tu handler también recibe la traza de la pila.
 
 ### Importancia de la Correlación
 
-1. **Privacidad del Usuario:** El usuario final no visualiza trazas de la pila (*stack traces*) crudas ni direcciones IP internas.
-2. **Triaje Determinista:** Cuando un usuario reporta *"Mi consulta falló a las 18:22"*, el equipo de soporte técnico puede buscar directamente `trace_id: 3c9b7e41...` en los registros para inspeccionar los parámetros de entrada y el error completo.
+1. **Privacidad del Usuario:** El modelo, y por tanto el usuario final, recibe solo el mensaje genérico con el `trace_id`, no el texto de la excepción ni direcciones internas.
+2. **Triaje Determinista:** Cuando un usuario reporta *"Mi consulta falló a las 18:22"*, el equipo de soporte técnico puede buscar directamente `trace_id: 3c9b7e41...` en los registros para inspeccionar la excepción y su traza de la pila (*stack trace*). Los argumentos de la herramienta no se registran.
 
 ## Inspección de Telemetría de Respuesta
 
@@ -140,6 +148,6 @@ if session:
         print(f"[{msg.role.value}] {msg.content}")
 ```
 
-<Callout type="info" title="Cero Registro de Claves de API">
-Los loggers de `chatflow-agent` redactan automáticamente tokens de API y cabeceras de autorización. Las cabeceras de autorización en registros HTTP aparecen como `Bearer sk-****` o se omiten de las cadenas de consulta, garantizando el cumplimiento de auditorías SOC 2 y GDPR.
+<Callout type="warn" title="Datos Sensibles en los Registros">
+<code>chatflow-agent</code> no instala ningún filtro ni mecanismo de redacción de registros. Sus motores no registran las cabeceras de las peticiones, por lo que las propias llamadas de registro del SDK no escriben claves de API, y <code>WhatsAppChannel</code> enmascara los números de teléfono en sus propios mensajes. Otro contenido aún puede llegar a tus registros: mensajes de excepción de las herramientas, cuerpos de error de los proveedores incluidos en <code>ProviderError</code> y respuestas de error de Meta. El registro por sí solo no hace que un despliegue cumpla con SOC 2, GDPR o marcos similares; añade filtros de redacción y políticas de retención acordes con tus requisitos.
 </Callout>

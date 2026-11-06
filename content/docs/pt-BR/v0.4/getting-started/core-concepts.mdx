@@ -1,6 +1,8 @@
 ---
 title: "Conceitos Fundamentais"
 description: "Compreenda a arquitetura fundamental do chatflow-agent: Agentes, Motores, Ferramentas, Runner, Memória e Handoffs."
+sourceRevision: "737aa0d"
+sourceHash: "ca0994e380b8ebc8aeaaf0e645d0645295844595152f5ef80ba833b048d9e7fb"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -58,10 +60,12 @@ Na versão <VersionBadge version="0.4.0rc1" status="prerelease" />, o <code>Runn
 O `Runner` orquestra o ciclo de vida da conversação, gerenciando:
 
 1. O carregamento do contexto da sessão e histórico de mensagens a partir do `SessionStore`.
-2. A captura de um **snapshot atômico** do estado da sessão antes de executar o turno.
+2. A criação de um ponto de verificação (*checkpoint*) do histórico, do agente ativo e dos metadados da sessão antes de executar o turno.
 3. A invocação do motor do modelo.
 4. O parsing de chamadas a ferramentas, a execução das funções correspondentes e o envio dos resultados de volta ao modelo até a obtenção de uma resposta textual final.
-5. A confirmação das alterações de estado, ou reversão automática (*rollback*) em caso de exceções não tratadas ou expiração de tempo limite.
+5. A manutenção das alterações em caso de sucesso, ou a restauração do checkpoint se o turno lançar uma exceção, for cancelado ou atingir seu `turn_timeout`.
+
+Invocação síncrona, para scripts e ferramentas de CLI (sem um event loop em execução):
 
 ```python
 from chatflow_agent import Agent, Runner, SessionStore
@@ -79,17 +83,35 @@ runner = Runner(
     session_store=store,
 )
 
-# Invocação síncrona
 response = runner.run(
     session_id="user_123",
     user_message="Book a meeting tomorrow at 3 PM",
 )
+```
 
-# Invocação assíncrona
-response = await runner.run_async(
-    session_id="user_123",
-    user_message="Book a meeting tomorrow at 3 PM",
-)
+Invocação assíncrona, dentro de um event loop (servidores web, bots, aplicações `asyncio`):
+
+```python
+# [min-version: 0.4.0rc1]
+# [no-exec: requires real openai api key for live response]
+import asyncio
+
+from chatflow_agent import Agent, Runner
+
+async def main() -> None:
+    agent = Agent(
+        name="Assistant",
+        instructions="Concise scheduling assistant.",
+        model="gpt-4o",
+    )
+    async with Runner(starting_agent=agent) as runner:
+        response = await runner.run_async(
+            session_id="user_123",
+            user_message="Book a meeting tomorrow at 3 PM",
+        )
+        print(response.content)
+
+asyncio.run(main())
 ```
 
 <Callout type="info" title="turn_timeout em v0.4.0rc1">
@@ -128,7 +150,7 @@ local_agent = Agent(
 
 ## 4. Ferramentas Determinísticas (`Tool` e `@tool`)
 
-As ferramentas conferem aos agentes poder de execução determinístico. Quando decoradas com `@tool`, o `chatflow-agent` analisa automaticamente as anotações de tipo do Python e as docstrings para gerar especificações JSON Schema padronizadas para o LLM:
+As ferramentas conferem aos agentes poder de execução determinístico. Quando decoradas com `@tool`, o `chatflow-agent` constrói o schema de parâmetros a partir das anotações de tipo do Python e dos valores padrão. A descrição da ferramenta é o argumento `description=`, ou a docstring da função quando nenhuma descrição é informada; seções da docstring como `Args:` não são interpretadas como descrições por parâmetro:
 
 ```python
 # [min-version: 0.3.0]
@@ -137,11 +159,7 @@ from chatflow_agent import tool
 
 @tool(name="fetch_user_profile", description="Fetch user metadata from internal database.")
 def fetch_user_profile(user_id: str) -> dict[str, str]:
-    """Retrieve user details.
-
-    Args:
-        user_id: Unique user identifier string.
-    """
+    """Retrieve user details."""
     return {"user_id": user_id, "tier": "enterprise", "status": "active"}
 ```
 
@@ -156,7 +174,8 @@ O `chatflow-agent` trata a persistência de estado e a segurança de concorrênc
 ```python
 from chatflow_agent import SQLiteSessionStore
 
-# Armazenamento persistente de sessões em SQLite com limite configurável de turnos
+# Armazenamento persistente de sessões em SQLite. default_max_turns é uma janela
+# deslizante de histórico: mantém os últimos 40 turnos completos de cada sessão.
 store = SQLiteSessionStore(
     db_path="./chat_sessions.db",
     default_max_turns=40,
@@ -165,18 +184,19 @@ store = SQLiteSessionStore(
 
 ### A Garantia de Reversão Transacional (*Rollback*)
 
-Antes de processar um turno, o `Runner` captura uma imagem instantânea da sessão ativa. Caso ocorra uma queda de conexão, uma ferramenta lance uma exceção não tratada ou o `turn_timeout` expire, o snapshot é restaurado imediatamente. Isso garante que turnos corrompidos ou parciais nunca degradem o histórico da conversação.
+Antes de processar um turno, o `Runner` cria um checkpoint do histórico, do agente ativo e dos metadados da sessão. Se uma exceção escapar do turno (por exemplo, uma indisponibilidade do provedor), o turno for cancelado ou o `turn_timeout` expirar, o checkpoint é restaurado antes que o erro seja lançado. Assim, turnos corrompidos ou parciais nunca degradam o histórico da conversação.
 
 ### Proteção do Event Loop e Escudos de Concorrência
 
-* **Descarga para Pools de Threads:** Operações de E/S em disco com SQLite rodam em threads trabalhadoras dedicadas (`_run_blocking`), impedindo que bloqueios de sistema de arquivos travem o loop de eventos asyncio do Python.
-* **Bloqueio de Sessão (`ReentrantTurnError`):** Cada ID de sessão possui um bloqueio interno. Requisições simultâneas para o mesmo ID de sessão lançarão `ReentrantTurnError` em vez de permitir condições de corrida que corrompam o estado.
+* **Descarga para Pools de Threads:** A E/S de SQLite baseado em arquivo roda nas threads trabalhadoras dedicadas do próprio store, impedindo que bloqueios de sistema de arquivos travem o loop de eventos asyncio do Python. Stores `":memory:"` permanecem no event loop.
+* **Bloqueio de Sessão:** Os turnos de uma mesma sessão são serializados (por store e por event loop, tanto para `SessionStore` quanto para `SQLiteSessionStore`); requisições simultâneas para uma sessão aguardam o bloqueio.
+* **Proteção contra Reentrância (`ReentrantTurnError`):** Iniciar um turno para uma sessão a partir de código iniciado pelo turno em execução dessa mesma sessão (uma ferramenta, ou uma task ou thread criada por ela) lança `ReentrantTurnError` em vez de causar um deadlock. Use `Runner.spawn_turn()` para enfileirar um turno de acompanhamento.
 
 ---
 
 ## 6. Handoffs Multiagente (`Handoffs`)
 
-Enxames multiagente delegam tarefas dinamicamente através de transferências declarativas (*handoffs*). Quando um agente define `handoffs=[agent_b]`, o `chatflow-agent` sintetiza automaticamente uma ferramenta chamada `transfer_to_agent_b`:
+Enxames multiagente delegam tarefas dinamicamente através de transferências declarativas (*handoffs*). Quando um agente declara um par em `handoffs=[...]`, o `chatflow-agent` sintetiza uma ferramenta de transferência nomeada a partir do `name` do par, transliterado para ASCII, convertido para minúsculas e sanitizado: um par chamado `BillingAgent` se torna `transfer_to_billingagent`:
 
 ```python
 from chatflow_agent import Agent, Runner
@@ -208,7 +228,7 @@ print(f"Responding agent: {response.active_agent_name}")
 print(f"Message content: {response.content}")
 ```
 
-O `Runner` rastreia automaticamente as delegações, e o agente que efetivamente gerou a resposta final permanece sempre visível através de `response.active_agent_name`.
+O agente que gerou a resposta final fica visível através de `response.active_agent_name`. As transferências dentro de um turno são limitadas por `Runner(max_handoffs_per_turn=5)`; não existe uma detecção de ciclos separada.
 
 ---
 

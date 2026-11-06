@@ -1,6 +1,8 @@
 ---
 title: "OpenAI y Endpoints Compatibles"
 description: "Configuración, preajustes, pasarelas personalizadas y políticas de seguridad para OpenAI, Groq, DeepSeek y xAI Grok."
+sourceRevision: "82d8ebf"
+sourceHash: "a25e971ba432830099fdbceac769e41bc5d7be392bc6a273dbe457db66491a50"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -111,7 +113,7 @@ reasoning_agent = Agent(
 import os
 from chatflow_agent import Agent
 
-# Mapea implícitamente al preajuste de xAI mediante el prefijo de modelo 'grok'
+# provider="grok" selecciona el preajuste de xAI (api.x.ai); en v0.4.0rc1 basta también con un prefijo de modelo "grok"
 # Requiere la variable de entorno XAI_API_KEY
 grok_agent = Agent(
     name="GrokAgent",
@@ -176,7 +178,7 @@ open_engine = OpenAIEngine(
 
 OpenAI impone una longitud máxima estricta de 40 caracteres en `tool_call_id` en las respuestas de function calling. En entornos multi-agente donde los agentes se transfieren sesiones entre diferentes proveedores (por ejemplo, herramientas de Anthropic Claude que generan IDs superiores a 40 caracteres), `chatflow-agent` garantiza la conformidad del protocolo:
 
-1. **Truncamiento y Hashing:** Si un mensaje histórico contiene un ID de llamada que excede 40 caracteres, `OpenAIEngine` lo reemplaza de forma segura usando un identificador determinista derivado con SHA-256 (`call_` + 24 caracteres hexadecimales).
+1. **Reemplazo Determinista:** Con `provider="openai"`, si un mensaje histórico contiene un ID de llamada a herramienta vacío o de más de 40 caracteres, `OpenAIEngine` envía en su lugar un identificador determinista derivado con SHA-256 (`call_` + 24 caracteres hexadecimales), el mismo en la llamada y en su resultado. Los demás proveedores (Groq, DeepSeek, Ollama, etc.) reciben el ID original. El historial de sesión almacenado conserva el ID original.
 2. **Normalización de Tipos de Esquema:** El motor normaliza automáticamente los tipos de parámetros del esquema JSON (`_lowercase_schema_types`) preservando al mismo tiempo los esquemas de propiedades personalizadas, lo que garantiza la compatibilidad de herramientas en diferentes versiones de modelos de OpenAI.
 
 ## Solución de Problemas

@@ -1,6 +1,8 @@
 ---
 title: "Agentes e Instrucciones Dinámicas"
 description: "Profundiza en la abstracción de Agent, funciones invocables para instrucciones dinámicas en tiempo de ejecución, vinculación de herramientas y parámetros de configuración en chatflow-agent."
+sourceRevision: "f8f8bac"
+sourceHash: "2f2bf00b518f2c11972a9436e148b73eb7b506a6b6330e513f1bcad23de752c8"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -41,7 +43,7 @@ agent = Agent(
 | `provider` | `str \| None` | `None` | Nombre explícito del proveedor (ej. `"openai"`, `"anthropic"`, `"gemini"`, `"groq"`). |
 | `base_url` | `str \| None` | `None` | Endpoint personalizado de la API REST para pasarelas compatibles con OpenAI. |
 | `api_key` | `str \| None` | `None` | Clave de API específica que sobreescribe las variables de entorno para este agente. |
-| `engine` | `BaseEngine \| None` | `None` | Instancia de motor preconfigurada para anular la resolución automática de motores. |
+| `engine` | `Any \| None` | `None` | Instancia de motor preconfigurada (se espera que sea un `BaseEngine`) que anula la resolución automática de motores. |
 
 <Callout type="info" title="El Modelo Pertenece al Agente, No al Motor">
 En <code>chatflow-agent</code>, la cadena <code>model</code> se configura directamente en el <code>Agent</code>, nunca en el constructor de <code>Engine</code>. Esto desacopla la capa de conexión de red de las decisiones específicas de modelo, permitiendo que múltiples agentes compartan una única instancia de motor mientras consultan distintos tamaños de modelo.
@@ -166,7 +168,7 @@ assert any(t.name == "query_active_users" for t in agent.tools)
 `chatflow-agent` ofrece una mecánica consistente de agentes a la vez que introduce validaciones más estrictas y normalización de caracteres en versiones más recientes:
 
 ### Versión Estable (`v0.3.4`)
-* <VersionBadge version="0.3.4" status="stable" /> Validación base en la construcción de agentes.
+* <VersionBadge version="0.3.4" status="stable" /> El constructor no valida `name`; solo se rechaza una transferencia al propio agente.
 * Las herramientas sintéticas de transferencia se formatean como `transfer_to_<sanitized_name>`.
 
 ### Mejoras de la Versión Preliminar (`v0.4.0rc1`)
@@ -207,8 +209,14 @@ agent = Agent(name="Writer", instructions="...", model="gpt-4o", engine=engine)
 agent.current_user = "user_123"  # ¡Se filtrará entre sesiones concurrentes!
 
 # [CORRECTO]: Almacena el estado conversacional en los metadatos de sesión
-# Pasa metadata a runner.run_async(session_id="s1", metadata={"user_id": "user_123"})
+# await runner.run_async(
+#     session_id="s1",
+#     user_message="Hello",
+#     metadata={"user_id": "user_123"},
+# )
 ```
+
+En v0.4.0rc1, los `metadata` pasados a `run()` / `run_async()` se fusionan con los metadatos de la sesión en cada turno y se persisten junto con ella.
 
 ### 3. Registro de Auto-Transferencias (Self-Handoff)
 Un agente no puede registrar una transferencia hacia sí mismo. Hacerlo genera un error inmediato:

@@ -1,6 +1,8 @@
 ---
 title: "Integración con Bots de Telegram"
 description: "Despliega asistentes de IA multi-agente en Telegram con python-telegram-bot, memoria de sesión, división de mensajes y controles de administración para grupos."
+sourceRevision: "a4d8b1d"
+sourceHash: "166eaa22dbe0db4dc31c44e00adb2a84641edc8f2f5c626700217ff5a9f70fcc"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -118,16 +120,18 @@ chunks = split_message(long_text, max_len=4096)
 # Divide progresivamente por \n\n, \n, puntos o espacios para preservar legibilidad
 ```
 
-El canal entrega los fragmentos secuencialmente, asegurando que párrafos, oraciones y listas nunca queden truncados a mitad de palabra.
+El canal entrega los fragmentos secuencialmente. `split_message` prioriza los límites de párrafo, línea, oración y, por último, palabra; cuando un fragmento no contiene ningún separador (por ejemplo, una URL muy larga), recurre a un corte forzado en `max_len`. Las longitudes se cuentan en caracteres de Python.
 
 ## Indicadores de Escritura y Experiencia de Usuario
 
-Mientras el turno del modelo se ejecuta (incluyendo invocaciones de herramientas y transferencias), `TelegramChannel` emite periódicamente indicadores `ChatAction.TYPING` cada 4 segundos. Los usuarios visualizan el estado nativo *"Escribiendo..."* en su cliente de Telegram hasta que la respuesta completa sea entregada.
+Cuando llega un mensaje, `TelegramChannel` envía un único indicador `ChatAction.TYPING` antes de despachar el turno (los errores de esa llamada se ignoran). No se repite mientras el turno se ejecuta, por lo que en turnos largos el estado de escritura de Telegram puede desaparecer antes de que llegue la respuesta.
 
-## Ejecución en Bucles de Eventos Existentes
+## Gestión del Bucle de Eventos
 
-Si estás integrando el bot dentro de un servicio `asyncio` existente o una aplicación FastAPI, pasa `close_loop=False` a `run()`:
+`run()` inicia el long polling y bloquea: controla el bucle de eventos por sí mismo mediante `run_polling()` de python-telegram-bot, y los argumentos con nombre se transmiten a esa función. Pasar `close_loop=False` mantiene abierto el bucle de eventos después de que `run()` retorne:
 
 ```python
 telegram.run(drop_pending_updates=True, close_loop=False)
 ```
+
+`close_loop=False` no hace que `run()` pueda usarse dentro de un bucle de eventos que ya está en ejecución, como el de una aplicación FastAPI. `TelegramChannel` no proporciona un método de inicio no bloqueante.

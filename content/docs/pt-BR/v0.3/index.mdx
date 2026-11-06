@@ -1,6 +1,8 @@
 ---
 title: "Visão Geral da Documentação"
 description: "Documentação oficial estável do chatflow-agent v0.3.4: um framework leve e assíncrono para múltiplos agentes com handoffs nativos em Python."
+sourceRevision: "8be3a1c"
+sourceHash: "1b0c12671cb8775947f81d4dbced1d0723d898753da30b01ea566751bd6a7b4a"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -13,21 +15,21 @@ Você está visualizando a documentação oficial estável do <strong>chatflow-a
 
 Bem-vindo à documentação oficial do **chatflow-agent**, um framework assíncrono e leve em Python projetado para construir agentes conversacionais modulares e enxames multiagente com transferências (*handoffs*) nativas e fortemente tipadas.
 
-Criado e liderado por **Gustavo Baranda** junto a uma comunidade internacional de código aberto, o `chatflow-agent` foi concebido para eliminar o excesso de complexidade de frameworks monolíticos e a dependência de fornecedores (*vendor lock-in*), oferecendo concorrência de nível empresarial, memória resiliente e conectividade multicanal.
+Criado e liderado por **Gustavo Baranda**, o `chatflow-agent` concentra-se em uma API Python compacta, serialização assíncrona de turnos por sessão para sessões em memória, sessões persistentes em SQLite e conectividade multicanal.
 
 ---
 
 ## Destaques da Arquitetura
 
 <Cards>
-  <Card title="Zero Bloqueio de SDKs (Vendor Lock-In)">
-    Conecta-se a modelos LLM através de REST HTTP assíncrono puro usando `httpx`. Sem necessidade de SDKs pesados ou dependências desnecessárias em tempo de execução.
+  <Card title="Motores para Vários Provedores">
+    Usa `google-genai` para Gemini na versão estável v0.3.4 e clientes HTTP dedicados para Anthropic e provedores compatíveis com OpenAI. Gemini somente por REST é recurso da v0.4.0rc1 prerelease.
   </Card>
   <Card title="Handoffs Multiagente Nativos">
-    Declare enxames colaborativos. Os agentes delegam tarefas dinamicamente usando ferramentas sintetizadas `transfer_to_*` com prevenção automática de ciclos.
+    Declare enxames colaborativos. Os agentes delegam tarefas dinamicamente usando ferramentas sintetizadas `transfer_to_*`, com as transferências por turno limitadas por `max_handoffs_per_turn`.
   </Card>
-  <Card title="Memória Transacional e Resiliente">
-    Cada turno realiza uma captura atômica de estado. Em caso de erro ou estouro de tempo limite, o estado é revertido automaticamente. As operações SQLite rodam em pools de threads dedicados.
+  <Card title="Memória de Sessão">
+    Persiste conversas em memória ou SQLite. Para exceções comuns, a v0.3.4 restaura o tamanho do histórico; não garante rollback de todo o estado nem em cancelamentos. O pool de threads para SQLite pertence à v0.4.0rc1 prerelease.
   </Card>
   <Card title="Pronto para Múltiplos Canais">
     Implante seus agentes facilmente em terminais REPL, bots do Telegram ou na API do WhatsApp Business Cloud com verificação de assinatura HMAC SHA-256.

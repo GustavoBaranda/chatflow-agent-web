@@ -1,6 +1,8 @@
 ---
 title: "OpenAI e Endpoints Compatíveis"
 description: "Configuração, predefinições, gateways customizados e políticas de segurança para OpenAI, Groq, DeepSeek e xAI Grok."
+sourceRevision: "3c5ab27"
+sourceHash: "f5aef0a3913ca6c7e0b80c44726b72c6398290f3b546a967bf7d35f98d3d9f23"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -32,14 +34,11 @@ import os
 from chatflow_agent import Agent, Runner
 from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
 
-# Opção 1: Resolução implícita do motor via prefixo do nome do modelo
-analyst = Agent(
-    name="Analyst",
-    model="gpt-4o",
-    instructions="Analyze structured operational data.",
-)
+# Os prefixos do nome do modelo sozinhos não bastam na v0.3.4: um agente executado
+# por um Runner sem provider= ou engine= é enviado ao GeminiEngine padrão do
+# Runner. Use uma das duas opções abaixo.
 
-# Opção 2: Atribuição explícita do provedor
+# Opção 1: Atribuição explícita do provedor
 writer = Agent(
     name="Writer",
     provider="openai",
@@ -47,7 +46,7 @@ writer = Agent(
     instructions="Draft concise summaries.",
 )
 
-# Opção 3: Instanciação explícita do motor com parâmetros customizados
+# Opção 2: Instanciação explícita do motor com parâmetros customizados
 custom_engine = OpenAIEngine(
     api_key=os.environ.get("OPENAI_API_KEY"),
     provider="openai",
@@ -63,7 +62,7 @@ senior_agent = Agent(
 
 ## Provedores Terceirizados: Groq, DeepSeek e xAI Grok
 
-Conectar-se a provedores de inferência de ultra-baixa latência ou modelos especializados de raciocínio exige apenas especificar o atributo `provider` ou o prefixo padrão do modelo:
+Conectar-se a provedores de inferência de ultra-baixa latência ou modelos especializados de raciocínio exige apenas especificar o atributo `provider` (na v0.3.4, um prefixo de modelo sozinho não seleciona o provedor quando o agente é executado por um `Runner`):
 
 <Tabs items={["Groq Cloud", "DeepSeek API", "xAI Grok"]}>
   <Tab value="Groq Cloud">
@@ -111,7 +110,7 @@ reasoning_agent = Agent(
 import os
 from chatflow_agent import Agent
 
-# Mapeia implicitamente para o preset da xAI via prefixo 'grok'
+# provider="grok" seleciona o preset da xAI (api.x.ai)
 # Exige a variável de ambiente XAI_API_KEY
 grok_agent = Agent(
     name="GrokAgent",
@@ -172,9 +171,9 @@ open_engine = OpenAIEngine(
 )
 ```
 
-## Restrições e Normalização de IDs de Chamadas de Ferramenta
+## Restrições e Normalização de IDs de Chamadas de Ferramenta (Pré-lançamento)
 
-A OpenAI impõe um limite máximo rigoroso de 40 caracteres para o `tool_call_id` em respostas de chamada de funções. Em ambientes multiagente onde sessões são transferidas entre diferentes provedores (por exemplo, ferramentas do Anthropic Claude gerando IDs com mais de 40 caracteres), o `chatflow-agent` garante total conformidade com o protocolo:
+<VersionBadge version="0.4.0rc1" status="prerelease" /> adiciona normalização determinística para valores `tool_call_id` da OpenAI com mais de 40 caracteres. A versão estável v0.3.4 não oferece essa garantia entre provedores:
 
 1. **Truncamento e Hashing:** Se uma mensagem histórica contiver um ID de chamada de ferramenta superior a 40 caracteres, o `OpenAIEngine` o substitui com segurança por um identificador determinístico derivado de SHA-256 (`call_` + 24 caracteres hexadecimais).
 2. **Normalização de Tipos de Esquema:** O motor normaliza automaticamente os tipos de parâmetros do JSON Schema (`_lowercase_schema_types`) mantendo esquemas de propriedades customizadas, garantindo compatibilidade entre diferentes versões dos modelos da OpenAI.

@@ -11,7 +11,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 While `chatflow-agent` provides pre-built channels for Telegram and WhatsApp, modern systems frequently require connecting multi-agent swarms to internal microservices, Slack Events APIs, Discord bots, or CRM webhooks (Zendesk, Intercom). 
 
-Through the `BaseChannel` interface and the optional `webhook` extra (`fastapi>=0.110.0`, `uvicorn>=0.29.0`), you can implement production-grade webhook listeners in just a few lines of code.
+`chatflow-agent` does not ship a generic webhook channel. The optional `webhook` extra only installs `fastapi>=0.110.0` and `uvicorn>=0.29.0`; you write the endpoint yourself, either as a `BaseChannel` subclass (as below) or by calling `runner.run_async()` from an existing route. The SDK repository includes a complete reference application in [`examples/webhook_api_service.py`](https://github.com/GustavoBaranda/chatflow-agent/blob/v0.4.0rc1/examples/webhook_api_service.py).
 
 ## The BaseChannel Architecture
 
@@ -22,7 +22,7 @@ All communication channels inherit from `BaseChannel`. It establishes a standard
            |
            v
 +-------------------------------------------------------------------+
-|                       Custom WebhookChannel                       |
+|            Your custom channel (BaseChannel subclass)             |
 |   1. Authenticate Request (API Key or HMAC Signature)             |
 |   2. Extract session_id, message, and metadata                    |
 |   3. Forward via dispatch_async(session_id, message, metadata)    |
@@ -31,12 +31,12 @@ All communication channels inherit from `BaseChannel`. It establishes a standard
                                   v
 +---------------------------------+---------------------------------+
 |                       chatflow-agent Runner                       |
-|   - Session Lock & Memory Retrieval                               |
+|   - Session Lock (serializes turns of a session) & Memory Refresh |
 |   - Multi-Agent Orchestration & Tool Calling                      |
 |   - State Persistence                                             |
 +---------------------------------+---------------------------------+
                                   |
-                        AgentResponse (text, data)
+               AgentResponse (content, active_agent_name)
                                   |
                                   v
 [ Immediate HTTP Response or Async Webhook Callback ]
@@ -56,13 +56,14 @@ class MyChannel(BaseChannel):
 ```
 
 * `attach(runner: Runner) -> BaseChannel`: Binds a multi-agent Runner instance to the channel.
-* `dispatch_async(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Forwards the message to the attached runner asynchronously, ensuring session concurrency locking.
+* `dispatch_async(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Forwards the message to the attached runner asynchronously (`runner.run_async`). In v0.4.0rc1, same-session turns are serialized for both `SessionStore` and `SQLiteSessionStore` (per store and event loop).
 * `dispatch(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Synchronous counterpart for synchronous runtimes.
-* `split_message(text: str, max_len: int = 4096) -> list[str]`: Utility for chunking long outbound responses across messaging limits.
 
-## Implementing a Production FastAPI Webhook
+`split_message(text: str, max_len: int = 4096) -> list[str]` is not a `BaseChannel` method but a module-level helper for chunking long outbound responses: `from chatflow_agent.channels import split_message`.
 
-Below is a complete, production-ready implementation of a custom webhook channel using FastAPI:
+## Implementing a Secure FastAPI Webhook Baseline
+
+The following custom channel provides a secure HMAC and session-routing baseline. Production deployments must additionally apply provider-specific replay protection, secret rotation, rate limiting, request-size limits, and operational monitoring.
 
 ```python
 import hmac
@@ -76,8 +77,10 @@ from chatflow_agent.channels.base import BaseChannel, ChannelError
 class GenericWebhookChannel(BaseChannel):
     """Custom webhook receiver supporting HMAC verification and session routing."""
 
-    def __init__(self, secret: str = "webhook-secret") -> None:
+    def __init__(self, secret: str) -> None:
         super().__init__()
+        if not secret:
+            raise ValueError("A non-empty webhook signing secret is required")
         self.secret = secret
         self.app = FastAPI(title="Agent Webhook Channel")
         self._setup_routes()
@@ -86,38 +89,40 @@ class GenericWebhookChannel(BaseChannel):
         @self.app.post("/api/v1/chat")
         async def handle_chat_webhook(
             request: Request,
-            x_signature: str = Header(None, alias="X-Webhook-Signature"),
+            x_signature: str | None = Header(default=None, alias="X-Webhook-Signature"),
         ) -> dict[str, Any]:
             body_bytes = await request.body()
 
-            # Optional: Cryptographic signature verification
-            if self.secret and x_signature:
-                expected = hmac.new(
-                    self.secret.encode("utf-8"),
-                    body_bytes,
-                    hashlib.sha256,
-                ).hexdigest()
-                if not hmac.compare_digest(expected, x_signature):
-                    raise HTTPException(status_code=403, detail="Invalid signature")
+            if not x_signature:
+                raise HTTPException(status_code=403, detail="Missing signature")
+
+            expected = hmac.new(
+                self.secret.encode("utf-8"), body_bytes, hashlib.sha256
+            ).hexdigest()
+            if not hmac.compare_digest(expected, x_signature):
+                raise HTTPException(status_code=403, detail="Invalid signature")
 
             data = await request.json()
-            session_id = data.get("session_id", "default-session")
+            authenticated_user_id = data.get("user_id")
             message = data.get("message", "")
-            metadata = data.get("metadata", {})
 
-            if not message:
-                raise HTTPException(status_code=400, detail="Field 'message' is required")
+            if not authenticated_user_id or not message:
+                raise HTTPException(status_code=400, detail="Fields 'user_id' and 'message' are required")
+
+            # The signed body authenticates this identity. Never use a shared session.
+            session_id = f"webhook:{authenticated_user_id}"
+            metadata = {"authenticated_user_id": authenticated_user_id}
 
             # Dispatch directly into the attached runner
             try:
                 response = await self.dispatch_async(session_id, message, metadata=metadata)
                 return {
                     "session_id": session_id,
-                    "reply": response.text,
-                    "agent": response.agent_name,
+                    "reply": response.content,
+                    "agent": response.active_agent_name,
                 }
             except ChannelError as err:
-                raise HTTPException(status_code=500, detail=str(err))
+                raise HTTPException(status_code=500, detail="Channel dispatch failed") from err
 
     def run(self, host: str = "0.0.0.0", port: int = 8080) -> None:
         """Start Uvicorn server."""
@@ -130,6 +135,7 @@ class GenericWebhookChannel(BaseChannel):
 Connect the channel to your agent and runner:
 
 ```python
+import os
 from chatflow_agent import Agent, Runner
 from chatflow_agent.core.memory import SQLiteSessionStore
 
@@ -144,7 +150,8 @@ store = SQLiteSessionStore("webhook_sessions.db")
 runner = Runner(starting_agent=assistant, session_store=store)
 
 # 3. Instantiate channel and attach runner
-channel = GenericWebhookChannel(secret="super-secret-key")
+# Read the signing secret from the environment; never hardcode it
+channel = GenericWebhookChannel(secret=os.environ["WEBHOOK_SIGNING_SECRET"])
 channel.attach(runner)
 
 if __name__ == "__main__":
@@ -153,9 +160,10 @@ if __name__ == "__main__":
 
 ## Mounting Inside Existing FastAPI Applications
 
-If your backend already runs a FastAPI or Starlette application, you don't need a separate server. You can mount `runner.run_async()` directly inside existing API route handlers:
+If your backend already runs a FastAPI or Starlette application, you don't need a separate server. The route must still authenticate the sender before deriving its session ID. The dependency below represents your application's existing authentication layer:
 
 ```python
+from typing import Annotated
 from fastapi import FastAPI, Depends
 from chatflow_agent import Agent, Runner
 
@@ -164,9 +172,16 @@ app = FastAPI()
 agent = Agent(name="RouterAgent", instructions="Triage support requests.")
 runner = Runner(starting_agent=agent)
 
+def require_authenticated_sender() -> str:
+    """Validate the request credential and return its immutable subject."""
+    raise NotImplementedError("Connect this dependency to your authentication system")
+
 @app.post("/crm/webhook")
-async def crm_webhook_endpoint(payload: dict):
-    session_id = payload["customer_id"]
+async def crm_webhook_endpoint(
+    payload: dict,
+    authenticated_subject: Annotated[str, Depends(require_authenticated_sender)],
+):
+    session_id = f"crm:{authenticated_subject}:{payload['customer_id']}"
     incoming_text = payload["ticket_description"]
 
     # Execute agent directly

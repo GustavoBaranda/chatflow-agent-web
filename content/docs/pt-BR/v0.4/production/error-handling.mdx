@@ -1,6 +1,8 @@
 ---
 title: "Tratamento de Erros e Recuperação"
-description: "Estratégias de tratamento de erros em produção no chatflow-agent, hierarquia de exceções do SDK, autocorreção de ferramentas e reversão transacional de turnos."
+description: "Estratégias de tratamento de erros em produção no chatflow-agent v0.4.0rc1, a hierarquia de exceções do SDK, o isolamento de erros de ferramentas e a reversão transacional de turnos."
+sourceRevision: "db864ef"
+sourceHash: "65ff8a0b6ffc6280f0d8d24377176aabb6a41278c4f21bd47273953e4aaac609"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -11,7 +13,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 Construir sistemas multiagente robustos exige tolerância a falhas estruturada. Indisponibilidades em provedores de LLM, timeouts de rede, argumentos inválidos de ferramentas e exceções inesperadas precisam ser tratados com elegância sem corromper o estado da conversa.
 
-O `chatflow-agent` implementa um modelo de recuperação em camadas: erros não fatais de ferramentas são retornados ao LLM para autocorreção autônoma, enquanto falhas fatais no turno disparam reversões atômicas (*rollbacks*) de estado.
+O `chatflow-agent` implementa um modelo de recuperação em camadas: erros de ferramentas são reportados ao LLM como um resultado de erro genérico para que o turno possa continuar, enquanto um turno que falha, é cancelado ou excede o tempo limite tem seu histórico, agente ativo e metadados restaurados ao estado anterior ao turno.
 
 ## Hierarquia de Exceções do SDK
 
@@ -21,11 +23,11 @@ Todas as exceções no `chatflow-agent` herdam de `ChatFlowError`. Isso permite 
 ChatFlowError (Base)
 ├── DependencyError (Missing optional extra dependencies)
 ├── ToolExecutionError (Uncaught error during tool execution)
-├── ToolSchemaError (Invalid parameter type annotation) [v0.4.0rc1]
-├── AgentHandoffError (Unknown handoff target or transfer loop)
+├── ToolSchemaError (Union annotation with an unmappable member) [v0.4.0rc1]
+├── AgentHandoffError (Unknown or unauthorized handoff target)
 ├── ProviderError (LLM API status error, network failure, or timeout)
-├── ReentrantTurnError (Concurrent turn invocation on locked session) [v0.4.0rc1]
-└── SessionDeletedError (Message dispatched to a deleted session) [v0.4.0rc1]
+├── ReentrantTurnError (Nested same-session turn started from a running turn) [v0.4.0rc1]
+└── SessionDeletedError (Running turn stores a message after its session was deleted) [v0.4.0rc1]
 ```
 
 ### Tabela de Referência de Exceções
@@ -34,16 +36,16 @@ ChatFlowError (Base)
 | :--- | :--- | :--- | :--- |
 | `ChatFlowError` | `Exception` | Classe base para todas as exceções do SDK. | Capture nas fronteiras de requisição de nível superior. |
 | `DependencyError` | `ChatFlowError` | Um extra opcional de canal (ex.: `[telegram]`, `[whatsapp]`) não está instalado. | Instale o extra requerido via `pip install "chatflow-agent[extra]"`. |
-| `ToolExecutionError` | `ChatFlowError` | Uma função de ferramenta levanta uma exceção não tratada durante a execução. | Envolvida em `ToolResult(is_error=True)` para que o agente possa se autocorrigir. |
-| `ToolSchemaError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Argumentos de função de ferramenta não possuem anotações de tipo Python válidas. | Corrija as assinaturas de tipo da função em tempo de desenvolvimento. |
-| `AgentHandoffError` | `ChatFlowError` | O agente de destino não existe no registro do `Runner`, ou o turno ultrapassa `max_handoffs_per_turn`. | Verifique os alvos de transferência e revise possíveis condições de ciclo. |
+| `ToolExecutionError` | `ChatFlowError` | Uma função de ferramenta levanta uma exceção não tratada durante a execução. | Dentro de um turno, o `Runner` a registra no log e retorna ao modelo um `ToolResult(is_error=True)` genérico. |
+| `ToolSchemaError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Uma ferramenta é criada com uma anotação de união que contém um membro sem mapeamento de esquema. Parâmetros sem anotação são permitidos. | Corrija as assinaturas de tipo da função em tempo de desenvolvimento. |
+| `AgentHandoffError` | `ChatFlowError` | O destino do handoff não existe ou não está declarado nos `handoffs` do agente atual. Exceder `max_handoffs_per_turn` não lança exceção: em vez disso, adiciona um resultado de ferramenta com erro. | Verifique os alvos de transferência. |
 | `ProviderError` | `ChatFlowError` | O provedor do modelo upstream retorna um código de erro HTTP (ex.: 429, 500, 503). | Implemente recuo exponencial ou comutação por falha (*failover*) para um motor reserva. |
-| `ReentrantTurnError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError`, `RuntimeError` | Código executando dentro de um turno inicia outro turno na mesma sessão. | Utilize filas de tarefas em segundo plano ou despachantes de turnos subsequentes. |
-| `SessionDeletedError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Uma mensagem é processada para uma sessão purgada durante a execução. | Recrie a sessão ou notifique o usuário para reiniciar o fluxo. |
+| `ReentrantTurnError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError`, `RuntimeError` | Código iniciado por um turno em execução inicia outro turno na mesma sessão. | Use `Runner.spawn_turn()` para enfileirar um turno de acompanhamento. |
+| `SessionDeletedError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Um turno em execução armazena uma mensagem depois que sua sessão SQLite foi excluída. | Notifique o usuário para reiniciar o fluxo; um turno posterior inicia uma sessão nova e vazia. |
 
 ## Autocorreção Autônoma de Ferramentas
 
-Quando uma ferramenta registrada levanta uma exceção ou recebe argumentos que falham na validação do esquema, o `Runner` captura a falha e retorna um erro estruturado ao modelo em vez de derrubar o turno:
+Quando uma ferramenta registrada levanta uma exceção, incluindo um `TypeError` causado por argumentos que a função não aceita, o `Runner` captura a falha e retorna um erro estruturado ao modelo em vez de derrubar o turno. A v0.4.0rc1 não valida os argumentos das ferramentas contra o esquema antes de chamar a função:
 
 ```python
 import logging
@@ -84,11 +86,11 @@ runner = Runner(starting_agent=agent)
    {
      "tool_call_id": "call_abc123",
      "name": "process_refund",
-     "content": "Tool execution failed [trace_id: a8c2...]. Invalid order format. Order ID must begin with 'ORD-'.",
+     "content": "Tool execution failed [trace_id: a8c2...]. Please try a different approach or inform the user.",
      "is_error": true
    }
    ```
-4. O modelo recebe `is_error=True` na iteração seguinte e informa ao usuário: *"O identificador do pedido '12345' precisa conter o prefixo 'ORD-'. Você poderia confirmar o número completo do pedido?"*
+4. A exceção original é registrada no log `chatflow_agent.runner` com o mesmo `trace_id`. O modelo recebe apenas o resultado genérico `is_error=True` e não consegue ver o texto da exceção, portanto só pode tentar de outra forma ou informar ao usuário que a operação falhou. Para permitir que o modelo explique um problema específico, faça a ferramenta retornar uma mensagem segura para o usuário em vez de levantar uma exceção.
 
 <Callout type="info" title="Proteção contra Loops Infinitos">
 Para evitar loops infinitos de novas tentativas nos quais um agente falha repetidamente em chamadas de ferramentas, o `Runner` impõe `max_tool_iterations` (padrão: `10`). Se o limite for atingido sem uma resposta textual final, o runner retorna uma mensagem de fallback controlada sem travar.
@@ -165,14 +167,14 @@ response = await runner.run_async(
 ```
 
 Se `turn_timeout` expirar:
-1. Todas as tarefas assíncronas filhas em execução são canceladas imediatamente.
-2. Execuções síncronas de ferramentas são aguardadas em threads de trabalho para prevenir impasses (*deadlocks*) no SQLite.
-3. O histórico da conversa e os metadados sofrem reversão para o checkpoint anterior ao turno.
+1. O turno é cancelado. Se uma de suas escritas SQLite estiver em andamento, ela pode terminar primeiro, de modo que o `TimeoutError` pode chegar depois do prazo.
+2. Uma ferramenta síncrona não pode ser interrompida: sua thread de trabalho continua rodando em segundo plano, e turnos posteriores da mesma sessão aguardam por ela antes de adquirir o bloqueio da sessão.
+3. O histórico da conversa, o agente ativo e os metadados sofrem reversão para o checkpoint anterior ao turno.
 4. `asyncio.TimeoutError` é levantado para o chamador.
 
 ## Checklist de Melhores Práticas
 
 - **Capture `ChatFlowError`:** Intercepte exceções do framework antes de permitir que se propaguem para manipuladores HTTP.
 - **Defina Limites de Iteração:** Nunca configure `max_tool_iterations` ou `max_handoffs_per_turn` com valores ilimitados.
-- **Retorne Erros Significativos nas Ferramentas:** Levante mensagens descritivas de `ValueError` ou `KeyError` dentro das ferramentas para que o agente interprete o erro e se autocerrija.
+- **Retorne Erros Significativos nas Ferramentas:** O modelo nunca vê o texto de uma exceção levantada por uma ferramenta, apenas um erro genérico com um `trace_id`. Se o modelo deve reagir a um problema específico (por exemplo, um ID de pedido malformado), faça a ferramenta **retornar** uma mensagem de erro curta e segura para o usuário em vez de levantar uma exceção.
 - **Registre IDs de Correlação:** Capture o `trace_id` gerado nos logs do `Runner` para correlacionar relatos de erro dos clientes com rastros internos.

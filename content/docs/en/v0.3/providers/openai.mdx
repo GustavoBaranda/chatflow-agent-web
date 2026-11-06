@@ -32,14 +32,11 @@ import os
 from chatflow_agent import Agent, Runner
 from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
 
-# Option 1: Implicit engine resolution via model name prefix
-analyst = Agent(
-    name="Analyst",
-    model="gpt-4o",
-    instructions="Analyze structured operational data.",
-)
+# Model-name prefixes alone are not enough in v0.3.4: an agent run through a
+# Runner without provider= or engine= is sent to the Runner's default
+# GeminiEngine. Use one of the two options below.
 
-# Option 2: Explicit provider assignment
+# Option 1: Explicit provider assignment
 writer = Agent(
     name="Writer",
     provider="openai",
@@ -47,7 +44,7 @@ writer = Agent(
     instructions="Draft concise summaries.",
 )
 
-# Option 3: Explicit engine instantiation with custom parameters
+# Option 2: Explicit engine instantiation with custom parameters
 custom_engine = OpenAIEngine(
     api_key=os.environ.get("OPENAI_API_KEY"),
     provider="openai",
@@ -63,7 +60,7 @@ senior_agent = Agent(
 
 ## Third-Party Providers: Groq, DeepSeek, and xAI Grok
 
-Connecting to ultra-fast inference providers or specialized reasoning models requires only specifying the `provider` attribute or standard model prefix:
+Connecting to ultra-fast inference providers or specialized reasoning models requires only specifying the `provider` attribute (in v0.3.4 a model prefix alone does not select the provider when the agent runs through a `Runner`):
 
 <Tabs items={["Groq Cloud", "DeepSeek API", "xAI Grok"]}>
   <Tab value="Groq Cloud">
@@ -111,7 +108,7 @@ reasoning_agent = Agent(
 import os
 from chatflow_agent import Agent
 
-# Implicitly maps to xAI preset via 'grok' model prefix
+# provider="grok" selects the xAI preset (api.x.ai)
 # Requires XAI_API_KEY environment variable
 grok_agent = Agent(
     name="GrokAgent",
@@ -172,9 +169,9 @@ open_engine = OpenAIEngine(
 )
 ```
 
-## Tool Call ID Constraints & Normalization
+## Tool Call ID Constraints & Normalization (Prerelease)
 
-OpenAI enforces a strict maximum length of 40 characters on `tool_call_id` in function calling responses. In multi-agent environments where agents hand off sessions across different providers (for example, Anthropic Claude tools generating IDs longer than 40 characters), `chatflow-agent` guarantees protocol compliance:
+<VersionBadge version="0.4.0rc1" status="prerelease" /> adds deterministic normalization for OpenAI `tool_call_id` values longer than 40 characters. Stable v0.3.4 does not provide this cross-provider normalization guarantee:
 
 1. **Truncation and Hashing:** If an existing historical message contains a tool call ID exceeding 40 characters, `OpenAIEngine` safely replaces it using a deterministic SHA-256 derived identifier (`call_` + 24 hex characters).
 2. **Schema Type Normalization:** The engine automatically normalizes JSON schema parameter types (`_lowercase_schema_types`) while preserving custom property schemas, ensuring tool compatibility across different OpenAI model versions.

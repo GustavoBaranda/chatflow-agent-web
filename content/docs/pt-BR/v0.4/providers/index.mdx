@@ -1,6 +1,8 @@
 ---
 title: "Visão Geral dos Provedores de LLM"
 description: "Arquitetura de motores, resolução dinâmica de provedores, políticas de segurança e execução de múltiplos modelos no chatflow-agent."
+sourceRevision: "82d8ebf"
+sourceHash: "aae4021b4927ebfec7285ce16d029b60fd4011a20490636583bc2c718b0c9520"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -32,7 +34,7 @@ Toda interação com modelos no framework executa através de uma implementaçã
 +----------+----------+  +--------+---------+  +-------+------------+
 |    GeminiEngine     |  | AnthropicEngine  |  |   OpenAIEngine     |
 | Direct REST v1beta  |  | Messages API v1  |  | OpenAI, Groq,      |
-| Connection Pooling  |  | Retry & Backoff  |  | DeepSeek, Ollama   |
+| Pooled in Runner    |  | Retry & Backoff  |  | DeepSeek, Ollama   |
 +---------------------+  +------------------+  +--------------------+
 ```
 
@@ -94,7 +96,7 @@ flowchart TD
     C1 -- Yes --> R1["Return agent.engine"]
     C1 -- No --> C2{"2. agent.provider set?"}
     C2 -- Yes --> R2["Instantiate Provider Engine"]
-    C2 -- No --> C3{"3. agent.base_url or api_key set?"}
+    C2 -- No --> C3{"3. agent.base_url set?"}
     C3 -- Yes --> R3["Resolve via OpenAIEngine"]
     C3 -- No --> C4{"4. prefer_default_engine and default_engine?"}
     C4 -- Yes --> R4["Return default_engine"]
@@ -113,10 +115,10 @@ flowchart TD
 
 1. **Motor Explícito:** `agent.engine` tem prioridade máxima se atribuído diretamente na instância do agente.
 2. **Provedor Explícito:** `agent.provider` corresponde a strings reconhecidas (`"gemini"`, `"google"`, `"anthropic"`, `"claude"`, `"openai"`, `"grok"`, `"xai"`, `"ollama"`, `"gemma"`, `"deepseek"`, `"groq"`).
-3. **Conexão Customizada:** `agent.base_url` ou `agent.api_key` sem provedor. Endpoints oficiais mapeiam automaticamente para a configuração do respectivo provedor; caso contrário, o padrão é `"openai"`.
-4. **Sobrescrita do Chamador:** `default_engine` fornecido com `prefer_default_engine=True` (utilizado quando os chamadores impõem deliberadamente um mock de teste ou um padrão específico do runner).
+3. **URL Base Customizada:** `agent.base_url` sem provedor. Endpoints oficiais mapeiam para o respectivo provedor; outras URLs usam `OpenAIEngine(provider="openai")` e exigem uma chave explícita, a menos que sejam locais. Definir apenas `agent.api_key` não seleciona um motor.
+4. **Sobrescrita do Chamador:** `default_engine` fornecido com `prefer_default_engine=True`. O `Runner` faz isso quando você passa `Runner(engine=...)` explicitamente, de modo que um motor explícito tem prioridade sobre os prefixos de nome de modelo.
 5. **Heurísticas de Prefixo do Nome do Modelo:** Mapeia prefixos reconhecíveis (`claude-`, `gpt-`, `o1`, `o3`, `grok`, `deepseek-`, `gemma`, `llama`, `mistral`, `qwen`, `phi`). Isso evita que um modelo Claude acidentalmente reverta para um padrão Gemini.
-6. **Motor Padrão do Runner:** O motor construído pelo `Runner` (ex.: a partir de `Runner(starting_agent=..., api_key=...)`).
+6. **Motor Padrão do Runner:** O `GeminiEngine` implícito construído pelo `Runner` quando nenhum motor foi passado (ex.: a partir de `Runner(starting_agent=..., api_key=...)`), usado para modelos Gemini e não reconhecidos.
 7. **Fallback Final:** `GeminiEngine(api_key=...)` padrão.
 
 ## Regras de Segurança e Isolamento de Credenciais
@@ -154,12 +156,13 @@ Compreender as diferenças arquiteturais entre as versões ajuda a escolher a co
 | Área Arquitetural | Linha Base `v0.3.4` (Estável) | Pré-lançamento `v0.4.0rc1` |
 | :--- | :--- | :--- |
 | **Runtime do Gemini Engine** | Baseado no SDK `google-genai` do Google (`from google import genai`). | **Zero Bloqueio de SDK**: Reformulado com `httpx` assíncrono nativo diretamente contra `https://generativelanguage.googleapis.com/v1beta`. |
-| **Pools de Conexões** | Handles de conexão separados por requisição. | **Pool de Clientes no Ciclo de Vida do Runner**: `_ClientPool` gerencia conexões keepalive compartilhadas entre turnos via `async with runner:`. |
-| **Presets de Provedores** | OpenAI, Grok, Ollama. | Presets expandidos: `deepseek`, `groq`, `xai`, `gemma`, com validação estrita de URLs base. |
-| **Proteção de Credenciais** | Fallback básico de chave de ambiente. | Verificação segura com bloqueio automático (*fail-closed*) em `_resolve_api_key`, impedindo vazamento de chaves de nuvem para endpoints customizados. |
+| **Pools de Conexões** | Handles de conexão separados por requisição. | **Pool de Clientes no Ciclo de Vida do Runner** para o `GeminiEngine`: dentro de `async with runner:`, as requisições Gemini compartilham um único cliente `httpx` em pool. Os motores compatíveis com OpenAI e Anthropic continuam usando um cliente por tentativa de requisição. |
+| **Presets de Provedores** | OpenAI, Grok/xAI, Ollama/Gemma, DeepSeek e Groq. | Os mesmos presets; o prefixo de modelo `deepseek-` agora é reconhecido. |
+| **Proteção de Credenciais** | `_resolve_api_key` restringe as chaves de ambiente aos endpoints oficiais exatos e exige credenciais explícitas para URLs remotas customizadas. | A mesma proteção; além disso, o `GeminiEngine` nunca segue redirecionamentos e remove sua chave dos erros. |
+| **Resolução de Motores** | O motor padrão de um `Runner` tem prioridade sobre os prefixos de nome de modelo, portanto modelos não Gemini precisam de `provider=` ou `engine=`. | Os prefixos de nome de modelo têm prioridade sobre o motor padrão implícito; um `Runner(engine=...)` explícito continua tendo prioridade sobre os prefixos. |
 
 <Callout type="info" title="Pool de Conexões do Runner na v0.4.0rc1">
-Na `v0.4.0rc1`, envolva as execuções do runner dentro de `async with runner:` para habilitar o pool de conexões HTTP keepalive entre turnos:
+Na `v0.4.0rc1`, envolva as execuções do runner dentro de `async with runner:` para que as requisições Gemini reutilizem um único cliente HTTP em pool entre turnos. `Runner.run()`, `TelegramChannel.run()` e o app do `WhatsAppChannel` abrem esse escopo automaticamente:
 
 ```python
 # [min-version: 0.4.0rc1]

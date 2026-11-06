@@ -1,6 +1,8 @@
 ---
 title: "Google Gemini y Anthropic Claude"
-description: "Integración de modelos fundacionales de alto rendimiento con Google Gemini REST v1beta y Anthropic Claude Messages API."
+description: "Google Gemini mediante google-genai y Anthropic Claude mediante Messages API en chatflow-agent v0.3.4."
+sourceRevision: "3c5ab27"
+sourceHash: "8df069a969d2f8a3e8c0e8612bca1e9514624d4583c7bd3b9417ac11c0239cb0"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -9,13 +11,13 @@ import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Card, Cards } from 'fumadocs-ui/components/card';
 import { VersionBadge } from '@/components/docs/VersionBadge';
 
-Google Gemini y Anthropic Claude representan dos de las familias de modelos de frontera más potentes para flujos de trabajo basados en agentes. `chatflow-agent` proporciona motores dedicados y nativos para ambos proveedores, optimizados para baja latencia, cero dependencia cautiva de SDKs y ejecución fiable de llamadas a herramientas.
+Google Gemini y Anthropic Claude representan dos familias de modelos potentes para flujos de trabajo basados en agentes. `chatflow-agent` v0.3.4 proporciona motores dedicados para ambos proveedores y utiliza sus clientes oficiales para admitir conversaciones de múltiples turnos y llamadas a herramientas.
 
 ---
 
 ## Motor Google Gemini
 
-`GeminiEngine` se comunica directamente con la API para desarrolladores de Gemini (`v1beta`) para ejecutar conversaciones de múltiples turnos y llamadas a funciones.
+En la versión estable v0.3.4, `GeminiEngine` utiliza el cliente `google-genai` de Google para comunicarse con la API para desarrolladores de Gemini y ejecutar conversaciones de múltiples turnos y llamadas a funciones.
 
 <Callout type="info" title="Variante de API de Gemini Soportada">
 `GeminiEngine` es compatible con la **API de desarrolladores de Gemini** (claves de API de Google AI Studio). Google Cloud Vertex AI no está soportado por este motor.
@@ -23,19 +25,20 @@ Google Gemini y Anthropic Claude representan dos de las familias de modelos de f
 
 ### Autenticación y Credenciales
 
-El motor lee las credenciales desde las siguientes fuentes, en orden de prioridad:
+En la versión estable v0.3.4, el motor lee las credenciales desde las siguientes fuentes, en orden de prioridad:
 1. `api_key` pasado directamente a `GeminiEngine(api_key="...")` o `Agent(api_key="...")`.
 2. Variable de entorno `GEMINI_API_KEY`.
-3. Variable de entorno `GOOGLE_API_KEY`.
 
-Por defecto, la clave de API se transmite a través de la cabecera HTTP segura `x-goog-api-key`. Pasar `api_key_in_query=True` transmite la clave como parámetro de consulta `?key=`:
+<Callout type="info" title="Opciones de credenciales en prerelease">
+<VersionBadge version="0.4.0rc1" status="prerelease" /> agrega el fallback `GOOGLE_API_KEY` y la opción `api_key_in_query`. Estas opciones no están disponibles en la versión estable v0.3.4.
+</Callout>
 
 ```python
 import os
 from chatflow_agent import Agent, Runner
 from chatflow_agent.core.engines.gemini import GeminiEngine
 
-# Recomendado: Autenticación segura mediante cabecera HTTP
+# v0.3.4: la clave se pasa al cliente google-genai
 gemini_engine = GeminiEngine(
     api_key=os.environ.get("GEMINI_API_KEY"),
     timeout_seconds=30.0,
@@ -50,43 +53,49 @@ assistant = Agent(
 )
 ```
 
-### Pool de Conexiones y Arquitectura sin Dependencias de SDK
+### Arquitectura del Motor Gemini por Versión
 
 <div className="flex gap-2 my-3">
-  <VersionBadge version="0.4.0rc1" status="prerelease" />
   <VersionBadge version="0.3.4" status="stable" />
+  <VersionBadge version="0.4.0rc1" status="prerelease" />
 </div>
 
 La implementación de Gemini experimentó una evolución arquitectónica entre versiones:
 
-* **En `v0.3.4` (Estable):** El motor importaba el SDK oficial `google-genai` de Google (`from google import genai`), requiriendo la instalación de la biblioteca cliente externa.
-* **En `v0.4.0rc1` (Pre-lanzamiento):** El motor fue rediseñado íntegramente utilizando `httpx` asíncrono nativo contra `https://generativelanguage.googleapis.com/v1beta`. Esto elimina dependencias pesadas y habilita un **pool de conexiones** reutilizables entre turnos de agentes:
+* **En `v0.3.4` (Estable):** El motor usa el SDK oficial `google-genai` de Google (`from google import genai`), que se instala automáticamente como dependencia principal. No hay pool de conexiones.
+* **En `v0.4.0rc1` (Pre-lanzamiento):** El motor fue reescrito utilizando `httpx` asíncrono nativo contra `https://generativelanguage.googleapis.com/v1beta`. Esto elimina la dependencia de `google-genai` y, dentro de un ámbito `async with runner:`, permite que las peticiones a Gemini compartan un único cliente HTTP con pool de conexiones.
+
+En v0.3.4, ejecuta los turnos directamente sobre un runner compartido:
 
 ```python
 # [no-exec: requires real gemini api key]
 import asyncio
 from chatflow_agent import Agent, Runner
 
-agent = Agent(name="Assistant", model="gemini-2.5-flash")
+agent = Agent(
+    name="Assistant",
+    instructions="Provide concise, accurate answers.",
+    model="gemini-2.5-flash",
+)
 runner = Runner(starting_agent=agent)
 
 async def main():
     # En v0.3.x, ejecuta turnos asíncronos directamente sobre el runner
     res1 = await runner.run_async("session-1", "What is quantum computing?")
     res2 = await runner.run_async("session-1", "Summarize in 3 bullet points.")
-    print(res2.text)
+    print(res2.content)
 
 asyncio.run(main())
 ```
 
-### Configuración de Proxies Personalizados
+### Configuración de Proxies Personalizados (Prerelease)
 
-Para enrutar peticiones de Gemini a través de una pasarela o proxy corporativo, define la variable de entorno `GOOGLE_GEMINI_BASE_URL`:
+<VersionBadge version="0.4.0rc1" status="prerelease" /> Para enrutar peticiones de Gemini mediante un proxy corporativo en la prerelease, define `GOOGLE_GEMINI_BASE_URL`. La versión estable v0.3.4 no admite esta variable:
 
 ```bash
 export GOOGLE_GEMINI_BASE_URL="https://gemini-proxy.internal.corp"
 ```
-El motor añade automáticamente `/v1beta` a la URL base.
+El motor v0.4.0rc1 añade automáticamente `/v1beta` a la URL base.
 
 ---
 
@@ -126,12 +135,12 @@ editor = Agent(
 
 ### Reintentos Automáticos y Retroceso con Jitter
 
-`AnthropicEngine` gestiona automáticamente los límites de tasa (`429 Too Many Requests`) y errores temporales de pasarela (`500`, `502`, `503`, `504`) mediante retroceso exponencial:
-* **Reintentos Máximos:** 3 intentos.
+`AnthropicEngine` reintenta automáticamente los límites de tasa (`429 Too Many Requests`), los errores temporales del servidor (`500`, `502`, `503`, `504`), el estado de sobrecarga de Anthropic (`529`) y los errores de conexión, mediante retroceso exponencial con jitter:
+* **Reintentos Máximos:** 3 reintentos tras el primer intento (hasta 4 peticiones).
 * **Demora Base:** 1.0 segundo.
 * **Demora Máxima:** 10.0 segundos.
 
-Si una respuesta `429` incluye la cabecera `Retry-After`, el motor respeta el retraso solicitado por el proveedor antes de reintentar.
+Estos valores son fijos en v0.3.4; no son parámetros del constructor. Cuando una respuesta reintentada incluye una cabecera `Retry-After` numérica, ese valor sustituye a la demora exponencial, pero la espera sigue limitada a 10 segundos, por lo que un retraso solicitado mayor no se respeta por completo.
 
 ---
 
@@ -171,4 +180,4 @@ runner = Runner(starting_agent=researcher)
 En este enjambre:
 1. El **Investigador** se ejecuta sobre Gemini 2.5 Flash para ingestión y búsqueda de alto rendimiento.
 2. Una vez recopilados los datos, la sesión se transfiere al **Sintetizador** sobre Claude 3.5 Sonnet.
-3. Los mensajes históricos y los IDs de llamadas a herramientas se normalizan automáticamente, evitando incompatibilidades de formato entre proveedores.
+3. <VersionBadge version="0.4.0rc1" status="prerelease" /> En la prerelease se normalizan los mensajes históricos y los IDs de llamadas a herramientas. La versión estable v0.3.4 no ofrece esta garantía.

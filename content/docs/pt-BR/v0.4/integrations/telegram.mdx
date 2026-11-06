@@ -1,6 +1,8 @@
 ---
 title: "Integração com Bots do Telegram"
 description: "Implante assistentes de IA multiagente no Telegram com python-telegram-bot, memória de sessão, divisão de mensagens e controles de administração em grupos."
+sourceRevision: "a362b6e"
+sourceHash: "e47d9526bd20b8d74e895cd47584ae536abb28c4a6d8887e1f4cf36d38b2a7fa"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -118,16 +120,18 @@ chunks = split_message(long_text, max_len=4096)
 # Divide progressivamente em \n\n, \n, . ou espaços para preservar a legibilidade
 ```
 
-O canal entrega os blocos sequencialmente, garantindo que parágrafos, frases e listas nunca sejam interrompidos abruptamente no meio de palavras.
+O canal entrega os blocos sequencialmente. `split_message` prefere limites de parágrafo, linha, frase e, por fim, de palavra; quando um bloco não contém nenhum separador (por exemplo, uma URL muito longa), recorre a um corte rígido em `max_len`. Os comprimentos são contados em caracteres Python, e `max_len` deve ser positivo.
 
 ## Indicadores de Digitação e Experiência do Usuário
 
-Enquanto o turno do modelo é processado (incluindo invocações de ferramentas e transferências), o `TelegramChannel` emite periodicamente o indicador `ChatAction.TYPING` a cada 4 segundos. Os usuários visualizam o status nativo *"Bot está digitando..."* no aplicativo do Telegram até que a resposta completa seja entregue.
+Quando uma mensagem chega, o `TelegramChannel` envia um único indicador `ChatAction.TYPING` antes de despachar o turno (erros dessa chamada são ignorados). Ele não é repetido enquanto o turno é executado, portanto, em turnos longos, o status de digitação do Telegram pode desaparecer antes de a resposta chegar.
 
-## Execução em Loops de Eventos Existentes
+## Gerenciamento do Loop de Eventos
 
-Caso esteja integrando o bot em um serviço `asyncio` existente ou aplicação FastAPI, informe `close_loop=False` no método `run()`:
+`run()` inicia o long polling e bloqueia: ele mesmo conduz o loop de eventos através do `run_polling()` do python-telegram-bot. Na v0.4.0rc1, ele também abre o escopo `async with runner:` do runner anexado durante todo o tempo de vida da aplicação (aberto em `post_init`, fechado em `post_shutdown`), de modo que os turnos reutilizam conexões Gemini em pool. Passar `close_loop=False` mantém o loop de eventos aberto depois que `run()` retorna:
 
 ```python
 telegram.run(drop_pending_updates=True, close_loop=False)
 ```
+
+`close_loop=False` não torna `run()` utilizável dentro de um loop de eventos que já está em execução, como o de uma aplicação FastAPI. O `TelegramChannel` não fornece um método de inicialização não bloqueante.

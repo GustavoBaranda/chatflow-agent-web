@@ -1,6 +1,8 @@
 ---
 title: "Instalação"
 description: "Instale o chatflow-agent e configure extras opcionais de canais para Telegram, WhatsApp e desenvolvimento."
+sourceRevision: "737aa0d"
+sourceHash: "903c02fefacd32bfe241ebbc90833ea2d33e12534ab20d971b7d884ff95bf9dd"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -13,7 +15,7 @@ Antes de instalar o `chatflow-agent`, certifique-se de que seu sistema atende ao
 
 * **Versão do Python:** Python `>=3.10` (testado nas versões 3.10, 3.11, 3.12 e 3.13).
 * **Gerenciador de Pacotes:** `pip`, `uv` ou `poetry`.
-* **Sistemas Operacionais:** Linux, macOS e Windows (x86_64, arm64).
+* **Sistemas Operacionais:** a CI do SDK roda em Linux (Ubuntu) e Windows. O pacote é Python puro, portanto espera-se que macOS e arm64 funcionem, mas eles não fazem parte da matriz de CI.
 
 Verifique sua versão local do Python no terminal:
 
@@ -26,7 +28,7 @@ python --version
 
 ## Instalando o Pacote Principal
 
-O `chatflow-agent` disponibiliza um núcleo leve com zero dependências pesadas de provedores. Escolha entre a versão estável de produção ou a versão candidata de pré-lançamento:
+Na v0.4.0rc1, o núcleo depende apenas de `pydantic` e `httpx`; nenhum SDK de provedor é necessário. Esta trilha documenta a versão candidata publicada `0.4.0rc1`. Para produção, use a versão estável `0.3.4`:
 
 <Tabs items={['pip', 'uv', 'poetry']}>
   <Tab value="pip">
@@ -34,9 +36,8 @@ O `chatflow-agent` disponibiliza um núcleo leve com zero dependências pesadas 
 # Instalar a versão estável atual (v0.3.4 - recomendada para produção)
 pip install chatflow-agent
 
-# Ou instalar a versão candidata de pré-lançamento (v0.4.0rc1+)
-pip install --pre chatflow-agent
-# ou: pip install "chatflow-agent==0.4.0rc1"
+# Ou instalar a versão candidata de pré-lançamento documentada aqui (fixe a versão exata)
+pip install "chatflow-agent==0.4.0rc1"
 ```
   </Tab>
   <Tab value="uv">
@@ -44,9 +45,8 @@ pip install --pre chatflow-agent
 # Instalar a versão estável atual com uv
 uv add chatflow-agent
 
-# Ou instalar a versão candidata de pré-lançamento
-uv add --prerelease=allow chatflow-agent
-# ou: uv add "chatflow-agent==0.4.0rc1"
+# Ou instalar a versão candidata de pré-lançamento documentada aqui
+uv add "chatflow-agent==0.4.0rc1"
 ```
   </Tab>
   <Tab value="poetry">
@@ -61,7 +61,7 @@ poetry add chatflow-agent@0.4.0rc1
 </Tabs>
 
 <Callout type="info" title="Zero Bloqueio de SDKs (Vendor Lock-In) e Dependências Principais">
-Na versão **v0.3.4**, as dependências principais limitam-se estritamente a `google-genai>=0.1.1`, `pydantic>=2.6.0` e `httpx>=0.27.0`. Na **v0.4.0rc1+**, `google-genai` não é mais necessário: toda a comunicação com Gemini e endpoints compatíveis com OpenAI é executada diretamente sobre REST assíncrono via `httpx`. A persistência SQLite utiliza a biblioteca nativa `sqlite3` do Python sem requerer drivers adicionais de banco de dados.
+Na **v0.4.0rc1**, as dependências principais são `pydantic>=2.6.0` e `httpx>=0.27.0`: `google-genai` deixou de ser uma dependência, e os motores Gemini, Anthropic e compatíveis com OpenAI chamam suas APIs REST via `httpx`. Na versão estável **v0.3.4**, o núcleo também depende de `google-genai>=0.1.1`, usado pelo `GeminiEngine`. A persistência SQLite utiliza a biblioteca nativa `sqlite3` do Python sem requerer drivers adicionais de banco de dados.
 </Callout>
 
 ---
@@ -72,11 +72,11 @@ O `chatflow-agent` declara dependências opcionais no `pyproject.toml` para mant
 
 | Nome do Extra | Descrição | Principais Dependências Adicionadas | Comando |
 | :--- | :--- | :--- | :--- |
-| `[telegram]` | Integração com bots do Telegram via polling ou webhooks | `python-telegram-bot>=21.0` | `pip install "chatflow-agent[telegram]"` |
-| `[whatsapp]` | Webhooks da Meta WhatsApp Cloud API e listener de webhooks | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[whatsapp]"` |
-| `[webhook]` | Servidor de webhooks HTTP genérico para integrações externas | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[webhook]"` |
-| `[all]` | Instala todas as dependências de canais simultaneamente | `telegram`, `whatsapp`, `webhook` | `pip install "chatflow-agent[all]"` |
-| `[dev]` | Ferramentas para executar suítes de testes unitários e de integração | `pytest>=8.0.0`, `pytest-asyncio`, `ruff`, `mypy` | `pip install "chatflow-agent[dev]"` |
+| `[telegram]` | Integração com bots do Telegram via long polling (`TelegramChannel`) | `python-telegram-bot>=21.0` | `pip install "chatflow-agent[telegram]==0.4.0rc1"` |
+| `[whatsapp]` | Servidor de webhooks da Meta WhatsApp Cloud API (`WhatsAppChannel`) | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[whatsapp]==0.4.0rc1"` |
+| `[webhook]` | Instala FastAPI e Uvicorn para construir seu próprio endpoint HTTP. Não existe um canal de webhook genérico embutido; consulte o [guia de Webhooks e Canais Customizados](/pt-BR/docs/v0.4/integrations/webhook) | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[webhook]==0.4.0rc1"` |
+| `[all]` | Instala todas as dependências de canais simultaneamente | `telegram`, `whatsapp`, `webhook` | `pip install "chatflow-agent[all]==0.4.0rc1"` |
+| `[dev]` | Ferramentas para executar suítes de testes unitários e de integração | `pytest>=8.0.0`, `pytest-asyncio`, `ruff`, `mypy` | `pip install "chatflow-agent[dev]==0.4.0rc1"` |
 
 ---
 
@@ -88,27 +88,36 @@ Confirme se o `chatflow-agent` foi instalado corretamente verificando a versão 
 python -c "import chatflow_agent; print(chatflow_agent.__version__)"
 ```
 
-Saída esperada:
+Saída esperada para esta trilha:
 ```text
-0.3.4
+0.4.0rc1
 ```
-*(ou `0.4.0rc1` caso tenha instalado com a flag de pré-lançamento)*.
+*(`0.3.4` caso tenha instalado a versão estável)*.
 
 ---
 
 ## Configuração de Chaves de API dos Provedores
 
-Para interagir com LLMs, exporte a chave de API do provedor escolhido como variável de ambiente no seu terminal ou arquivo `.env`:
+Para interagir com LLMs, exporte a chave de API do provedor escolhido como variável de ambiente no seu terminal ou arquivo `.env`. Cada provedor lê sua própria variável, e somente quando a requisição vai para o endpoint oficial desse provedor; a `OPENAI_API_KEY` nunca é enviada a outro provedor ou host:
 
 ```bash
-# Provedores OpenAI ou compatíveis com OpenAI (Groq, xAI, DeepSeek, Ollama)
+# OpenAI
 export OPENAI_API_KEY="sk-..."
+
+# xAI Grok (provider="grok" ou provider="xai")
+export XAI_API_KEY="xai-..."
+
+# DeepSeek e Groq
+export DEEPSEEK_API_KEY="sk-..."
+export GROQ_API_KEY="gsk_..."
 
 # Modelos Anthropic Claude
 export ANTHROPIC_API_KEY="sk-ant-..."
 
-# Modelos Google Gemini
+# Modelos Google Gemini (GOOGLE_API_KEY é usada se GEMINI_API_KEY não estiver definida)
 export GEMINI_API_KEY="AIzaSy..."
+
+# Um servidor Ollama local não precisa de chave. OLLAMA_API_KEY só é usada se você a definir.
 ```
 
 No Windows PowerShell:

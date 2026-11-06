@@ -118,16 +118,18 @@ chunks = split_message(long_text, max_len=4096)
 # Splits progressively at \n\n, \n, . , or spaces to preserve readability
 ```
 
-The channel delivers chunks sequentially, ensuring that paragraphs, sentences, and lists are never broken abruptly mid-word.
+The channel delivers chunks sequentially. `split_message` prefers paragraph, line, sentence, and then word boundaries; when a chunk contains no separator (for example a very long URL), it falls back to a hard cut at `max_len`. Lengths are counted in Python characters, and `max_len` must be positive.
 
 ## Typing Indicators & User Experience
 
-While the model turn executes (including tool invocations and handoffs), `TelegramChannel` sends periodic `ChatAction.TYPING` indicators every 4 seconds. Users see the native *"Bot is typing..."* status in their Telegram client until the complete response is delivered.
+When a message arrives, `TelegramChannel` sends a single `ChatAction.TYPING` indicator before dispatching the turn (errors from that call are ignored). It is not repeated while the turn runs, so for long turns Telegram's typing status may disappear before the reply arrives.
 
-## Running in Existing Event Loops
+## Event Loop Handling
 
-If you are integrating the bot inside an existing `asyncio` service or FastAPI application, pass `close_loop=False` to `run()`:
+`run()` starts long polling and blocks: it drives the event loop itself through python-telegram-bot's `run_polling()`. In v0.4.0rc1 it also opens the attached runner's `async with runner:` scope for the application's lifetime (entered in `post_init`, closed in `post_shutdown`), so turns reuse pooled Gemini connections. Passing `close_loop=False` keeps the event loop open after `run()` returns:
 
 ```python
 telegram.run(drop_pending_updates=True, close_loop=False)
 ```
+
+`close_loop=False` does not make `run()` usable inside an event loop that is already running, such as a FastAPI application's. `TelegramChannel` does not provide a non-blocking start method.

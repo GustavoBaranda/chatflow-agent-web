@@ -1,6 +1,8 @@
 ---
 title: "Modelos Locales con Ollama"
 description: "Ejecuta modelos de pesos abiertos como Google Gemma 2, Llama 3 y Mistral en hardware local sin costos en la nube."
+sourceRevision: "82d8ebf"
+sourceHash: "fbf126632b844d741be3636a8527de87f25e583323a3e9276b6946b994d2fc13"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -30,7 +32,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
   <Step>
     ### Definir un Agente Local
 
-    `chatflow-agent` enruta automáticamente nombres de modelo que comiencen con `gemma`, `llama`, `mistral`, `qwen` o `phi` al preajuste del motor Ollama:
+    En v0.4.0rc1, `chatflow-agent` enruta automáticamente nombres de modelo que comiencen con `gemma`, `llama`, `mistral`, `qwen` o `phi` al preajuste del motor Ollama, salvo que el agente defina `provider`, `base_url` o `engine`, o que el `Runner` haya recibido un `engine=` explícito:
 
 ```python
 from chatflow_agent import Agent, Runner
@@ -79,17 +81,17 @@ El framework protege tus credenciales de la nube durante el desarrollo local:
 
 1. **Detección de Loopback:** Cuando `base_url` apunta a `localhost`, `127.0.0.1`, `::1` o `0.0.0.0`, `OpenAIEngine` identifica un entorno local.
 2. **Aislamiento de Credenciales:** **Nunca enviará tu `OPENAI_API_KEY` ni tu `ANTHROPIC_API_KEY`** a endpoints locales.
-3. **Clave de Respaldo Automática:** Dado que los servidores locales normalmente no requieren autenticación pero el cliente HTTP de OpenAI exige un encabezado `Authorization` no vacío, el motor suministra automáticamente `"ollama"` como clave ficticia si no se especifica ninguna.
+3. **Clave Provisional:** Si no se pasa ninguna clave, el motor utiliza `OLLAMA_API_KEY` cuando esa variable está definida y, en caso contrario, el valor provisional `"ollama"`. Los servidores locales normalmente la ignoran.
 
 ```python
 from chatflow_agent.core.engines.openai_compatible import OpenAIEngine
 
-# Seguro: utiliza automáticamente la clave ficticia "ollama" sin tocar credenciales en la nube
+# Seguro: utiliza OLLAMA_API_KEY si está definida; en caso contrario, el valor provisional "ollama";
+# las credenciales de la nube nunca se tocan
 engine = OpenAIEngine(
     base_url="http://localhost:11434/v1",
     provider="ollama",
 )
-assert engine.api_key == "ollama"
 ```
 
 ## Llamadas a Funciones con Modelos Locales

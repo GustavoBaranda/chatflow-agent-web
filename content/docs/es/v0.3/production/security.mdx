@@ -1,6 +1,8 @@
 ---
 title: "Prácticas de Seguridad Recomendadas"
 description: "Directrices de seguridad en profundidad para chatflow-agent, aislamiento de credenciales, mitigación de inyecciones de prompt, firmas de webhooks y privacidad de datos."
+sourceRevision: "0ca4592"
+sourceHash: "c8cd4853946d5c94d2b16c5e23bfff1f61eb377dec8af50d5aff01f553a9f2e4"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -19,17 +21,19 @@ Los agentes autónomos capaces de invocar herramientas, consultar bases de datos
 Entrada No Confiable (Webhooks / Canales de Chat)
           │
           ▼
-1. Seguridad de Transporte y Autenticación (HMAC SHA-256 / Tokens Bearer / Verificación de Admin)
+1. Autenticación de Entrada (HMAC SHA-256 de WhatsApp / Verify Token / Verificación de Admin en Telegram)
           │
           ▼
-2. Concurrencia de Sesión y Barreras de Reentrada (ReentrantTurnError / Bloqueo de Sesión)
+2. Serialización de Sesión (Bloqueo de Sesión; solo SessionStore en memoria en v0.3.4)
           │
           ▼
-3. Fronteras del Agente y Aislamiento de Herramientas (Validación / Verificación de Tipos / Límites de Iteración)
+3. Fronteras del Agente (Herramientas Acotadas por Agente / Límites de Iteración y de Handoff)
           │
           ▼
 4. Aislamiento de Credenciales y Control de Egreso (ValueError en Host Personalizado / Cero Fuga de Claves)
 ```
+
+El SDK no aísla las herramientas en un sandbox: se ejecutan en el proceso de la aplicación con todos sus privilegios, y los argumentos de herramienta proporcionados por el modelo se pasan a la función sin validación en tiempo de ejecución. La autenticación de entrada para canales personalizados, como los tokens Bearer, la implementa tu aplicación.
 
 ## Protección de Credenciales y Control de Egreso
 
@@ -49,16 +53,16 @@ internal_engine = OpenAIEngine(
     api_key="internal-bearer-token",
 )
 
-# [SEGURO] Inferencia local offline con clave ficticia
+# [SEGURO] Inferencia local offline: no se requiere clave. El motor usa
+# OLLAMA_API_KEY si está definida y, en caso contrario, la clave provisional "ollama".
 local_engine = OpenAIEngine(
     base_url="http://localhost:11434/v1",
     provider="ollama",
 )
-assert local_engine.api_key == "ollama"
 ```
 
 <Callout type="warn" title="Protección Automática con ValueError">
-Si especificas un `base_url` personalizado sin proporcionar una `api_key` explícita, `OpenAIEngine` rechaza reutilizar la clave `OPENAI_API_KEY` del entorno y genera un `ValueError`. Esto evita la exfiltración accidental de credenciales a proxies no confiables.
+Si especificas un `base_url` remoto personalizado sin proporcionar una `api_key` explícita, `OpenAIEngine` rechaza reutilizar la clave `OPENAI_API_KEY` (o la de cualquier otro proveedor) del entorno y genera un `ValueError`. Esto evita la exfiltración accidental de credenciales a proxies no confiables. Los hosts de loopback (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`) están exentos y reciben en su lugar una clave provisional.
 </Callout>
 
 ## Protocolos de Seguridad en Canales
@@ -75,17 +79,19 @@ from chatflow_agent.channels import WhatsAppChannel
 
 # Habilita siempre la verificación de firmas en producción
 channel = WhatsAppChannel(
-    verify_token=os.environ.get("WHATSAPP_VERIFY_TOKEN", ""),
-    access_token=os.environ.get("WHATSAPP_ACCESS_TOKEN", ""),
-    phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID", ""),
-    app_secret=os.environ.get("META_APP_SECRET", ""),
-    verify_signature=True,  # Rechaza intentos no autenticados con HTTP 403
+    verify_token=os.environ["WHATSAPP_VERIFY_TOKEN"],
+    access_token=os.environ["WHATSAPP_ACCESS_TOKEN"],
+    phone_number_id=os.environ["WHATSAPP_PHONE_NUMBER_ID"],
+    app_secret=os.environ["WHATSAPP_APP_SECRET"],
+    verify_signature=True,  # Firmas de solicitud ausentes o inválidas reciben HTTP 403
 )
 ```
 
+Con `verify_signature=True` (predeterminado), construir el canal sin `app_secret` genera `ValueError`. Lee los secretos sin valores de respaldo: un marcador no vacío como `"secret"` superaría esa comprobación y permitiría a cualquiera que lo conozca falsificar peticiones firmadas.
+
 ### Enmascaramiento Automático de Números Telefónicos
 
-Los números de teléfono de clientes recibidos por WhatsApp constituyen Información de Identificación Personal (PII). `WhatsAppChannel` enmascara automáticamente los números en los registros (`+1415****71`) mediante su filtro interno `_mask_phone`, previniendo fugas de PII a plataformas de monitorización.
+Los números de teléfono recibidos por WhatsApp son Información de Identificación Personal (PII). `WhatsAppChannel` enmascara los valores en sus propios logs conservando los primeros cuatro y los últimos tres caracteres de entrada; por ejemplo, el remitente de Meta `14155552671` se convierte en `1415***671`. El número sin procesar sigue apareciendo en la respuesta JSON del webhook (`"sender"`), en el ID de sesión y los metadatos almacenados por el session store, en el argumento que se pasa a `on_24h_window_expired` y en las respuestas de error de Meta que se registran tal como se reciben. Las aplicaciones y herramientas externas deben aplicar sus propias políticas de redacción.
 
 ### Administración de Chats Grupales en Telegram
 
@@ -100,19 +106,16 @@ La inyección de prompts ocurre cuando entradas no confiables del usuario engañ
 Para mitigar riesgos de inyección de prompts:
 
 1. **Principio de Menor Privilegio:** Asigna a cada agente especializado únicamente las herramientas que necesita de forma estricta. Un `BillingAgent` no debe tener acceso a herramientas de eliminación de bases de datos o reinicio de servidores.
-2. **Validación Determinista de Argumentos:** Valida todas las entradas de herramientas con pistas de tipo explícitas y comprobaciones en tiempo de ejecución:
+2. **Validar los Argumentos Dentro de Cada Herramienta:** v0.3.4 no valida ni convierte en tiempo de ejecución los argumentos proporcionados por el modelo; las pistas de tipo solo dan forma al esquema que ve el modelo. Comprueba cada entrada dentro de la herramienta antes de actuar:
 
 ```python
 from chatflow_agent import tool
 
 @tool
 def update_email(user_id: int, new_email: str) -> str:
-    """Update a user's verified email address.
-
-    Args:
-        user_id: Numeric user identifier.
-        new_email: Valid email address.
-    """
+    """Update a user's verified email address."""
+    if not isinstance(user_id, int):
+        raise ValueError("user_id must be an integer.")
     if "@" not in new_email or "." not in new_email:
         raise ValueError("Invalid email format.")
     # Ejecutar actualización
@@ -123,8 +126,10 @@ def update_email(user_id: int, new_email: str) -> str:
 
 ## Seguridad ante Reentrada y Concurrencia
 
+En la versión estable v0.3.4 no existe protección contra reentrada. Una herramienta que llama a `runner.run_async()` o `runner.run()` para su propia sesión espera indefinidamente con el `SessionStore` en memoria (el turno externo mantiene el bloqueo), y con `SQLiteSessionStore` el turno anidado se ejecuta sin serializar junto al externo. No inicies un turno de una sesión desde dentro del turno en ejecución de esa misma sesión.
+
 <VersionBadge version="0.4.0rc1" status="prerelease" />
 
-A partir de `v0.4.0rc1`, `Runner` protege las sesiones frente a turnos reentrantes concurrentes:
-- Si una herramienta dispara código que invoca `runner.run_async` sobre la misma sesión mientras el bloqueo está activo, el `Runner` lanza un `ReentrantTurnError`.
-- Esto previene condiciones de carrera, recursión infinita y mutaciones concurrentes en el historial.
+A partir de `v0.4.0rc1`, `Runner` rechaza estos turnos anidados:
+- Si el código iniciado por un turno en ejecución (una herramienta, o una tarea o hilo que esta inicie) llama a `runner.run_async` o `runner.run` para la misma sesión, el `Runner` lanza `ReentrantTurnError` de inmediato en lugar de bloquearse indefinidamente. `Runner.spawn_turn()` encola en su lugar un turno de seguimiento.
+- La protección cubre solo las llamadas anidadas. No serializa sesiones entre instancias de store, procesos o hilos que ejecutan sus propios bucles de eventos.

@@ -19,17 +19,19 @@ Autonomous AI agents capable of invoking tools, querying internal databases, and
 Untrusted Input (Webhooks / Chat Channels)
           │
           ▼
-1. Transport Security & Authentication (HMAC SHA-256 / Bearer Tokens / Admin Check)
+1. Inbound Authentication (WhatsApp HMAC SHA-256 / Verify Token / Telegram Admin Check)
           │
           ▼
-2. Session Concurrency & Reentrancy Guards (ReentrantTurnError / Session Lock)
+2. Session Concurrency & Reentrancy Guards (Session Lock / ReentrantTurnError)
           │
           ▼
-3. Agent Boundaries & Tool Sandboxing (Validation / Type Check / Iteration Limits)
+3. Agent Boundaries (Per-Agent Tool Scoping / Iteration and Handoff Limits)
           │
           ▼
 4. Credential Isolation & Egress Guards (ValueError on Custom Host / No API Key Leak)
 ```
+
+The SDK does not sandbox tools: they run in the application process with its full privileges, and in v0.4.0rc1 model-supplied tool arguments are passed to the function without runtime validation. Inbound authentication for custom channels, such as Bearer tokens, is implemented by your application.
 
 ## Credential Protection & Egress Guards
 
@@ -49,16 +51,16 @@ internal_engine = OpenAIEngine(
     api_key="internal-bearer-token",
 )
 
-# [SAFE] Local offline inference with dummy key
+# [SAFE] Local offline inference: no key is required. The engine uses
+# OLLAMA_API_KEY if it is set, otherwise the placeholder key "ollama".
 local_engine = OpenAIEngine(
     base_url="http://localhost:11434/v1",
     provider="ollama",
 )
-assert local_engine.api_key == "ollama"
 ```
 
 <Callout type="warn" title="Automatic ValueError Protection">
-If you supply a custom `base_url` without providing an explicit `api_key`, `OpenAIEngine` refuses to reuse `OPENAI_API_KEY` from the environment and raises `ValueError`. This prevents accidental credential exfiltration to untrusted proxies.
+If you supply a custom remote `base_url` without providing an explicit `api_key`, `OpenAIEngine` refuses to reuse `OPENAI_API_KEY` (or any other provider key) from the environment and raises `ValueError`. This prevents accidental credential exfiltration to untrusted proxies. Loopback hosts (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`) are exempt and get a placeholder key instead. In v0.4.0rc1, `GeminiEngine` also never follows HTTP redirects and removes the API key from its error messages.
 </Callout>
 
 ## Channel Security Protocols
@@ -75,17 +77,19 @@ from chatflow_agent.channels import WhatsAppChannel
 
 # Always enable signature verification in production
 channel = WhatsAppChannel(
-    verify_token=os.environ.get("WHATSAPP_VERIFY_TOKEN", ""),
-    access_token=os.environ.get("WHATSAPP_ACCESS_TOKEN", ""),
-    phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID", ""),
-    app_secret=os.environ.get("META_APP_SECRET", ""),
-    verify_signature=True,  # Rejects unauthenticated forge attempts with HTTP 403
+    verify_token=os.environ["WHATSAPP_VERIFY_TOKEN"],
+    access_token=os.environ["WHATSAPP_ACCESS_TOKEN"],
+    phone_number_id=os.environ["WHATSAPP_PHONE_NUMBER_ID"],
+    app_secret=os.environ["WHATSAPP_APP_SECRET"],
+    verify_signature=True,  # Missing/invalid request signatures receive HTTP 403
 )
 ```
 
+With `verify_signature=True` (the default), constructing the channel without an `app_secret` raises `ValueError`. Read secrets without fallback values: a non-empty placeholder such as `"secret"` would pass that check and let anyone who knows it forge signed requests.
+
 ### Automatic Phone Number Masking
 
-Customer phone numbers received through WhatsApp are classified as Personally Identifiable Information (PII). `WhatsAppChannel` automatically masks telephone numbers in log outputs (`+1415****71`) via its internal `_mask_phone` sanitizer, preventing PII leaks to log monitoring platforms.
+Customer phone numbers received through WhatsApp are Personally Identifiable Information (PII). `WhatsAppChannel` masks values in its own log messages by retaining the first four and last three input characters; for example, the Meta sender `14155552671` becomes `1415***671`. The raw number still appears in the webhook's JSON response (`"sender"`), in the session ID and metadata stored by the session store, in the argument passed to `on_24h_window_expired`, and in Meta error responses that are logged as received. Applications and external tools must apply their own redaction policies.
 
 ### Telegram Group Chat Administration
 
@@ -100,19 +104,16 @@ Prompt injection occurs when untrusted user input tricks the LLM into overriding
 To mitigate prompt injection risks:
 
 1. **Principle of Least Privilege:** Grant each specialized agent only the tools it strictly needs. A `BillingAgent` should not have access to database deletion or server restart tools.
-2. **Deterministic Argument Validation:** Validate all tool inputs against explicit type hints and runtime validation:
+2. **Validate Arguments Inside Each Tool:** v0.4.0rc1 does not validate or coerce model-supplied arguments at runtime; type hints only shape the schema the model sees. Check every input inside the tool before acting on it:
 
 ```python
 from chatflow_agent import tool
 
 @tool
 def update_email(user_id: int, new_email: str) -> str:
-    """Update a user's verified email address.
-
-    Args:
-        user_id: Numeric user identifier.
-        new_email: Valid email address.
-    """
+    """Update a user's verified email address."""
+    if not isinstance(user_id, int):
+        raise ValueError("user_id must be an integer.")
     if "@" not in new_email or "." not in new_email:
         raise ValueError("Invalid email format.")
     # Execute update
@@ -125,7 +126,12 @@ def update_email(user_id: int, new_email: str) -> str:
 
 <VersionBadge version="0.4.0rc1" status="prerelease" />
 
-Starting in `v0.4.0rc1`, `Runner` protects sessions against concurrent reentrant turns:
-- If a tool triggers code that calls `runner.run_async` on the same session while the lock is held, `Runner` raises `ReentrantTurnError`.
-- This prevents race conditions, infinite recursion, and concurrent history mutations.
+Starting in `v0.4.0rc1`, `Runner` protects sessions against reentrant turns:
+- If code started by a running turn (a tool, or a task or thread it starts: `create_task`, `gather`, `wait_for`, `TaskGroup`, `asyncio.to_thread`) calls `runner.run_async` or `runner.run` for the same session, `Runner` raises `ReentrantTurnError` immediately instead of deadlocking. Use `Runner.spawn_turn()` to queue a follow-up turn.
+- Independent requests for the same session are serialized by the session lock (per store instance, session ID, and event loop).
+
+Known limitations in v0.4.0rc1:
+- Serialization is not provided across store instances on the same file, across processes, or across threads running their own event loops.
+- A tool that waits for work done by a task that was not started from the turn can still deadlock if that work runs a turn of the same session; awaiting a `spawn_turn()` task inside the turn that spawned it deadlocks as well.
+- `clear_history()` and `delete()` (and therefore Telegram's `/reset`) are not coordinated with running turns beyond the rollback and `SessionDeletedError` guarantees.
 

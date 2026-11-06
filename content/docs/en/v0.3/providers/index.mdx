@@ -31,8 +31,8 @@ Every model interaction in the framework executes through a concrete implementat
            v                      v                    v
 +----------+----------+  +--------+---------+  +-------+------------+
 |    GeminiEngine     |  | AnthropicEngine  |  |   OpenAIEngine     |
-| Direct REST v1beta  |  | Messages API v1  |  | OpenAI, Groq,      |
-| Connection Pooling  |  | Retry & Backoff  |  | DeepSeek, Ollama   |
+| google-genai SDK    |  | Messages API v1  |  | OpenAI, Groq,      |
+| Retries             |  | Retry & Backoff  |  | DeepSeek, Ollama   |
 +---------------------+  +------------------+  +--------------------+
 ```
 
@@ -69,9 +69,9 @@ The engine returns an `EngineTurnResult` containing:
 | `tool_calls` | `list[ToolCall]` | Structured tool execution requests requested by the model. |
 | `raw_response` | `Any \| None` | Native provider response payload for debugging or token inspection. |
 
-### Universal Tool Call ID Normalization
+### Tool Call ID Normalization (Prerelease)
 
-When multi-agent handoffs occur between different model families (for instance, handing off from Anthropic Claude to OpenAI GPT-4o), historical messages retain tool call IDs issued by the previous model. Because different providers impose conflicting ID validation constraints (for example, OpenAI rejects tool call IDs exceeding 40 characters), `chatflow-agent` uses deterministic replacement:
+<VersionBadge version="0.4.0rc1" status="prerelease" /> adds deterministic replacement of incompatible historical tool call IDs. Stable v0.3.4 does not provide this cross-provider normalization guarantee:
 
 ```python
 # [no-exec: illustrative tool call normalization]
@@ -88,7 +88,7 @@ safe_id = normalize_tool_call_id(original_id)
 
 ## Dynamic Engine Resolution
 
-When an agent executes a turn, `chatflow_agent.core.engines.factory.resolve_engine` inspects agent properties and applies a strict 7-level precedence hierarchy:
+In stable v0.3.4, `chatflow_agent.core.engines.factory.resolve_engine` applies this resolution order:
 
 ```mermaid
 flowchart TD
@@ -98,28 +98,28 @@ flowchart TD
     C2 -- Yes --> R2["Instantiate Provider Engine"]
     C2 -- No --> C3{"3. agent.base_url or api_key set?"}
     C3 -- Yes --> R3["Resolve via OpenAIEngine"]
-    C3 -- No --> C4{"4. prefer_default_engine and default_engine?"}
+    C3 -- No --> C4{"4. default_engine set?"}
     C4 -- Yes --> R4["Return default_engine"]
     C4 -- No --> C5{"5. Model Prefix Heuristic Match?"}
     C5 -- claude-* --> R5A["AnthropicEngine"]
     C5 -- gpt-*, o1, o3 --> R5B["OpenAIEngine (openai)"]
     C5 -- grok* --> R5C["OpenAIEngine (grok)"]
-    C5 -- deepseek-* --> R5D["OpenAIEngine (deepseek)"]
-    C5 -- gemma, llama, mistral, qwen, phi --> R5E["OpenAIEngine (ollama)"]
-    C5 -- None of above --> C6{"6. default_engine set?"}
-    C6 -- Yes --> R6["Return default_engine"]
-    C6 -- No --> R7["Fallback: GeminiEngine()"]
+    C5 -- gemma, llama, mistral, qwen, phi --> R5D["OpenAIEngine (ollama)"]
+    C5 -- None of above --> R6["Fallback: GeminiEngine()"]
 ```
 
 ### Resolution Order Details
 
 1. **Explicit Engine:** `agent.engine` takes precedence if directly assigned on the agent instance.
 2. **Explicit Provider:** `agent.provider` matches recognized strings (`"gemini"`, `"google"`, `"anthropic"`, `"claude"`, `"openai"`, `"grok"`, `"xai"`, `"ollama"`, `"gemma"`, `"deepseek"`, `"groq"`).
-3. **Custom Connection:** `agent.base_url` or `agent.api_key` without provider. Official endpoints automatically map to their respective provider configuration; otherwise, defaults to `"openai"`.
-4. **Caller Override:** `default_engine` supplied with `prefer_default_engine=True` (used when callers deliberately enforce a test mock or specific runner default).
-5. **Model Name Prefix Heuristics:** Matches recognizable prefixes (`claude-`, `gpt-`, `o1`, `o3`, `grok`, `deepseek-`, `gemma`, `llama`, `mistral`, `qwen`, `phi`). This prevents a Claude model from accidentally falling back to a Gemini default.
-6. **Default Runner Engine:** The engine built by `Runner` (e.g., from `Runner(starting_agent=..., api_key=...)`).
-7. **Ultimate Fallback:** Standard `GeminiEngine(api_key=...)`.
+3. **Custom Base URL:** `agent.base_url` without a provider. Official endpoints map to their provider; other URLs use `OpenAIEngine(provider="openai")` and require an explicit key unless local.
+4. **Default Runner Engine:** Any `default_engine` supplied by the caller wins before model-name heuristics.
+5. **Model Prefix Heuristics:** Recognizes Gemini, Claude, OpenAI, Grok, and Ollama-family prefixes. Stable v0.3.4 does **not** recognize `deepseek-`; use `provider="deepseek"` or an explicit engine. A Groq Llama model also needs `provider="groq"` or an explicit Groq engine, otherwise the `llama` prefix selects local Ollama.
+6. **Ultimate Fallback:** `GeminiEngine(api_key=...)`.
+
+<Callout type="info" title="Resolution changes in v0.4.0rc1">
+<VersionBadge version="0.4.0rc1" status="prerelease" /> adds the `prefer_default_engine` option and a `deepseek-` model-prefix heuristic. These rules do not apply to stable v0.3.4.
+</Callout>
 
 ## Security Rules and Credential Isolation
 
@@ -157,8 +157,8 @@ Understanding architectural differences between releases helps choose the right 
 | :--- | :--- | :--- |
 | **Gemini Engine Runtime** | Powered by the Google `google-genai` SDK (`from google import genai`). | **Zero-SDK Lock-in**: Re-engineered with native asynchronous `httpx` directly against `https://generativelanguage.googleapis.com/v1beta`. |
 | **Connection Pooling** | Separate connection handles per request. | **Runner Lifespan Client Pool**: `_ClientPool` manages shared keepalive connections across turns via `async with runner:`. |
-| **Provider Presets** | OpenAI, Grok, Ollama. | Expanded presets: `deepseek`, `groq`, `xai`, `gemma`, with strict base URL verification. |
-| **Credential Guard** | Basic environment key fallback. | `_resolve_api_key` fail-closed verification preventing cloud key leakage to custom endpoints. |
+| **Provider Presets** | OpenAI, Grok/xAI, Ollama/Gemma, DeepSeek, and Groq. | Retains the presets and improves model-prefix resolution. |
+| **Credential Guard** | `_resolve_api_key` restricts environment keys to exact official endpoints and requires explicit credentials for custom remote URLs. | Retains fail-closed credential isolation. |
 
 <Callout type="info" title="Preview Note: Connection Pooling in v0.4.0rc1">
 In stable `v0.3.4`, turns are executed directly via `await runner.run_async(...)`. In prerelease `v0.4.0rc1`, wrap runner executions inside `async with runner:` to enable HTTP connection keepalive pooling across turns:
@@ -190,7 +190,7 @@ Explore detailed setup guides for each provider:
     Configure GPT-4o, Groq, DeepSeek, and custom proxy gateways.
   </Card>
   <Card title="Google Gemini & Anthropic Claude" href="/en/docs/providers/gemini-anthropic">
-    Direct REST Gemini v1beta and Anthropic Messages API integrations.
+    Stable Gemini integration through `google-genai` and Anthropic Messages API integration.
   </Card>
   <Card title="Local Models with Ollama" href="/en/docs/providers/ollama">
     Run Gemma 2, Llama 3, and Mistral on local hardware with zero cloud fees.

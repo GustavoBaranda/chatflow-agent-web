@@ -1,6 +1,8 @@
 ---
 title: "Handoffs y Coordinación Multi-Agente"
 description: "Orquestación de enjambres autónomos, delegación punto a punto, herramientas sintéticas de transferencia y prevención de ciclos en chatflow-agent."
+sourceRevision: "0ffb562"
+sourceHash: "a48d585989b7285a1841e4fa223556aceba347c3dc83df7eb64710ba3f0e6fb6"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -68,8 +70,8 @@ A menudo los especialistas necesitan reenviar usuarios entre sí. Utiliza `agent
 # [executable]
 from chatflow_agent import Agent
 
-support = Agent(name="Support", instructions="General support", model="gpt-4o")
-billing = Agent(name="Billing", instructions="Billing support", model="gpt-4o")
+support = Agent(name="Support", instructions="General support", model="gpt-4o", provider="openai")
+billing = Agent(name="Billing", instructions="Billing support", model="gpt-4o", provider="openai")
 
 # Establecer handoff bidireccional
 support.add_handoff(billing)
@@ -138,15 +140,14 @@ Cuando `runner.run_async()` procesa un turno:
 Transferencias incontroladas entre agentes podrían provocar bucles infinitos si las instrucciones son ambiguas. `chatflow-agent` protege la ejecución mediante límites integrados:
 
 * **`max_handoffs_per_turn` (Predeterminado: 5):**
-  Número máximo de transferencias permitidas dentro del turno de un único mensaje de usuario. Si se supera este límite, el runner detiene nuevas transferencias e inyecta un resultado de error:
-  `"Maximum agent transfers exceeded for a single turn."`
+  Número máximo de transferencias contabilizadas dentro del turno de un único mensaje de usuario. En v0.3.4 la comprobación se ejecuta después de la transferencia: la transferencia que supera el límite se aplica de todos modos (el agente activo cambia), luego se añade un resultado de error, `"Maximum agent transfers exceeded for a single turn."`, y las llamadas a herramientas restantes de ese mensaje del modelo no reciben resultado. <VersionBadge version="0.4.0rc1" status="prerelease" /> comprueba el límite antes de cambiar de agente y añade un resultado "Tool skipped" para cada llamada restante.
 * **`max_tool_iterations` (Predeterminado: 10):**
-  Límite global de ejecuciones de herramientas por turno, asegurando la terminación garantizada incluso si las herramientas encadenan llamadas reiteradas.
+  Número máximo de rondas modelo/herramientas por turno. Una ronda es una generación del modelo más todas las llamadas a herramientas que solicitó, por lo que una ronda puede ejecutar varias herramientas. Al alcanzar el límite, el turno termina con una respuesta de respaldo "Execution iteration limit reached".
 
 ```python
 from chatflow_agent import Agent, Runner
 
-triage = Agent(name="Triage", instructions="...", model="gpt-4o")
+triage = Agent(name="Triage", instructions="...", model="gpt-4o", provider="openai")
 
 # Configurar límites más estrictos para entornos de alto rendimiento o bajo coste
 runner = Runner(
@@ -165,13 +166,14 @@ La generación y sanitización de handoffs incorporan mejoras sustanciales en ve
 ### Versión Estable (`v0.3.4`)
 * <VersionBadge version="0.3.4" status="stable" /> Sanitización básica con expresiones regulares: `clean = re.sub(r"[^a-zA-Z0-9_]", "_", name.strip().lower())`.
 * Historial de sesión compartido que preserva el contexto conversacional íntegro entre transferencias.
+* `Handoff.context_updates` existe como campo, pero el runner de v0.3.4 lo ignora cuando se produce una transferencia.
 
 ### Mejoras de Pre-lanzamiento (`v0.4.0rc1`)
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Transliteración Unicode NFKD:** Normaliza automáticamente caracteres acentuados a ASCII (ej. `AtenciónAlCliente` se convierte en `transfer_to_atencionalcliente`).
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Alternativa Determinista por Hash:** Nombres de agentes en escrituras no latinas (japonés, árabe, cirílico) o con emojis recurren a un prefijo hash SHA-256 (`transfer_to_u<hash>`) para garantizar sintaxis de identificador válida.
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Desambiguación en Colisiones:** Si dos agentes generan nombres sanitizados conflictivos, se agregan sufijos numéricos (`_2`, `_3`) automáticamente para evitar sobreescrituras en el esquema.
 * <VersionBadge version="0.4.0rc1" status="prerelease" /> **Límite de Longitud:** Los identificadores de herramientas de transferencia se limitan a 60 caracteres para cumplir con las restricciones de proveedores.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Reenvío de Actualizaciones de Contexto:** `session.set_active_agent(agent, context_updates)` permite propagar cambios en los metadatos junto con el evento de transferencia.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Reenvío de Actualizaciones de Contexto:** `session.set_active_agent(agent, context_updates)` almacena `Handoff.context_updates` en los metadatos de la sesión cuando se produce la transferencia. Las herramientas integradas `transfer_to_*` nunca rellenan `context_updates`; solo puede hacerlo una herramienta personalizada que devuelva su propio `Handoff`.
 
 ---
 

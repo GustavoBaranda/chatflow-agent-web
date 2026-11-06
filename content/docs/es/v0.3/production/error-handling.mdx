@@ -24,7 +24,7 @@ ChatFlowError (Base)
 ├── ToolSchemaError (Anotación de tipo de parámetro inválida) [v0.4.0rc1]
 ├── AgentHandoffError (Destino de handoff desconocido o bucle de transferencias)
 ├── ProviderError (Error de estado HTTP de API de LLM, fallo de red o tiempo límite)
-├── ReentrantTurnError (Invocación de turno concurrente en sesión bloqueada) [v0.4.0rc1]
+├── ReentrantTurnError (Turno anidado de la misma sesión iniciado desde un turno activo) [v0.4.0rc1]
 └── SessionDeletedError (Mensaje despachado a una sesión eliminada) [v0.4.0rc1]
 ```
 
@@ -84,11 +84,11 @@ runner = Runner(starting_agent=agent)
    {
      "tool_call_id": "call_abc123",
      "name": "process_refund",
-     "content": "Tool execution failed [trace_id: a8c2...]. Invalid order format. Order ID must begin with 'ORD-'.",
+     "content": "Tool execution failed [trace_id: a8c2...]. Please try a different approach or inform the user.",
      "is_error": true
    }
    ```
-4. El modelo recibe `is_error=True` en la siguiente iteración y le informa al usuario: *"El ID de pedido '12345' carece del prefijo 'ORD-'. ¿Podrías confirmar el número de pedido completo?"*
+4. La excepción original se registra internamente con el mismo `trace_id`. El modelo recibe sólo el resultado genérico con `is_error=True` y no puede deducir el detalle privado de la excepción.
 
 <Callout type="info" title="Protección Contra Bucles de Reintento">
 Para evitar bucles de reintento infinitos en los que un agente falla reiteradamente la llamada a una herramienta, el `Runner` impone `max_tool_iterations` (predeterminado: `10`). Si se alcanza este límite sin una respuesta final de texto, el runner retorna un mensaje de respaldo controlado sin bloquearse.
@@ -96,17 +96,17 @@ Para evitar bucles de reintento infinitos en los que un agente falla reiteradame
 
 ## Reversión Transaccional de Turnos (Rollback)
 
-Los turnos de enjambres multi-agente suelen modificar el historial de la conversación, transferir el diálogo a especialistas y actualizar metadatos de sesión. Si ocurre un fallo irrecuperable a mitad del turno (como una desconexión de red o límite de cuota del proveedor), dejar la sesión parcialmente ejecutada corrompería las interacciones posteriores.
+Los turnos multiagente pueden modificar el historial, cambiar el agente activo y actualizar metadatos. La versión estable v0.3.4 ofrece una garantía más limitada que una transacción completa.
 
-El `Runner` garantiza la semántica de **reversión a punto de control**:
+Para excepciones ordinarias capturadas por `Runner`, v0.3.4 sólo trunca `session.history` hasta su longitud previa al turno:
 
 ```text
 Inicio del Turno
-    ├── Capturar Punto de Control: (history, active_agent, metadata)
+    ├── Capturar Punto de Control: longitud de history
     ├── Añadir Mensaje Entrante del Usuario
     ├── Ejecutar Turnos del LLM y Herramientas
     │     ├── Éxito: Confirmar respuesta final del asistente en SessionStore
-    │     └── Fallo / CancelledError: Restaurar (history, active_agent, metadata)
+    │     └── Excepción ordinaria: truncar history a su longitud anterior
     └── Liberar Bloqueo de Sesión
 ```
 
@@ -138,10 +138,11 @@ async def execute_turn_with_recovery(
         )
         return response.content
     except ProviderError as err:
-        # El estado fue revertido automáticamente al estado previo al turno
+        # v0.3.4 revierte el historial para esta excepción ordinaria.
+        # active_agent y metadata no se restauran.
         return "Our AI inference service is temporarily degraded. Please retry in a few moments."
     except TimeoutError:
-        # Tiempo límite del turno excedido; punto de control restaurado
+        # La cancelación externa en v0.3.4 no garantiza rollback.
         return "The request took too long to complete. Please try a simpler question."
     except Exception as err:
         return "An unexpected system error occurred. Our operations team has been notified."
@@ -149,27 +150,30 @@ async def execute_turn_with_recovery(
 
 ## Tiempos Límite de Turno y Límites de Recursos
 
-En el SDK `v0.3.x`, los tiempos de espera se gestionan a nivel del turno asíncrono utilizando la utilidad estándar `asyncio.wait_for` de Python. Ten en cuenta que un parámetro de palabra clave explícito `turn_timeout` en `run_async` se introduce en la versión de pre-lanzamiento `v0.4.0rc1`:
+La versión estable v0.3.4 no tiene un parámetro `turn_timeout`. Envolver `run_async` con `asyncio.wait_for` cancela la tarea, pero `CancelledError` no queda cubierto por `except Exception`, por lo que el rollback del historial no está garantizado. Es preferible configurar timeouts del proveedor o canal; si la aplicación cancela externamente, debe tratar la sesión como potencialmente parcial y recuperarla de forma explícita.
 
 ```python
 # [no-exec: illustrative turn timeout call]
 import asyncio
+from chatflow_agent import Runner
 
-# En v0.3.x, aplica tiempos límite de turno mediante asyncio.wait_for
-response = await asyncio.wait_for(
-    runner.run_async(
-        session_id="customer-1029",
-        user_message="Analyze this quarterly financial audit report...",
-    ),
-    timeout=45.0,
-)
+async def run_with_external_timeout(runner: Runner):
+    try:
+        return await asyncio.wait_for(
+            runner.run_async(
+                session_id="customer-1029",
+                user_message="Analyze this quarterly financial audit report...",
+            ),
+            timeout=45.0,
+        )
+    except asyncio.TimeoutError:
+        # v0.3.4: recupera o descarta esta sesión antes de reutilizarla.
+        raise
 ```
 
-Si el tiempo límite expira:
-1. Todas las subtareas asíncronas en ejecución se cancelan inmediatamente.
-2. Las ejecuciones síncronas de herramientas se esperan en hilos secundarios para prevenir interbloqueos en SQLite.
-3. El historial conversacional y los metadatos se revierten al punto de control previo al turno.
-4. Se lanza `asyncio.TimeoutError` al invocador.
+<Callout type="info" title="Timeout transaccional en prerelease">
+<VersionBadge version="0.4.0rc1" status="prerelease" /> introduce el parámetro explícito `turn_timeout` y restaura historial, agente activo y metadatos cuando vence. Esta garantía no se aplica a la versión estable v0.3.4.
+</Callout>
 
 ## Lista de Verificación de Buenas Prácticas
 

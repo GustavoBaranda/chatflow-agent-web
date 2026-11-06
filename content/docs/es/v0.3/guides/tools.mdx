@@ -158,9 +158,9 @@ En entornos de producción, las herramientas pueden experimentar tiempos de espe
 2. El `Runner` captura el fallo e inyecta un `ToolResult` en el historial de la conversación marcado con `is_error=True`:
    ```python
    # Inyectado en el historial para el LLM:
-   # ToolResult(tool_call_id="call_123", name="query_db", content="Database connection timeout", is_error=True)
+   # ToolResult(tool_call_id="call_123", name="query_db", content="Tool execution failed [trace_id: ...]. Please try a different approach or inform the user.", is_error=True)
    ```
-3. En lugar de interrumpir la conversación completa del usuario, el agente activo observa el mensaje de error y puede explicárselo al usuario, reintentar con parámetros alternativos o transferir a una cola de soporte humano.
+3. La excepción original se registra internamente con el mismo `trace_id`; no se expone al modelo. El agente activo recibe sólo el error genérico y puede intentar otra estrategia o informar al usuario.
 
 ---
 

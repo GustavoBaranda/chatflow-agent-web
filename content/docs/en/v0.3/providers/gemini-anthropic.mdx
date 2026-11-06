@@ -1,6 +1,6 @@
 ---
 title: Google Gemini & Anthropic Claude
-description: High-performance foundation model integration with Google Gemini REST v1beta and Anthropic Claude Messages API.
+description: Google Gemini through google-genai and Anthropic Claude through the Messages API in chatflow-agent v0.3.4.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -9,13 +9,13 @@ import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Card, Cards } from 'fumadocs-ui/components/card';
 import { VersionBadge } from '@/components/docs/VersionBadge';
 
-Google Gemini and Anthropic Claude represent two of the most capable frontier model families for agentic workflows. `chatflow-agent` provides dedicated, native engines for both providers, optimized for low latency, zero SDK lock-in, and reliable tool calling.
+Google Gemini and Anthropic Claude represent two capable model families for agentic workflows. `chatflow-agent` v0.3.4 provides dedicated engines for both providers and uses their provider clients to support multi-turn conversations and tool calling.
 
 ---
 
 ## Google Gemini Engine
 
-`GeminiEngine` communicates directly with Google's Gemini Developer API (`v1beta`) to execute multi-turn conversations and function calling.
+In stable v0.3.4, `GeminiEngine` uses Google's `google-genai` client to communicate with the Gemini Developer API and execute multi-turn conversations and function calling.
 
 <Callout type="info" title="Supported Gemini API Flavor">
 `GeminiEngine` supports the **Gemini Developer API** (Google AI Studio API keys). Google Cloud Vertex AI is not supported by this engine.
@@ -23,12 +23,13 @@ Google Gemini and Anthropic Claude represent two of the most capable frontier mo
 
 ### Authentication and Credentials
 
-The engine reads credentials from the following sources, in order of priority:
+In stable v0.3.4, the engine reads credentials from the following sources, in order of priority:
 1. `api_key` passed directly to `GeminiEngine(api_key="...")` or `Agent(api_key="...")`.
 2. `GEMINI_API_KEY` environment variable.
-3. `GOOGLE_API_KEY` environment variable.
 
-By default, the API key is transmitted via the secure `x-goog-api-key` HTTP header. Passing `api_key_in_query=True` transmits the key as a `?key=` query parameter instead:
+<Callout type="info" title="Prerelease credential options">
+<VersionBadge version="0.4.0rc1" status="prerelease" /> adds the `GOOGLE_API_KEY` fallback and the `api_key_in_query` option. Those options are not available in stable v0.3.4.
+</Callout>
 
 ```python
 import os
@@ -67,26 +68,30 @@ The Gemini implementation underwent an architectural shift between releases:
 import asyncio
 from chatflow_agent import Agent, Runner
 
-agent = Agent(name="Assistant", model="gemini-2.5-flash")
+agent = Agent(
+    name="Assistant",
+    instructions="Provide concise, accurate answers.",
+    model="gemini-2.5-flash",
+)
 runner = Runner(starting_agent=agent)
 
 async def main():
     # In v0.3.x, execute asynchronous turns directly on the runner
     res1 = await runner.run_async("session-1", "What is quantum computing?")
     res2 = await runner.run_async("session-1", "Summarize in 3 bullet points.")
-    print(res2.text)
+    print(res2.content)
 
 asyncio.run(main())
 ```
 
-### Custom Proxy Configuration
+### Custom Proxy Configuration (Prerelease)
 
-To route Gemini requests through an enterprise proxy or gateway, set the `GOOGLE_GEMINI_BASE_URL` environment variable:
+<VersionBadge version="0.4.0rc1" status="prerelease" /> To route Gemini requests through an enterprise proxy or gateway in the prerelease, set the `GOOGLE_GEMINI_BASE_URL` environment variable. Stable v0.3.4 does not support this environment variable:
 
 ```bash
 export GOOGLE_GEMINI_BASE_URL="https://gemini-proxy.internal.corp"
 ```
-The engine automatically appends `/v1beta` to the base URL.
+The v0.4.0rc1 engine automatically appends `/v1beta` to the base URL.
 
 ---
 
@@ -171,4 +176,4 @@ runner = Runner(starting_agent=researcher)
 In this swarm:
 1. The **Researcher** runs on Gemini 2.5 Flash for rapid ingestion and search.
 2. Once data is collected, the session hands off to the **Synthesizer** on Claude 3.5 Sonnet.
-3. Historical messages and tool call IDs are automatically normalized, preventing cross-provider format mismatches.
+3. <VersionBadge version="0.4.0rc1" status="prerelease" /> Historical messages and tool call IDs are normalized in the prerelease to prevent cross-provider format mismatches. Stable v0.3.4 does not provide this normalization guarantee.

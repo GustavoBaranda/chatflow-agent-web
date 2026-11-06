@@ -31,8 +31,8 @@ Toda interação com modelos no framework executa através de uma implementaçã
            v                      v                    v
 +----------+----------+  +--------+---------+  +-------+------------+
 |    GeminiEngine     |  | AnthropicEngine  |  |   OpenAIEngine     |
-| Direct REST v1beta  |  | Messages API v1  |  | OpenAI, Groq,      |
-| Connection Pooling  |  | Retry & Backoff  |  | DeepSeek, Ollama   |
+| SDK google-genai    |  | Messages API v1  |  | OpenAI, Groq,      |
+| Retentativas        |  | Retry & Backoff  |  | DeepSeek, Ollama   |
 +---------------------+  +------------------+  +--------------------+
 ```
 
@@ -69,9 +69,9 @@ O motor retorna um `EngineTurnResult` contendo:
 | `tool_calls` | `list[ToolCall]` | Requisições estruturadas de execução de ferramentas solicitadas pelo modelo. |
 | `raw_response` | `Any \| None` | Carga de resposta nativa do provedor para depuração ou inspeção de tokens. |
 
-### Normalização Universal de IDs de Chamada de Ferramenta
+### Normalização de IDs de Chamada de Ferramenta (Pré-lançamento)
 
-Quando ocorrem handoffs multiagente entre diferentes famílias de modelos (por exemplo, transferindo de Anthropic Claude para OpenAI GPT-4o), mensagens anteriores retêm IDs de chamadas de ferramentas emitidos pelo modelo anterior. Como diferentes provedores impõem restrições de validação conflitantes (por exemplo, a OpenAI rejeita IDs que ultrapassem 40 caracteres), o `chatflow-agent` utiliza substituição determinística:
+<VersionBadge version="0.4.0rc1" status="prerelease" /> adiciona a substituição determinística de IDs históricos incompatíveis. A versão estável v0.3.4 não oferece essa garantia de normalização entre provedores:
 
 ```python
 # [no-exec: illustrative tool call normalization]
@@ -88,7 +88,7 @@ safe_id = normalize_tool_call_id(original_id)
 
 ## Resolução Dinâmica de Motores
 
-Quando um agente executa um turno, `chatflow_agent.core.engines.factory.resolve_engine` inspeciona os atributos do agente e aplica uma hierarquia estrita de 7 níveis de precedência:
+Na versão estável v0.3.4, `chatflow_agent.core.engines.factory.resolve_engine` aplica esta ordem de resolução:
 
 ```mermaid
 flowchart TD
@@ -96,30 +96,30 @@ flowchart TD
     C1 -- Sim --> R1["Retorna agent.engine"]
     C1 -- Não --> C2{"2. agent.provider definido?"}
     C2 -- Sim --> R2["Instancia Motor do Provedor"]
-    C2 -- Não --> C3{"3. agent.base_url ou api_key definidos?"}
+    C2 -- Não --> C3{"3. agent.base_url definido?"}
     C3 -- Sim --> R3["Resolve via OpenAIEngine"]
-    C3 -- Não --> C4{"4. prefer_default_engine e default_engine?"}
+    C3 -- Não --> C4{"4. default_engine definido?"}
     C4 -- Sim --> R4["Retorna default_engine"]
     C4 -- Não --> C5{"5. Correspondência Heurística por Prefixo?"}
     C5 -- claude-* --> R5A["AnthropicEngine"]
     C5 -- gpt-*, o1, o3 --> R5B["OpenAIEngine (openai)"]
     C5 -- grok* --> R5C["OpenAIEngine (grok)"]
-    C5 -- deepseek-* --> R5D["OpenAIEngine (deepseek)"]
-    C5 -- gemma, llama, mistral, qwen, phi --> R5E["OpenAIEngine (ollama)"]
-    C5 -- Nenhum dos anteriores --> C6{"6. default_engine definido?"}
-    C6 -- Sim --> R6["Retorna default_engine"]
-    C6 -- Não --> R7["Fallback: GeminiEngine()"]
+    C5 -- gemma, llama, mistral, qwen, phi --> R5D["OpenAIEngine (ollama)"]
+    C5 -- Nenhum dos anteriores --> R6["Fallback: GeminiEngine()"]
 ```
 
 ### Detalhes da Ordem de Resolução
 
 1. **Motor Explícito:** `agent.engine` tem prioridade máxima se atribuído diretamente na instância do agente.
 2. **Provedor Explícito:** `agent.provider` corresponde a strings reconhecidas (`"gemini"`, `"google"`, `"anthropic"`, `"claude"`, `"openai"`, `"grok"`, `"xai"`, `"ollama"`, `"gemma"`, `"deepseek"`, `"groq"`).
-3. **Conexão Customizada:** `agent.base_url` ou `agent.api_key` sem provedor. Endpoints oficiais mapeiam automaticamente para suas respectivas configurações de provedor; caso contrário, o padrão é `"openai"`.
-4. **Sobrescrita do Chamador:** `default_engine` fornecido com `prefer_default_engine=True` (usado quando o chamador força deliberadamente um mock de teste ou motor específico de runner).
-5. **Heurística de Prefixos de Nomes de Modelo:** Reconhece prefixos conhecidos (`claude-`, `gpt-`, `o1`, `o3`, `grok`, `deepseek-`, `gemma`, `llama`, `mistral`, `qwen`, `phi`). Isso impede que um modelo Claude recaia acidentalmente para o padrão Gemini.
-6. **Motor Padrão do Runner:** O motor construído pelo `Runner` (ex.: a partir de `Runner(starting_agent=..., api_key=...)`).
-7. **Fallback Final:** Padrão `GeminiEngine(api_key=...)`.
+3. **URL Base Customizada:** `agent.base_url` sem provedor. Endpoints oficiais mapeiam para seu provedor; outras URLs usam `OpenAIEngine(provider="openai")` e exigem chave explícita, exceto em hosts locais.
+4. **Motor Padrão do Runner:** Qualquer `default_engine` fornecido vence antes da heurística do nome do modelo.
+5. **Heurística do Modelo:** Reconhece prefixos de Gemini, Claude, OpenAI, Grok e da família Ollama. A v0.3.4 não reconhece `deepseek-`: use `provider="deepseek"` ou um motor explícito. Um modelo Llama da Groq também exige `provider="groq"` ou motor Groq; caso contrário, `llama` seleciona o Ollama local.
+6. **Fallback Final:** `GeminiEngine(api_key=...)`.
+
+<Callout type="info" title="Mudanças de resolução na v0.4.0rc1">
+<VersionBadge version="0.4.0rc1" status="prerelease" /> adiciona `prefer_default_engine` e a heurística do prefixo `deepseek-`. Essas regras não se aplicam à versão estável v0.3.4.
+</Callout>
 
 ## Regras de Segurança e Isolamento de Credenciais
 
@@ -157,8 +157,8 @@ Compreender as diferenças arquiteturais entre versões auxilia na escolha da co
 | :--- | :--- | :--- |
 | **Motor Gemini em Tempo de Execução** | Baseado no SDK `google-genai` do Google (`from google import genai`). | **Zero Bloqueio de SDK**: Reimplementado com `httpx` assíncrono nativo diretamente contra `https://generativelanguage.googleapis.com/v1beta`. |
 | **Pool de Conexões** | Manipuladores de conexão separados por requisição. | **Pool de Conexões com Ciclo de Vida do Runner**: O `_ClientPool` gerencia conexões persistentes *keepalive* compartilhadas entre turnos via `async with runner:`. |
-| **Predefinições de Provedores** | OpenAI, Grok, Ollama. | Predefinições expandidas: `deepseek`, `groq`, `xai`, `gemma`, com validação rigorosa de URL base. |
-| **Guarda de Credenciais** | Fallback básico para chaves de ambiente. | Verificação de falha segura (*fail-closed*) em `_resolve_api_key` impedindo o vazamento de chaves para endpoints customizados. |
+| **Predefinições de Provedores** | OpenAI, Grok/xAI, Ollama/Gemma, DeepSeek e Groq. | Mantém as predefinições e melhora a resolução pelo prefixo do modelo. |
+| **Guarda de Credenciais** | `_resolve_api_key` limita chaves de ambiente aos endpoints oficiais exatos e exige credenciais explícitas para URLs remotas customizadas. | Mantém o isolamento *fail-closed*. |
 
 <Callout type="info" title="Nota de Prévia: Pool de Conexões na v0.4.0rc1">
 Na versão estável `v0.3.4`, turnos são executados diretamente via <code>await runner.run_async(...)</code>. Na versão preliminar `v0.4.0rc1`, envolva as execuções do runner dentro de <code>async with runner:</code> para habilitar conexões HTTP persistentes (*keepalive*) compartilhadas entre turnos:
@@ -190,7 +190,7 @@ Explore guias de configuração detalhados para cada provedor:
     Configure GPT-4o, Groq, DeepSeek e gateways proxy customizados.
   </Card>
   <Card title="Google Gemini e Anthropic Claude" href="/pt-BR/docs/v0.3/providers/gemini-anthropic">
-    Integrações REST diretas com Gemini v1beta e Anthropic Messages API.
+    Integração estável do Gemini por `google-genai` e integração com a Anthropic Messages API.
   </Card>
   <Card title="Modelos Locais com Ollama" href="/pt-BR/docs/v0.3/providers/ollama">
     Execute Gemma 2, Llama 3 e Mistral em hardware local sem custos de nuvem.

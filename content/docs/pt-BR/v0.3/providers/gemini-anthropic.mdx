@@ -1,6 +1,6 @@
 ---
 title: "Google Gemini e Anthropic Claude"
-description: "Integração de modelos de fronteira de alto desempenho com Google Gemini REST v1beta e Anthropic Claude Messages API."
+description: "Google Gemini por meio do google-genai e Anthropic Claude por meio da Messages API no chatflow-agent v0.3.4."
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -9,13 +9,13 @@ import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Card, Cards } from 'fumadocs-ui/components/card';
 import { VersionBadge } from '@/components/docs/VersionBadge';
 
-O Google Gemini e o Anthropic Claude representam duas das famílias de modelos mais avançadas para fluxos de trabalho agentivos. O `chatflow-agent` disponibiliza motores dedicados e nativos para ambos os provedores, otimizados para baixa latência, zero dependência de SDKs proprietários e chamadas de ferramentas (*tool calling*) confiáveis.
+O Google Gemini e o Anthropic Claude representam duas famílias de modelos avançadas para fluxos de trabalho agentivos. O `chatflow-agent` v0.3.4 disponibiliza motores dedicados para ambos os provedores e usa seus clientes para oferecer conversas de múltiplos turnos e chamadas de ferramentas.
 
 ---
 
 ## Motor Google Gemini
 
-O `GeminiEngine` comunica-se diretamente com a API Gemini Developer do Google (`v1beta`) para executar conversas de múltiplos turnos e chamada de funções.
+Na versão estável v0.3.4, o `GeminiEngine` usa o cliente `google-genai` do Google para se comunicar com a Gemini Developer API e executar conversas de múltiplos turnos e chamadas de funções.
 
 <Callout type="info" title="Variante Suportada da API Gemini">
 O `GeminiEngine` suporta a **Gemini Developer API** (chaves de API do Google AI Studio). O Google Cloud Vertex AI não é suportado diretamente por este motor.
@@ -23,12 +23,13 @@ O `GeminiEngine` suporta a **Gemini Developer API** (chaves de API do Google AI 
 
 ### Autenticação e Credenciais
 
-O motor lê as credenciais das seguintes fontes, por ordem de prioridade:
+Na versão estável v0.3.4, o motor lê as credenciais das seguintes fontes, por ordem de prioridade:
 1. `api_key` passada diretamente para `GeminiEngine(api_key="...")` ou `Agent(api_key="...")`.
 2. Variável de ambiente `GEMINI_API_KEY`.
-3. Variável de ambiente `GOOGLE_API_KEY`.
 
-Por padrão, a chave de API é transmitida através do cabeçalho seguro HTTP `x-goog-api-key`. Ao definir `api_key_in_query=True`, a chave é transmitida como parâmetro de consulta `?key=`:
+<Callout type="info" title="Opções de credenciais na prévia">
+<VersionBadge version="0.4.0rc1" status="prerelease" /> adiciona o fallback `GOOGLE_API_KEY` e a opção `api_key_in_query`. Essas opções não estão disponíveis na versão estável v0.3.4.
+</Callout>
 
 ```python
 import os
@@ -67,26 +68,30 @@ A implementação do Gemini passou por uma evolução arquitetural fundamental e
 import asyncio
 from chatflow_agent import Agent, Runner
 
-agent = Agent(name="Assistant", model="gemini-2.5-flash")
+agent = Agent(
+    name="Assistant",
+    instructions="Provide concise, accurate answers.",
+    model="gemini-2.5-flash",
+)
 runner = Runner(starting_agent=agent)
 
 async def main():
     # Na v0.3.x, execute turnos assíncronos diretamente no runner
     res1 = await runner.run_async("session-1", "What is quantum computing?")
     res2 = await runner.run_async("session-1", "Summarize in 3 bullet points.")
-    print(res2.text)
+    print(res2.content)
 
 asyncio.run(main())
 ```
 
-### Configuração de Proxy Customizado
+### Configuração de Proxy Customizado (Pré-lançamento)
 
-Para direcionar requisições do Gemini através de um proxy ou gateway corporativo, defina a variável de ambiente `GOOGLE_GEMINI_BASE_URL`:
+<VersionBadge version="0.4.0rc1" status="prerelease" /> Para direcionar requisições do Gemini por um proxy corporativo na prévia, defina `GOOGLE_GEMINI_BASE_URL`. A versão estável v0.3.4 não oferece suporte a essa variável:
 
 ```bash
 export GOOGLE_GEMINI_BASE_URL="https://gemini-proxy.internal.corp"
 ```
-O motor anexa automaticamente `/v1beta` à URL base.
+O motor v0.4.0rc1 anexa automaticamente `/v1beta` à URL base.
 
 ---
 
@@ -171,4 +176,4 @@ runner = Runner(starting_agent=researcher)
 Neste enxame:
 1. O **Researcher** roda no Gemini 2.5 Flash para ingestão rápida e pesquisa de dados.
 2. Com os dados coletados, a sessão transfere o controle para o **Synthesizer** no Claude 3.5 Sonnet.
-3. Mensagens históricas e IDs de chamadas de ferramentas são normalizados automaticamente, evitando incompatibilidades de protocolo entre provedores.
+3. <VersionBadge version="0.4.0rc1" status="prerelease" /> Na prévia, mensagens históricas e IDs de chamadas de ferramentas são normalizados. A versão estável v0.3.4 não oferece essa garantia.

@@ -171,7 +171,7 @@ server {
 | Categoria | Item de Verificação | Configuração Recomendada |
 | :--- | :--- | :--- |
 | **Redes** | Timeout de Leitura do Proxy | `timeout >= 120s` |
-| **Resiliência** | Timeout de Turno | Configurar `turn_timeout=45.0` para evitar turnos travados |
+| **Resiliência** | Timeouts de Requisição | Configure timeouts do provedor ou canal na v0.3.4; `turn_timeout` está disponível somente na v0.4.0rc1 prerelease |
 | **Persistência** | Modo de Journal do SQLite | `PRAGMA journal_mode=WAL;` |
 | **Segurança** | Gestão de Segredos | Injetados via variáveis de ambiente; nunca no código-fonte |
 | **Monitoramento** | Verificações de Integridade | Endpoint `/healthz` respondendo com HTTP 200 |

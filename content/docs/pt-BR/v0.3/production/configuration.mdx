@@ -42,9 +42,9 @@ As seguintes variáveis de ambiente são reconhecidas pelos diversos componentes
 | `GROQ_API_KEY` | Groq Cloud | Token Bearer para LPUs da Groq (`provider="groq"`). | `None` (Obrigatório para Groq) |
 | `DEEPSEEK_API_KEY` | DeepSeek | Token Bearer para a API da DeepSeek (`provider="deepseek"`). | `None` (Obrigatório para DeepSeek) |
 | `XAI_API_KEY` | xAI Grok | Token Bearer para endpoints da xAI Grok (`provider="grok"`). | `None` (Obrigatório para Grok) |
-| `GEMINI_API_KEY` | Google Gemini | Chave de API para endpoints REST v1beta do Gemini. | `GOOGLE_API_KEY` |
-| `GOOGLE_API_KEY` | Google Gemini | Chave alternativa de fallback para ambientes Google Cloud. | `None` |
-| `GOOGLE_GEMINI_BASE_URL` | Google Gemini | URL base customizada para proxies do Gemini. | `https://generativelanguage.googleapis.com` |
+| `GEMINI_API_KEY` | Google Gemini | Chave usada pelo cliente `google-genai` da versão estável v0.3.4. | `None` (Obrigatória para Gemini) |
+| `GOOGLE_API_KEY` | Google Gemini | Chave alternativa disponível **somente na v0.4.0rc1 prerelease**. | A v0.3.4 não a lê |
+| `GOOGLE_GEMINI_BASE_URL` | Google Gemini | URL de proxy customizada disponível **somente na v0.4.0rc1 prerelease**. | A v0.3.4 não a lê |
 | `ANTHROPIC_API_KEY` | Anthropic | Chave de API para a Messages API da Claude (`x-api-key`). | `None` (Obrigatório para Anthropic) |
 | `OLLAMA_API_KEY` | Ollama | Token opcional para gateways autenticados do Ollama. | `"ollama"` (Chave dummy segura) |
 

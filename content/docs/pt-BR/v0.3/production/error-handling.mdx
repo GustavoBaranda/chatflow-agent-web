@@ -24,7 +24,7 @@ ChatFlowError (Base)
 ├── ToolSchemaError (Anotação de tipo de parâmetro inválida) [v0.4.0rc1]
 ├── AgentHandoffError (Destino de handoff desconhecido ou loop de transferências)
 ├── ProviderError (Erro de status de API de LLM, falha de rede ou timeout)
-├── ReentrantTurnError (Invocação de turno concorrente em sessão bloqueada) [v0.4.0rc1]
+├── ReentrantTurnError (Turno aninhado da mesma sessão iniciado por um turno ativo) [v0.4.0rc1]
 └── SessionDeletedError (Mensagem despachada para uma sessão excluída) [v0.4.0rc1]
 ```
 
@@ -84,11 +84,11 @@ runner = Runner(starting_agent=agent)
    {
      "tool_call_id": "call_abc123",
      "name": "process_refund",
-     "content": "Tool execution failed [trace_id: a8c2...]. Invalid order format. Order ID must begin with 'ORD-'.",
+     "content": "Tool execution failed [trace_id: a8c2...]. Please try a different approach or inform the user.",
      "is_error": true
    }
    ```
-4. O modelo recebe `is_error=True` na próxima iteração e informa ao usuário: *"The order ID '12345' is missing the 'ORD-' prefix. Could you please confirm the full order number?"*
+4. A exceção original é registrada internamente com o mesmo `trace_id`. O modelo recebe apenas o resultado genérico com `is_error=True` e não consegue inferir o detalhe privado da exceção.
 
 <Callout type="info" title="Proteção Contra Loops de Retentativa">
 Para prevenir loops infinitos em que um agente falha repetidamente em chamadas de ferramenta, o `Runner` impõe `max_tool_iterations` (padrão: `10`). Se o limite for atingido sem uma resposta de texto final, o runner retorna uma mensagem de fallback controlada sem travar a aplicação.
@@ -96,17 +96,17 @@ Para prevenir loops infinitos em que um agente falha repetidamente em chamadas d
 
 ## Reversão Transacional de Turnos (Rollback)
 
-Turnos multiagente frequentemente alteram o histórico da conversa, transferem para especialistas e atualizam metadados de sessão. Caso ocorra uma falha irrecuperável durante o turno (como desconexão de rede ou rate limit do provedor), manter a sessão em estado parcial corromperia interações futuras.
+Turnos multiagente podem alterar o histórico, trocar o agente ativo e atualizar metadados. A versão estável v0.3.4 oferece uma garantia mais limitada que uma transação completa.
 
-O `Runner` assegura a semântica de **reversão para ponto de controle**:
+Para exceções comuns capturadas pelo `Runner`, a v0.3.4 apenas trunca `session.history` até o tamanho anterior ao turno:
 
 ```text
 Início do Turno
-    ├── Capturar Ponto de Controle: (history, active_agent, metadata)
+    ├── Capturar Ponto de Controle: tamanho de history
     ├── Anexar Mensagem de Entrada do Usuário
     ├── Executar Turnos de LLM e Ferramentas
     │     ├── Sucesso: Confirmar resposta final do assistente no SessionStore
-    │     └── Falha / CancelledError: Restaurar (history, active_agent, metadata)
+    │     └── Exceção comum: truncar history ao tamanho anterior
     └── Liberar Bloqueio da Sessão
 ```
 
@@ -138,10 +138,11 @@ async def execute_turn_with_recovery(
         )
         return response.content
     except ProviderError as err:
-        # O estado foi revertido automaticamente para antes do turno
+        # A v0.3.4 reverte o histórico para esta exceção comum.
+        # active_agent e metadata não são restaurados.
         return "Our AI inference service is temporarily degraded. Please retry in a few moments."
     except TimeoutError:
-        # Timeout do turno atingido; ponto de controle restaurado
+        # Cancelamento externo na v0.3.4 não garante rollback.
         return "The request took too long to complete. Please try a simpler question."
     except Exception as err:
         return "An unexpected system error occurred. Our operations team has been notified."
@@ -149,27 +150,30 @@ async def execute_turn_with_recovery(
 
 ## Tempos Limite de Turno e Fronteiras de Recursos
 
-No SDK `v0.3.x`, os timeouts são gerenciados no nível do turno assíncrono utilizando o utilitário padrão `asyncio.wait_for` do Python. Vale destacar que o parâmetro explícito `turn_timeout` em `run_async` é introduzido na versão prévia `v0.4.0rc1`:
+A versão estável v0.3.4 não possui o parâmetro `turn_timeout`. Envolver `run_async` com `asyncio.wait_for` cancela a tarefa, mas `CancelledError` não é coberto por `except Exception`; portanto, o rollback do histórico não é garantido. Prefira timeouts do provedor ou canal; se a aplicação cancelar externamente, trate a sessão como potencialmente parcial e recupere-a de forma explícita.
 
 ```python
 # [no-exec: illustrative turn timeout call]
 import asyncio
+from chatflow_agent import Runner
 
-# No v0.3.x, aplique timeouts de turno via asyncio.wait_for
-response = await asyncio.wait_for(
-    runner.run_async(
-        session_id="customer-1029",
-        user_message="Analyze this quarterly financial audit report...",
-    ),
-    timeout=45.0,
-)
+async def run_with_external_timeout(runner: Runner):
+    try:
+        return await asyncio.wait_for(
+            runner.run_async(
+                session_id="customer-1029",
+                user_message="Analyze this quarterly financial audit report...",
+            ),
+            timeout=45.0,
+        )
+    except asyncio.TimeoutError:
+        # v0.3.4: recupere ou descarte esta sessão antes de reutilizá-la.
+        raise
 ```
 
-Se o `turn_timeout` expirar:
-1. Todas as subtarefas assíncronas em execução são canceladas imediatamente.
-2. Execuções síncronas de ferramentas são aguardadas em threads de trabalho para prevenir deadlocks no SQLite.
-3. O histórico de conversas e os metadados são restaurados para o ponto de controle anterior ao turno.
-4. `asyncio.TimeoutError` é lançado para quem fez a chamada.
+<Callout type="info" title="Timeout transacional na prévia">
+<VersionBadge version="0.4.0rc1" status="prerelease" /> introduz o parâmetro explícito `turn_timeout` e restaura histórico, agente ativo e metadados quando ele expira. Essa garantia não se aplica à versão estável v0.3.4.
+</Callout>
 
 ## Lista de Verificação de Melhores Práticas
 

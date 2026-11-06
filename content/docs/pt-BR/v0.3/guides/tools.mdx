@@ -158,9 +158,9 @@ O `chatflow-agent` isola falhas de ferramentas dentro do turno de execução. Se
 2. O `Runner` captura a falha e injeta um `ToolResult` no histórico da conversa com a flag `is_error=True`:
    ```python
    # Injetado no histórico de mensagens para o LLM:
-   # ToolResult(tool_call_id="call_123", name="query_db", content="Database connection timeout", is_error=True)
+   # ToolResult(tool_call_id="call_123", name="query_db", content="Tool execution failed [trace_id: ...]. Please try a different approach or inform the user.", is_error=True)
    ```
-3. Em vez de interromper toda a conversa do usuário com uma falha catastrófica, o agente ativo enxerga o resultado de erro e pode explicar o problema ao usuário, tentar novamente com parâmetros alternativos ou transferir para uma fila de atendimento humano.
+3. A exceção original é registrada internamente com o mesmo `trace_id`; ela não é exposta ao modelo. O agente ativo recebe apenas o erro genérico e pode tentar outra abordagem ou informar o usuário.
 
 ---
 

@@ -42,9 +42,9 @@ The following environment variables are recognized across SDK components:
 | `GROQ_API_KEY` | Groq Cloud | Bearer token for Groq LPUs (`provider="groq"`). | `None` (Required for Groq) |
 | `DEEPSEEK_API_KEY` | DeepSeek | Bearer token for DeepSeek API (`provider="deepseek"`). | `None` (Required for DeepSeek) |
 | `XAI_API_KEY` | xAI Grok | Bearer token for xAI Grok endpoints (`provider="grok"`). | `None` (Required for Grok) |
-| `GEMINI_API_KEY` | Google Gemini | API key for Gemini REST v1beta endpoints. | `GOOGLE_API_KEY` |
-| `GOOGLE_API_KEY` | Google Gemini | Alternate fallback key for Google Cloud environments. | `None` |
-| `GOOGLE_GEMINI_BASE_URL` | Google Gemini | Custom base URL override for Gemini proxies. | `https://generativelanguage.googleapis.com` |
+| `GEMINI_API_KEY` | Google Gemini | API key used by the stable v0.3.4 `google-genai` client. | `None` (Required for Gemini) |
+| `GOOGLE_API_KEY` | Google Gemini | Alternate fallback key in **v0.4.0rc1 prerelease only**. | Not read by v0.3.4 |
+| `GOOGLE_GEMINI_BASE_URL` | Google Gemini | Custom proxy base URL in **v0.4.0rc1 prerelease only**. | Not read by v0.3.4 |
 | `ANTHROPIC_API_KEY` | Anthropic | API key for Claude Messages API (`x-api-key`). | `None` (Required for Anthropic) |
 | `OLLAMA_API_KEY` | Ollama | Optional token for authenticated Ollama gateways. | `"ollama"` (Safe dummy key) |
 

@@ -172,9 +172,9 @@ open_engine = OpenAIEngine(
 )
 ```
 
-## Restrições e Normalização de IDs de Chamadas de Ferramenta
+## Restrições e Normalização de IDs de Chamadas de Ferramenta (Pré-lançamento)
 
-A OpenAI impõe um limite máximo rigoroso de 40 caracteres para o `tool_call_id` em respostas de chamada de funções. Em ambientes multiagente onde sessões são transferidas entre diferentes provedores (por exemplo, ferramentas do Anthropic Claude gerando IDs com mais de 40 caracteres), o `chatflow-agent` garante total conformidade com o protocolo:
+<VersionBadge version="0.4.0rc1" status="prerelease" /> adiciona normalização determinística para valores `tool_call_id` da OpenAI com mais de 40 caracteres. A versão estável v0.3.4 não oferece essa garantia entre provedores:
 
 1. **Truncamento e Hashing:** Se uma mensagem histórica contiver um ID de chamada de ferramenta superior a 40 caracteres, o `OpenAIEngine` o substitui com segurança por um identificador determinístico derivado de SHA-256 (`call_` + 24 caracteres hexadecimais).
 2. **Normalização de Tipos de Esquema:** O motor normaliza automaticamente os tipos de parâmetros do JSON Schema (`_lowercase_schema_types`) mantendo esquemas de propriedades customizadas, garantindo compatibilidade entre diferentes versões dos modelos da OpenAI.

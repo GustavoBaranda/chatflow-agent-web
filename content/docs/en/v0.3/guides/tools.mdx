@@ -158,9 +158,9 @@ In production, tools may encounter network timeouts, invalid database queries, o
 2. The `Runner` catches the failure and injects a `ToolResult` into conversation history marked with `is_error=True`:
    ```python
    # Injected into message history for the LLM:
-   # ToolResult(tool_call_id="call_123", name="query_db", content="Database connection timeout", is_error=True)
+   # ToolResult(tool_call_id="call_123", name="query_db", content="Tool execution failed [trace_id: ...]. Please try a different approach or inform the user.", is_error=True)
    ```
-3. Instead of crashing the entire user conversation, the active agent sees the error result and can explain the issue to the user, retry with alternative parameters, or hand off to a human support queue.
+3. The original exception is written to internal logs with the same `trace_id`; it is not exposed to the model. The active agent receives only the generic error and may retry another approach or inform the user.
 
 ---
 

@@ -24,7 +24,7 @@ pip install "chatflow-agent[whatsapp]"
 ```
 Meta WhatsApp Cloud API
          |
-         |  POST /webhook (Encrypted JSON + X-Hub-Signature-256)
+         |  POST /webhook (Signed JSON + X-Hub-Signature-256)
          v
 +-------------------------------------------------------------------+
 |                         WhatsAppChannel                           |
@@ -39,8 +39,8 @@ Meta WhatsApp Cloud API
                                   v
 +---------------------------------+---------------------------------+
 |                       chatflow-agent Runner                       |
-|   - Session Lock & Queue Timeout (queue_timeout_seconds=120)      |
-|   - Multi-Agent Turn Execution (llm_timeout_seconds=120)          |
+|   - Per-Session Lock (same-session turns are serialized)          |
+|   - Multi-Agent Turn Execution (llm_timeout_seconds=30)           |
 |   - Tool Calling & State Persistence                              |
 +---------------------------------+---------------------------------+
                                   |
@@ -116,7 +116,7 @@ if __name__ == "__main__":
 Meta signs every incoming POST webhook payload using your App Secret and attaches the signature in the `X-Hub-Signature-256` header.
 
 <Callout type="warn" title="Fail-Closed Signature Policy">
-If `verify_signature=True` (the default) and `app_secret` is omitted or invalid, `WhatsAppChannel` immediately fails closed and rejects requests with `HTTP 403 Forbidden`. Never disable signature verification in public production deployments.
+If `verify_signature=True` (the default), omitting `app_secret` raises `ValueError` when the channel is constructed. After construction, a missing, malformed, or invalid `X-Hub-Signature-256` header is rejected with `HTTP 403 Forbidden`. Never disable signature verification in public production deployments.
 </Callout>
 
 ### PII Protection & Phone Number Masking
@@ -125,20 +125,18 @@ To comply with data privacy standards (GDPR, LGPD), `WhatsAppChannel` automatica
 
 ```python
 # Raw incoming phone: "+1 (415) 555-2671"
-# Logged output:      "+1415****71"
+# Logged output:      "+1 (***671"
 ```
 
 ## Concurrency, Timeouts, and Deadlines
 
-In high-volume messaging, incoming requests require bounded deadlines:
+Stable v0.3.4 exposes the following inbound model deadline:
 
 | Parameter | Default | Purpose |
 | :--- | :--- | :--- |
-| `queue_timeout_seconds` | `120.0` | Maximum time a turn can wait in queue behind prior turns for the same phone number. |
-| `llm_timeout_seconds` | `120.0` | Hard deadline for model evaluation, tool execution, and handoffs. |
-| `max_concurrent_tasks` | `50` | Maximum parallel webhook worker tasks handled concurrently. |
+| `llm_timeout_seconds` | `30.0` | Deadline applied by `WhatsAppChannel` while awaiting the runner turn. |
 
-When a turn exceeds its deadline, the running task is cancelled, session changes are rolled back, and the user receives the configured `fallback_message`.
+`queue_timeout_seconds` and a `120.0`-second default are prerelease v0.4.0rc1 features. `max_concurrent_tasks` is not a constructor parameter in either v0.3.4 or v0.4.0rc1. In v0.3.4, same-session turns wait on the session lock without a queue deadline. A timeout cancels the awaiting task and returns the configured `fallback_message`, but v0.3.4 does not guarantee rollback for cancellation.
 
 ## 24-Hour Customer Care Window Tracking
 

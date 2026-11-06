@@ -13,21 +13,21 @@ You are viewing the official stable documentation for <strong>chatflow-agent v0.
 
 Welcome to the official documentation for **chatflow-agent**, a lightweight, async-first Python framework engineered for building modular conversational agents and multi-agent swarms with native, type-safe handoffs.
 
-Created and led by **Gustavo Baranda** alongside an international open-source community, `chatflow-agent` is designed to eliminate framework bloat and vendor lock-in while providing enterprise-grade concurrency, resilient memory, and multi-channel connectivity.
+Created and led by **Gustavo Baranda**, `chatflow-agent` focuses on a compact Python API, per-session async turn serialization, persistent SQLite sessions, and multi-channel connectivity.
 
 ---
 
 ## Architecture Highlights
 
 <Cards>
-  <Card title="Zero-SDK Lock-In">
-    Connects to LLMs over pure, asynchronous HTTP REST using `httpx`. No monolithic vendor SDKs or heavy runtime dependencies required.
+  <Card title="Multiple Provider Engines">
+    Uses `google-genai` for Gemini in stable v0.3.4 and dedicated HTTP clients for Anthropic and OpenAI-compatible providers. REST-only Gemini is a v0.4.0rc1 prerelease feature.
   </Card>
   <Card title="Native Multi-Agent Handoffs">
     Declare collaborative swarms. Agents delegate tasks dynamically using synthesized `transfer_to_*` tools with automatic cycle prevention.
   </Card>
-  <Card title="Transactional Resilient Memory">
-    Every turn takes an atomic snapshot. If an error or timeout occurs, state automatically rolls back. SQLite operations run in dedicated thread pools.
+  <Card title="Session Memory">
+    Persists conversations with in-memory or SQLite stores. For ordinary exceptions, v0.3.4 restores conversation history length; it does not promise full-state or cancellation rollback. SQLite thread-pool offloading is a v0.4.0rc1 prerelease feature.
   </Card>
   <Card title="Multi-Channel Readiness">
     Deploy your agents seamlessly to terminal REPLs, Telegram bots, or WhatsApp Business Cloud API with HMAC SHA-256 signature verification.

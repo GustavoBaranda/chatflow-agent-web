@@ -58,10 +58,10 @@ Na versão <VersionBadge version="0.4.0rc1" status="prerelease" />, o <code>Runn
 O `Runner` orquestra o ciclo de vida da conversa. Ele gerencia:
 
 1. Carregamento do contexto da sessão e histórico de mensagens a partir do `SessionStore`.
-2. Criação de um **instantâneo atômico (snapshot)** do estado da sessão antes de executar o turno.
+2. Registro do tamanho do histórico antes de executar o turno.
 3. Invocação do motor do modelo LLM.
 4. Análise de chamadas de ferramentas (*tool calls*), execução das funções correspondentes e envio dos resultados de volta ao modelo até que a resposta final seja gerada.
-5. Confirmação das alterações de estado ou reversão automática (*rollback*) caso ocorra uma exceção não tratada ou estouro de tempo limite.
+5. Preservação das alterações bem-sucedidas ou truncamento do histórico quando uma exceção comum não tratada escapa do turno.
 
 ```python
 from chatflow_agent import Agent, Runner, SessionStore
@@ -165,12 +165,12 @@ store = SQLiteSessionStore(
 
 ### A Garantia de Reversão Transacional (*Rollback*)
 
-Antes de processar um turno, o `Runner` captura um instantâneo da sessão ativa. Caso ocorra uma queda de rede, uma ferramenta lance uma exceção não tratada ou o tempo limite expire, o instantâneo é restaurado imediatamente. Isso garante que turnos corrompidos ou parciais nunca contaminem o histórico de conversas.
+Antes de processar um turno, a versão estável v0.3.4 registra o tamanho atual do histórico. Se uma exceção comum escapar do turno, o `Runner` trunca `session.history` até esse tamanho. Ele não restaura `active_agent` nem os metadados, e o cancelamento por `asyncio.wait_for` não é coberto por essa garantia.
 
 ### Proteção de Loop de Eventos e Bloqueio de Concorrência
 
-* **Execução Fora do Loop Principal (Thread-Pool Offloading):** Operações de disco do SQLite rodam dentro de threads de trabalho dedicadas (`_run_blocking`), evitando que bloqueios de sistema de arquivos travem o loop assíncrono do asyncio no Python.
-* **Bloqueio de Sessão (`ReentrantTurnError`):** Cada ID de sessão possui um bloqueio interno (*lock*). Requisições simultâneas para a mesma sessão levantarão um `ReentrantTurnError` em vez de permitir condições de corrida (*race conditions*) que possam corromper o estado.
+* **Bloqueio de Sessão na v0.3.4:** Turnos que compartilham o mesmo `SessionContext` em memória são serializados por um `asyncio.Lock`; chamadas externas concorrentes aguardam e não geram `ReentrantTurnError`. Essa é uma garantia do loop de eventos, não de segurança entre threads ou processos.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Proteções da Prévia:** O I/O de SQLite em arquivo é descarregado por `_run_blocking`, e `ReentrantTurnError` rejeita um turno aninhado da mesma sessão iniciado por código que já executa dentro desse turno. Chamadas externas independentes continuam aguardando na fila.
 
 ---
 

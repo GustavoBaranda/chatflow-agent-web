@@ -11,7 +11,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 Operar enxames multiagente em ambientes produtivos exige visibilidade abrangente. Quando um agente transfere uma conversa, invoca APIs externas ou aciona fallbacks, os operadores necessitam de logs estruturados e IDs de correlação para diagnosticar latência, investigar anomalias e auditar decisões tomadas.
 
-O `chatflow-agent` disponibiliza loggers estruturados baseados na biblioteca padrão do Python em todas as camadas da arquitetura, desde webhooks de canais até requisições de rede dos mecanismos.
+O `chatflow-agent` v0.3.4 usa loggers da biblioteca padrão do Python para o runner, os motores de provedores e as integrações de canais. A aplicação pode conectar seu próprio formatador estruturado.
 
 ## Hierarquia de Loggers
 
@@ -20,15 +20,17 @@ Todos os loggers estão organizados sob o namespace `chatflow_agent`. Você pode
 ```text
 chatflow_agent
 ├── chatflow_agent.runner      (Execução de turnos, handoffs, chamadas de ferramentas, checkpoints)
-├── chatflow_agent.tools       (Geração de esquemas, execução de ferramentas, validação de argumentos)
-├── chatflow_agent.memory      (Criação de sessões, E/S do SQLite, TTL de deduplicação)
 ├── chatflow_agent.engine
 │   ├── chatflow_agent.engine.openai     (Cargas úteis e latência de OpenAI/Groq/DeepSeek)
-│   ├── chatflow_agent.engine.gemini     (Requisições REST v1beta, turnos do modelo)
+│   ├── chatflow_agent.engine.gemini     (Requisições do google-genai, turnos do modelo)
 │   └── chatflow_agent.engine.anthropic  (Cabeçalhos da Messages API, contagem de tokens)
 ├── chatflow_agent.telegram    (Polling de atualizações, autorização de administradores, divisão de mensagens)
 └── chatflow_agent.whatsapp    (Validação HMAC, deduplicação, mascaramento de telefones)
 ```
+
+<Callout type="info" title="Loggers adicionais na prévia">
+<VersionBadge version="0.4.0rc1" status="prerelease" /> adiciona `chatflow_agent.tools` e `chatflow_agent.memory`. A versão estável v0.3.4 não os emite.
+</Callout>
 
 ## Configurando Logs Estruturados
 

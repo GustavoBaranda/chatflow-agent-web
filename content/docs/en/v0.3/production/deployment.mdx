@@ -171,7 +171,7 @@ server {
 | Category | Verification Item | Recommended Setting |
 | :--- | :--- | :--- |
 | **Networking** | Proxy Read Timeout | `timeout >= 120s` |
-| **Resilience** | Turn Timeout | Set `turn_timeout=45.0` to prevent hung turns |
+| **Resilience** | Request Timeouts | Configure provider or channel timeouts in v0.3.4; `turn_timeout` is available only in v0.4.0rc1 prerelease |
 | **Persistence** | SQLite Journal Mode | `PRAGMA journal_mode=WAL;` |
 | **Security** | Secrets Management | Injected via environment variables; never in code |
 | **Monitoring** | Health Checks | `/healthz` endpoint returning HTTP 200 |

@@ -70,7 +70,7 @@ La truncación simple de mensajes (como conservar los últimos $N$ mensajes indi
 `chatflow-agent` incluye dos backends de almacenamiento integrados que heredan de `BaseSessionStore`:
 
 ### 1. Almacenamiento en Memoria (`SessionStore`)
-Un backend rápido y seguro para subprocesos basado en diccionario en memoria. Ideal para pruebas, herramientas de línea de comandos y microservicios sin estado donde las conversaciones son efímeras:
+Un backend rápido basado en un diccionario en memoria. Serializa los turnos de una sesión dentro de un único bucle de eventos de asyncio, pero el store no es thread-safe y no debe compartirse entre hilos o procesos sin sincronización externa. Es ideal para pruebas, herramientas de línea de comandos y servicios de un solo proceso donde las conversaciones son efímeras:
 
 ```python
 from chatflow_agent import Agent, Runner, SessionStore
@@ -98,7 +98,7 @@ sqlite_store = SQLiteSessionStore(
 ```
 
 <Callout type="info" title="Parámetros Exactos de SQLiteSessionStore">
-<code>SQLiteSessionStore</code> acepta <code>db_path</code> y <code>default_max_turns</code>. No acepta parámetros como <code>busy_timeout</code>; la concurrencia y el modo WAL son administrados internamente por el framework.
+<code>SQLiteSessionStore</code> acepta <code>db_path</code>, <code>default_max_turns</code> y <code>dedup_ttl_hours</code>. No acepta parámetros como <code>busy_timeout</code>; la concurrencia y el modo WAL son administrados internamente por el framework.
 </Callout>
 
 ### Esquema de la Base de Datos Relacional
@@ -150,9 +150,12 @@ assert DEFAULT_DEDUP_TTL_HOURS == 192
 store = SessionStore()
 
 msg_id = "wamid.HBgLMjAyNjEwMzAA"
-if not store.is_message_processed(msg_id):
-    store.mark_message_processed(msg_id)
-    # Procesar el turno de forma segura sin ejecuciones duplicadas
+if store.record_processed_message(msg_id):
+    # Procesar el mensaje recién registrado
+    pass
+else:
+    # Duplicado dentro del TTL configurado
+    print(f"Omitiendo mensaje duplicado: {msg_id}")
 ```
 
 ---
@@ -162,7 +165,7 @@ if not store.is_message_processed(msg_id):
 La gestión de sesiones introduce optimizaciones para alta concurrencia en versiones recientes:
 
 ### Versión Estable (`v0.3.4`)
-* <VersionBadge version="0.3.4" status="stable" /> `SessionContext` con poda por grupos de turnos y rollback atómico.
+* <VersionBadge version="0.3.4" status="stable" /> `SessionContext` con poda por grupos de turnos y rollback del historial para excepciones ordinarias gestionadas por `Runner`.
 * `SessionStore` en memoria y persistencia en disco con `SQLiteSessionStore`.
 * TTL de deduplicación de mensajes de 8 días (`DEFAULT_DEDUP_TTL_HOURS = 192`).
 
@@ -199,11 +202,9 @@ runner = Runner(starting_agent=agent, session_store=store)
 
 async def handle_inbound_webhook(user_phone: str, message_text: str, webhook_msg_id: str):
     # 1. Protección contra duplicados
-    if store.is_message_processed(webhook_msg_id):
-        print(f"Skipping duplicate webhook: {webhook_msg_id}")
+    if not store.record_processed_message(webhook_msg_id):
+        print(f"Omitiendo webhook duplicado: {webhook_msg_id}")
         return None
-
-    store.mark_message_processed(webhook_msg_id)
 
     # 2. Ejecutar turno con sesión persistente
     response = await runner.run_async(

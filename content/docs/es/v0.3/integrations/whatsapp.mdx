@@ -24,7 +24,7 @@ pip install "chatflow-agent[whatsapp]"
 ```
 Meta WhatsApp Cloud API
          |
-         |  POST /webhook (JSON Cifrado + X-Hub-Signature-256)
+         |  POST /webhook (JSON Firmado + X-Hub-Signature-256)
          v
 +-------------------------------------------------------------------+
 |                         WhatsAppChannel                           |
@@ -39,8 +39,8 @@ Meta WhatsApp Cloud API
                                   v
 +---------------------------------+---------------------------------+
 |                       chatflow-agent Runner                       |
-|   - Bloqueo de Sesión y Cola (queue_timeout_seconds=120)          |
-|   - Ejecución de Turno Multi-Agente (llm_timeout_seconds=120)     |
+|   - Bloqueo por Sesión (los turnos se serializan)                 |
+|   - Ejecución de Turno Multi-Agente (llm_timeout_seconds=30)      |
 |   - Llamadas a Herramientas y Persistencia de Estado              |
 +---------------------------------+---------------------------------+
                                   |
@@ -116,7 +116,7 @@ if __name__ == "__main__":
 Meta firma cada carga útil entrante de tipo POST utilizando tu App Secret y adjunta la firma en la cabecera `X-Hub-Signature-256`.
 
 <Callout type="warn" title="Política de Firma Fail-Closed">
-Si `verify_signature=True` (predeterminado) y `app_secret` se omite o es inválido, `WhatsAppChannel` deniega el acceso de inmediato y rechaza peticiones con `HTTP 403 Forbidden`. Nunca desactives la verificación de firmas en despliegues públicos de producción.
+Si `verify_signature=True` (predeterminado), omitir `app_secret` genera `ValueError` al construir el canal. Una vez construido, un header `X-Hub-Signature-256` ausente, malformado o inválido se rechaza con `HTTP 403 Forbidden`. Nunca desactives la verificación de firmas en despliegues públicos de producción.
 </Callout>
 
 ### Protección de Datos Personales (PII) y Enmascaramiento de Números
@@ -125,20 +125,18 @@ Para cumplir con normativas de privacidad (GDPR, LGPD), `WhatsAppChannel` enmasc
 
 ```python
 # Teléfono entrante sin procesar: "+1 (415) 555-2671"
-# Salida en registros:             "+1415****71"
+# Salida en registros:             "+1 (***671"
 ```
 
 ## Concurrencia, Tiempos Límite y Plazos
 
-En flujos de mensajería con alto volumen, las peticiones requieren plazos de ejecución definidos:
+La versión estable v0.3.4 expone el siguiente plazo para la evaluación del modelo:
 
 | Parámetro | Predeterminado | Propósito |
 | :--- | :--- | :--- |
-| `queue_timeout_seconds` | `120.0` | Tiempo máximo que un turno puede esperar en cola tras turnos previos para el mismo teléfono. |
-| `llm_timeout_seconds` | `120.0` | Plazo máximo estricto para evaluación de modelo, ejecución de herramientas y handoffs. |
-| `max_concurrent_tasks` | `50` | Máximo número de tareas concurrentes de webhooks procesadas en paralelo. |
+| `llm_timeout_seconds` | `30.0` | Plazo que aplica `WhatsAppChannel` mientras espera el turno del runner. |
 
-Cuando un turno excede su plazo, la tarea en ejecución se cancela, los cambios de sesión se revierten y el usuario recibe el `fallback_message` configurado.
+`queue_timeout_seconds` y el valor predeterminado de `120.0` segundos son funciones de la prerelease v0.4.0rc1. `max_concurrent_tasks` no es un parámetro del constructor ni en v0.3.4 ni en v0.4.0rc1. En v0.3.4, los turnos de una misma sesión esperan el lock sin un plazo de cola. Un timeout cancela la espera y devuelve el `fallback_message`, pero v0.3.4 no garantiza rollback ante cancelación.
 
 ## Control de la Ventana de Atención al Cliente de 24 Horas
 

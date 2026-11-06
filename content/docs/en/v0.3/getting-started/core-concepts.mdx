@@ -58,10 +58,10 @@ In <VersionBadge version="0.4.0rc1" status="prerelease" />, the <code>Runner</co
 The `Runner` orchestrates the conversation lifecycle. It handles:
 
 1. Loading session context and conversation history from the `SessionStore`.
-2. Taking an **atomic snapshot** of the session state prior to executing the turn.
+2. Recording the conversation-history length before executing the turn.
 3. Invoking the model engine.
 4. Parsing tool calls, executing the corresponding functions, and feeding results back to the model until a final response is generated.
-5. Committing state changes, or rolling back automatically if an unhandled exception or timeout occurs.
+5. Keeping successful changes, or truncating history when an ordinary unhandled exception escapes the turn.
 
 ```python
 from chatflow_agent import Agent, Runner, SessionStore
@@ -165,12 +165,12 @@ store = SQLiteSessionStore(
 
 ### The Transactional Rollback Guarantee
 
-Prior to processing a turn, `Runner` snapshots the active session. If a network outage occurs, a tool raises an unhandled exception, or `turn_timeout` triggers, the snapshot is restored immediately. This guarantees that corrupted or partial turns never poison the conversation history.
+Before processing a turn, stable v0.3.4 records the current history length. If an ordinary exception escapes the turn, `Runner` truncates `session.history` to that length. It does not restore `active_agent` or metadata, and cancellation through `asyncio.wait_for` is not covered by this guarantee.
 
 ### Event-Loop Protection & Concurrency Shields
 
-* **Thread-Pool Offloading:** SQLite disk I/O runs inside dedicated worker threads (`_run_blocking`), preventing file system locks from choking Python's asyncio event loop.
-* **Session Locking (`ReentrantTurnError`):** Each session ID has an internal lock. Simultaneous requests for the same session ID will raise `ReentrantTurnError` rather than allowing race conditions to corrupt state.
+* **Stable v0.3.4 Session Locking:** Turns that share the same in-memory `SessionContext` are serialized by an `asyncio.Lock`; concurrent external calls wait rather than raising `ReentrantTurnError`. This is an event-loop guarantee, not thread or multi-process safety.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Prerelease Protections:** File-backed SQLite I/O is offloaded through `_run_blocking`, and `ReentrantTurnError` rejects a nested same-session turn started by code already running inside that turn. Independent external calls still queue.
 
 ---
 

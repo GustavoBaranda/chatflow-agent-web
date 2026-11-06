@@ -58,10 +58,10 @@ En <VersionBadge version="0.4.0rc1" status="prerelease" />, el <code>Runner</cod
 El `Runner` orquesta el ciclo de vida de la conversación. Se encarga de:
 
 1. Cargar el contexto de la sesión y el historial de conversación desde el `SessionStore`.
-2. Tomar una **captura atómica** del estado de la sesión antes de procesar el turno.
+2. Registrar la longitud del historial antes de procesar el turno.
 3. Invocar el motor del modelo correspondiente.
 4. Procesar las llamadas a herramientas, ejecutar las funciones y devolver los resultados al modelo hasta obtener la respuesta final.
-5. Confirmar los cambios de estado o realizar un rollback automático si ocurre una excepción no controlada o un tiempo límite.
+5. Conservar los cambios exitosos o truncar el historial cuando una excepción ordinaria no controlada escapa del turno.
 
 ```python
 from chatflow_agent import Agent, Runner, SessionStore
@@ -165,12 +165,12 @@ store = SQLiteSessionStore(
 
 ### Garantía Transaccional de Rollback
 
-Antes de procesar un turno, el `Runner` toma una captura instantánea de la sesión activa. Si ocurre una falla de red, una herramienta lanza una excepción no capturada o expira el `turn_timeout`, la captura se restaura de inmediato. Esto garantiza que turnos corruptos o incompletos nunca contaminen el historial de la conversación.
+Antes de procesar un turno, la versión estable v0.3.4 registra la longitud actual del historial. Si una excepción ordinaria escapa del turno, `Runner` trunca `session.history` hasta esa longitud. No restaura `active_agent` ni los metadatos, y la cancelación mediante `asyncio.wait_for` no está cubierta por esta garantía.
 
 ### Protección del Bucle de Eventos y Bloqueos de Concurrencia
 
-* **Descarga a Pool de Subprocesos:** Las operaciones de E/S en disco de SQLite se ejecutan dentro de subprocesos dedicados (`_run_blocking`), evitando que los bloqueos del sistema de archivos congelen el bucle de eventos asyncio de Python.
-* **Bloqueo por Sesión (`ReentrantTurnError`):** Cada ID de sesión cuenta con un bloqueo interno. Peticiones concurrentes para una misma sesión generarán un `ReentrantTurnError` en lugar de permitir condiciones de carrera que corrompan el estado.
+* **Bloqueo por Sesión en v0.3.4:** Los turnos que comparten el mismo `SessionContext` en memoria se serializan con un `asyncio.Lock`; las llamadas externas concurrentes esperan y no generan `ReentrantTurnError`. Es una garantía del bucle de eventos, no de seguridad entre hilos o procesos.
+* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Protecciones de la Prerelease:** El I/O de SQLite en archivo se descarga mediante `_run_blocking`, y `ReentrantTurnError` rechaza un turno anidado de la misma sesión iniciado desde código que ya se ejecuta dentro de ese turno. Las llamadas externas independientes siguen esperando en cola.
 
 ---
 

@@ -78,14 +78,14 @@ channel = WhatsAppChannel(
     verify_token=os.environ.get("WHATSAPP_VERIFY_TOKEN", ""),
     access_token=os.environ.get("WHATSAPP_ACCESS_TOKEN", ""),
     phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID", ""),
-    app_secret=os.environ.get("META_APP_SECRET", ""),
-    verify_signature=True,  # Rejeita tentativas forjadas com HTTP 403
+    app_secret=os.environ["META_APP_SECRET"],
+    verify_signature=True,  # Assinaturas ausentes ou inválidas recebem HTTP 403
 )
 ```
 
 ### Mascaramento Automático de Números de Telefone
 
-Números de telefone de clientes recebidos via WhatsApp são classificados como Informações Pessoais Identificáveis (PII). O `WhatsAppChannel` mascara automaticamente os números de telefone nas saídas de log (`+1415****71`) por meio de seu sanitizador interno `_mask_phone`, prevenindo vazamentos de PII em plataformas de monitoramento de logs.
+Números de telefone recebidos via WhatsApp são Informações Pessoais Identificáveis (PII). O `WhatsAppChannel` mascara os valores em seus próprios logs preservando os quatro primeiros e os três últimos caracteres de entrada; por exemplo, `+1 (415) 555-2671` se torna `+1 (***671`. Aplicações e ferramentas externas devem aplicar suas próprias políticas de redação.
 
 ### Administração de Chats de Grupo no Telegram
 

@@ -11,7 +11,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 Operar enjambres multi-agente en entornos de producción exige una visibilidad exhaustiva. Cuando un agente transfiere una conversación, invoca APIs externas o activa mecanismos de respaldo, los operadores requieren registros estructurados e IDs de correlación para diagnosticar latencias, investigar anomalías y auditar decisiones.
 
-`chatflow-agent` expone loggers estructurados de la biblioteca estándar de Python a lo largo de cada capa arquitectónica, desde los webhooks de canales hasta las peticiones de red de los motores.
+`chatflow-agent` v0.3.4 utiliza loggers de la biblioteca estándar de Python para el runner, los motores de proveedores y las integraciones de canales. La aplicación puede conectar su propio formateador estructurado.
 
 ## Jerarquía de Loggers
 
@@ -20,15 +20,17 @@ Todos los loggers se organizan bajo el espacio de nombres `chatflow_agent`. Pued
 ```text
 chatflow_agent
 ├── chatflow_agent.runner      (Ejecución de turnos, handoffs, llamadas a herramientas, checkpoints)
-├── chatflow_agent.tools       (Generación de esquemas, ejecución de herramientas, validación de argumentos)
-├── chatflow_agent.memory      (Creación de sesiones, E/S de SQLite, TTL de deduplicación)
 ├── chatflow_agent.engine
 │   ├── chatflow_agent.engine.openai     (Cargas útiles y latencias de OpenAI/Groq/DeepSeek)
-│   ├── chatflow_agent.engine.gemini     (Peticiones REST v1beta, turnos del modelo)
+│   ├── chatflow_agent.engine.gemini     (Peticiones de google-genai, turnos del modelo)
 │   └── chatflow_agent.engine.anthropic  (Cabeceras de Messages API, recuento de tokens)
 ├── chatflow_agent.telegram    (Polling de actualizaciones, autorización de administradores, fragmentación)
 └── chatflow_agent.whatsapp    (Validación HMAC, deduplicación, enmascaramiento de teléfonos)
 ```
+
+<Callout type="info" title="Loggers adicionales en prerelease">
+<VersionBadge version="0.4.0rc1" status="prerelease" /> agrega `chatflow_agent.tools` y `chatflow_agent.memory`. La versión estable v0.3.4 no los emite.
+</Callout>
 
 ## Configuración de Registros Estructurados
 

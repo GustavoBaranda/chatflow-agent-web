@@ -41,7 +41,7 @@
     "system": "Sistema"
   },
   "footer": {
-    "tagline": "Plataforma oficial de documentación para chatflow-agent, la librería de código abierto en Python para agentes de IA conversacional.",
+    "tagline": "Plataforma oficial de documentación para chatflow-agent, el framework ligero y asíncrono de Python para agentes de IA conversacional.",
     "license": "Publicado bajo la Licencia MIT.",
     "builtWith": "Construido con Next.js, Fumadocs y next-intl.",
     "copyright": "© {year} Gustavo Baranda y colaboradores de chatflow-agent.",
@@ -64,7 +64,7 @@
     }
   },
   "about": {
-    "metaTitle": "Acerca de chatflow-agent — Creador, Visión y Código Abierto",
+    "metaTitle": "Acerca del proyecto — Creador, Visión y Código Abierto",
     "metaDescription": "Conocé chatflow-agent, el framework ligero y asíncrono de multiagentes en Python creado por Gustavo Baranda, sus principios de diseño y su comunidad de código abierto.",
     "title": "Acerca de chatflow-agent",
     "subtitle": "Un framework ligero y asíncrono en Python para agentes de IA conversacional, diseñado con handoffs nativos y conectividad multicanal.",
@@ -95,8 +95,9 @@
   },
   "home": {
     "badge": "chatflow-agent v0.3.4 • Python >= 3.10",
-    "heroTitle": "Construí Sistemas Multiagente Contextuales en Python",
-    "heroSubtitle": "Framework ligero y asíncrono en Python para agentes de IA conversacional con handoffs nativos, persistencia de sesiones en SQLite e integraciones de canales listas para producción.",
+    "heroTitle": "Construí Chatflows y Sistemas Multiagente Contextuales en Python",
+    "heroSubtitle": "Construí chatflows en Python con agentes que usan herramientas, delegan tareas mediante handoffs y mantienen el contexto de la conversación entre sesiones.",
+    "chatflowConcepts": "Cómo funciona un chatflow en Python",
     "getStarted": "Empezar",
     "documentation": "Documentación",
     "github": "GitHub",
@@ -172,7 +173,7 @@
     "pypiCommand": "pip install chatflow-agent"
   },
   "community": {
-    "metaTitle": "Comunidad — Ecosistema de Código Abierto de chatflow-agent",
+    "metaTitle": "Comunidad — Ecosistema de Código Abierto",
     "metaDescription": "Unite a la comunidad de código abierto de chatflow-agent. Contribuí con código, reportá errores, sugerí funcionalidades y construí agentes de IA conversacional.",
     "badge": "Comunidad y Ecosistema",
     "title": "Comunidad de chatflow-agent",

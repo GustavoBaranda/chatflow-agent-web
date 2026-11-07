@@ -1,13 +1,17 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Navigation, Home, and About Suite', () => {
-  test('should redirect root path to an authoritative localized route with explicit prefix', async ({ page }) => {
+  test('should redirect root path to an authoritative localized route with explicit prefix', async ({
+    page,
+  }) => {
     await page.goto('/');
     // Must redirect to /en, /es, or /pt-BR
     await expect(page).toHaveURL(/\/(en|es|pt-BR)/);
   });
 
-  test('should render English Home page with aligned header controls, hero, code showcase, and features', async ({ page }) => {
+  test('should render English Home page with aligned header controls, hero, code showcase, and features', async ({
+    page,
+  }) => {
     await page.goto('/en');
 
     // Skip to content link
@@ -34,13 +38,17 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(themeBtn).toHaveClass(/h-9/);
     await expect(themeBtn).toHaveClass(/rounded-lg/);
 
-    const ghLink = page.locator('header a[href="https://github.com/GustavoBaranda/chatflow-agent"]');
+    const ghLink = page.locator(
+      'header a[href="https://github.com/GustavoBaranda/chatflow-agent"]',
+    );
     await expect(ghLink).toHaveClass(/h-9/);
     await expect(ghLink).toHaveClass(/rounded-lg/);
 
     // Hero Section
     const heroHeading = page.locator('h1');
-    await expect(heroHeading).toContainText('Build Contextual Multi-Agent Systems in Python');
+    await expect(heroHeading).toContainText(
+      'Build Chatflows and Contextual Multi-Agent Systems in Python',
+    );
 
     // Release badge with v0.3.4
     const badge = page.locator('text=chatflow-agent v0.3.4').first();
@@ -52,6 +60,11 @@ test.describe('Navigation, Home, and About Suite', () => {
 
     const docsBtn = page.locator('section[aria-labelledby="hero-title"] a[href="/en/docs"]');
     await expect(docsBtn).toBeVisible();
+
+    const chatflowConceptsLink = page.locator(
+      'section[aria-labelledby="hero-title"] a[href="/en/docs/v0.3/getting-started/core-concepts"]',
+    );
+    await expect(chatflowConceptsLink).toBeVisible();
 
     // Package manager tabs and command box (pip and uv)
     const pipTab = page.locator('button:has-text("pip")').first();
@@ -66,20 +79,28 @@ test.describe('Navigation, Home, and About Suite', () => {
     // Python Code Showcase
     const codeShowcase = page.locator('#quickstart');
     await expect(codeShowcase).toBeVisible();
-    await expect(codeShowcase).toContainText('from chatflow_agent import Agent, Runner, SQLiteSessionStore');
+    await expect(codeShowcase).toContainText(
+      'from chatflow_agent import Agent, Runner, SQLiteSessionStore',
+    );
     await expect(codeShowcase).toContainText('chatflow-agent v0.3.4');
 
     // Quickstart deep-link
-    const quickstartLink = codeShowcase.locator('a[href="/en/docs/v0.3/getting-started/quickstart"]');
+    const quickstartLink = codeShowcase.locator(
+      'a[href="/en/docs/v0.3/getting-started/quickstart"]',
+    );
     await expect(quickstartLink).toBeVisible();
 
     // Documentation Discovery Section (3 cards)
     const docsDiscovery = page.locator('section[aria-labelledby="docs-discovery-title"]');
     await expect(docsDiscovery).toBeVisible();
     await expect(docsDiscovery.locator('article')).toHaveCount(3);
-    await expect(docsDiscovery.locator('a[href="/en/docs/v0.3/getting-started/installation"]')).toBeVisible();
+    await expect(
+      docsDiscovery.locator('a[href="/en/docs/v0.3/getting-started/installation"]'),
+    ).toBeVisible();
     await expect(docsDiscovery.locator('a[href="/en/docs/v0.3/guides/agents"]')).toBeVisible();
-    await expect(docsDiscovery.locator('a[href="/en/docs/v0.3/integrations/webhook"]')).toBeVisible();
+    await expect(
+      docsDiscovery.locator('a[href="/en/docs/v0.3/integrations/webhook"]'),
+    ).toBeVisible();
 
     // Features Section (6 verified capabilities)
     const featuresSection = page.locator('section[aria-labelledby="features-title"]');
@@ -105,7 +126,9 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(signatureImg).toBeVisible();
 
     // Verify GitHub Sponsors link with pink heart in footer (exactly one in bottom attribution, no duplicates in nav columns)
-    const footerSponsorLinks = footer.locator('a[href="https://github.com/sponsors/GustavoBaranda"]');
+    const footerSponsorLinks = footer.locator(
+      'a[href="https://github.com/sponsors/GustavoBaranda"]',
+    );
     await expect(footerSponsorLinks).toHaveCount(1);
     await expect(footerSponsorLinks).toBeVisible();
     await expect(footerSponsorLinks).toHaveAttribute('target', '_blank');
@@ -113,7 +136,9 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(footerSponsorLinks).toContainText('Sponsor');
   });
 
-  test('should navigate to dedicated multilingual About page and verify Creator attribution in English', async ({ page }) => {
+  test('should navigate to dedicated multilingual About page and verify Creator attribution in English', async ({
+    page,
+  }) => {
     await page.goto('/en/about');
 
     // Heading
@@ -154,7 +179,9 @@ test.describe('Navigation, Home, and About Suite', () => {
     expect(htmlLang).toBe('es');
   });
 
-  test('should render About page in Brazilian Portuguese with proper translations', async ({ page }) => {
+  test('should render About page in Brazilian Portuguese with proper translations', async ({
+    page,
+  }) => {
     await page.goto('/pt-BR/about');
 
     await expect(page.locator('h1')).toContainText('Sobre o chatflow-agent');
@@ -174,7 +201,9 @@ test.describe('Navigation, Home, and About Suite', () => {
     await page.goto('/en');
 
     // Check English heading
-    await expect(page.locator('h1')).toContainText('Build Contextual Multi-Agent Systems in Python');
+    await expect(page.locator('h1')).toContainText(
+      'Build Chatflows and Contextual Multi-Agent Systems in Python',
+    );
 
     // Open language selector
     const langBtn = page.locator('header button[aria-label="Change language"]').first();
@@ -193,10 +222,14 @@ test.describe('Navigation, Home, and About Suite', () => {
     expect(htmlLang).toBe('es');
 
     // Spanish Hero heading
-    await expect(page.locator('h1')).toContainText('Construí Sistemas Multiagente Contextuales en Python');
+    await expect(page.locator('h1')).toContainText(
+      'Construí Chatflows y Sistemas Multiagente Contextuales en Python',
+    );
   });
 
-  test('should switch language from English to Brazilian Portuguese via LanguageSelector', async ({ page }) => {
+  test('should switch language from English to Brazilian Portuguese via LanguageSelector', async ({
+    page,
+  }) => {
     await page.goto('/en');
 
     // Open language selector
@@ -216,10 +249,14 @@ test.describe('Navigation, Home, and About Suite', () => {
     expect(htmlLang).toBe('pt-BR');
 
     // Portuguese Hero heading
-    await expect(page.locator('h1')).toContainText('Construa Sistemas Multiagentes Contextuais em Python');
+    await expect(page.locator('h1')).toContainText(
+      'Crie Chatflows e Sistemas Multiagentes Contextuais em Python',
+    );
   });
 
-  test('should include canonical and hreflang alternate links for all three launch locales', async ({ page }) => {
+  test('should include canonical and hreflang alternate links for all three launch locales', async ({
+    page,
+  }) => {
     await page.goto('/pt-BR');
 
     const canonical = await page.locator('link[rel="canonical"]').getAttribute('href');
@@ -281,7 +318,9 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(page.locator('html')).not.toHaveClass(/menu-open/);
   });
 
-  test('should close mobile drawer when clicking the morphed X button in navbar', async ({ page }) => {
+  test('should close mobile drawer when clicking the morphed X button in navbar', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/en');
 
@@ -301,7 +340,9 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(hamburger).toBeVisible();
   });
 
-  test('should render localized drawer navigation with About in Brazilian Portuguese', async ({ page }) => {
+  test('should render localized drawer navigation with About in Brazilian Portuguese', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/pt-BR');
 
@@ -318,7 +359,9 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(drawer.locator('a[href="/pt-BR/about"]')).toContainText('Sobre');
   });
 
-  test('should include official favicon, SVG icon, and Apple Touch Icon across localized routes (/en, /es, /pt-BR)', async ({ page }) => {
+  test('should include official favicon, SVG icon, and Apple Touch Icon across localized routes (/en, /es, /pt-BR)', async ({
+    page,
+  }) => {
     for (const locale of ['en', 'es', 'pt-BR']) {
       await page.goto(`/${locale}`);
 
@@ -336,7 +379,9 @@ test.describe('Navigation, Home, and About Suite', () => {
     }
   });
 
-  test('should serve favicon.ico, icon.svg, and apple-touch-icon.png with 200 OK status', async ({ request }) => {
+  test('should serve favicon.ico, icon.svg, and apple-touch-icon.png with 200 OK status', async ({
+    request,
+  }) => {
     const faviconRes = await request.get('/favicon.ico');
     expect(faviconRes.status()).toBe(200);
 
@@ -349,14 +394,20 @@ test.describe('Navigation, Home, and About Suite', () => {
     expect(appleRes.headers()['content-type']).toMatch(/image\/png/);
   });
 
-  test('should render localized 404 Not Found page for nonexistent routes within a locale without hydration errors', async ({ page }) => {
+  test('should render localized 404 Not Found page for nonexistent routes within a locale without hydration errors', async ({
+    page,
+  }) => {
     await page.goto('/pt-BR/non-existent-page');
-    await expect(page.locator('h1')).toContainText('O fluxo conversacional atingiu uma rota não mapeada');
+    await expect(page.locator('h1')).toContainText(
+      'O fluxo conversacional atingiu uma rota não mapeada',
+    );
     await expect(page.locator('a:has-text("Voltar ao início")')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
   });
 
-  test('should toggle theme from Light to Dark to Light and update computed styles across Home, Community, and About', async ({ page }) => {
+  test('should toggle theme from Light to Dark to Light and update computed styles across Home, Community, and About', async ({
+    page,
+  }) => {
     const routes = ['/en', '/en/community', '/en/about'];
 
     for (const route of routes) {
@@ -373,14 +424,18 @@ test.describe('Navigation, Home, and About Suite', () => {
         await page.waitForTimeout(300);
       }
 
-      const lightBg = await page.evaluate(() => window.getComputedStyle(document.body).backgroundColor);
+      const lightBg = await page.evaluate(
+        () => window.getComputedStyle(document.body).backgroundColor,
+      );
       expect(lightBg).toBe('rgb(255, 255, 255)');
 
       // Toggle to dark
       await themeBtn.click();
       await page.waitForTimeout(300);
 
-      const darkBg = await page.evaluate(() => window.getComputedStyle(document.body).backgroundColor);
+      const darkBg = await page.evaluate(
+        () => window.getComputedStyle(document.body).backgroundColor,
+      );
       expect(darkBg).toBe('rgb(6, 11, 24)');
       await expect(page.locator('html')).toHaveClass(/dark/);
 
@@ -388,13 +443,17 @@ test.describe('Navigation, Home, and About Suite', () => {
       await themeBtn.click();
       await page.waitForTimeout(300);
 
-      const revertedBg = await page.evaluate(() => window.getComputedStyle(document.body).backgroundColor);
+      const revertedBg = await page.evaluate(
+        () => window.getComputedStyle(document.body).backgroundColor,
+      );
       expect(revertedBg).toBe('rgb(255, 255, 255)');
       await expect(page.locator('html')).toHaveClass(/light/);
     }
   });
 
-  test('should prevent horizontal overflow across 320px, 375px, 390px, 430px, 768px, and 1280px viewports', async ({ page }) => {
+  test('should prevent horizontal overflow across 320px, 375px, 390px, 430px, 768px, and 1280px viewports', async ({
+    page,
+  }) => {
     const viewports = [
       { width: 320, height: 600 },
       { width: 375, height: 667 },
@@ -419,100 +478,104 @@ test.describe('Navigation, Home, and About Suite', () => {
 
         expect(
           isOverflowing,
-          `Horizontal overflow detected on ${route} at viewport ${vp.width}x${vp.height}`
+          `Horizontal overflow detected on ${route} at viewport ${vp.width}x${vp.height}`,
         ).toBe(false);
       }
     }
   });
 
-  test('should render localized Open Graph and Twitter Card metadata across routes', async ({ page }) => {
+  test('should render localized Open Graph and Twitter Card metadata across routes', async ({
+    page,
+  }) => {
     // 1. Home EN
     await page.goto('/en');
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
       'content',
-      'chatflow-agent — Conversational AI Agents in Python'
+      'Python Chatflows & Multi-Agent Workflows | chatflow-agent',
     );
     await expect(page.locator('meta[property="og:locale"]')).toHaveAttribute('content', 'en_US');
     await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
       'content',
-      'https://chatflowagent.org/en'
+      'https://chatflowagent.org/en',
     );
     await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute(
       'content',
-      'chatflow-agent'
+      'chatflow-agent',
     );
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
       'content',
-      'https://chatflowagent.org/brand/social-preview.png'
+      'https://chatflowagent.org/brand/social-preview.png',
     );
     await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
       'content',
-      'summary_large_image'
+      'summary_large_image',
     );
     await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute(
       'content',
-      'https://chatflowagent.org/brand/social-preview.png'
+      'https://chatflowagent.org/brand/social-preview.png',
     );
 
     // 2. Home ES
     await page.goto('/es');
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
       'content',
-      'chatflow-agent — Agentes de IA Conversacional en Python'
+      'Chatflows y agentes de IA en Python | chatflow-agent',
     );
     await expect(page.locator('meta[property="og:locale"]')).toHaveAttribute('content', 'es_ES');
     await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
       'content',
-      'https://chatflowagent.org/es'
+      'https://chatflowagent.org/es',
     );
 
     // 3. Home PT-BR
     await page.goto('/pt-BR');
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
       'content',
-      'chatflow-agent — Agentes de IA Conversacional em Python'
+      'Chatflows e agentes de IA em Python | chatflow-agent',
     );
     await expect(page.locator('meta[property="og:locale"]')).toHaveAttribute('content', 'pt_BR');
     await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
       'content',
-      'https://chatflowagent.org/pt-BR'
+      'https://chatflowagent.org/pt-BR',
     );
 
     // 4. About page
     await page.goto('/en/about');
     await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
       'content',
-      'https://chatflowagent.org/en/about'
+      'https://chatflowagent.org/en/about',
     );
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
       'content',
-      'https://chatflowagent.org/brand/social-preview.png'
+      'https://chatflowagent.org/brand/social-preview.png',
     );
 
     // 5. Community page
     await page.goto('/en/community');
     await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
       'content',
-      'https://chatflowagent.org/en/community'
+      'https://chatflowagent.org/en/community',
     );
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
       'content',
-      'https://chatflowagent.org/brand/social-preview.png'
+      'https://chatflowagent.org/brand/social-preview.png',
     );
 
     // 6. Docs page
     await page.goto('/en/docs');
     await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
       'content',
-      'https://chatflowagent.org/en/docs/v0.3'
+      'https://chatflowagent.org/en/docs/v0.3',
     );
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
       'content',
-      'https://chatflowagent.org/brand/social-preview.png'
+      'https://chatflowagent.org/brand/social-preview.png',
     );
   });
 
-  test('should present mobile Quickstart code cleanly without horizontal page overflow or intrusive scrollbar', async ({ page }) => {
+  test('should present mobile Quickstart code cleanly without horizontal page overflow or intrusive scrollbar', async ({
+    page,
+  }) => {
     const mobileViewports = [
       { width: 320, height: 600 },
       { width: 375, height: 667 },
@@ -565,7 +628,11 @@ test.describe('Navigation, Home, and About Suite', () => {
       await expect(page.locator('code:has-text("pip install chatflow-agent")')).toBeVisible();
 
       // 4. Code copy button
-      const copyCodeBtn = page.locator('#quickstart button[aria-label="Copy command"], #quickstart button[aria-label="Copied!"]').nth(1);
+      const copyCodeBtn = page
+        .locator(
+          '#quickstart button[aria-label="Copy command"], #quickstart button[aria-label="Copied!"]',
+        )
+        .nth(1);
       await expect(copyCodeBtn).toBeVisible();
       await copyCodeBtn.click();
       await expect(copyCodeBtn).toContainText(/Copied!|Copy command/);

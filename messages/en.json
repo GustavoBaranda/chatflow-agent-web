@@ -41,7 +41,7 @@
     "system": "System"
   },
   "footer": {
-    "tagline": "Official documentation and web platform for chatflow-agent, the open-source Python library for conversational AI agents.",
+    "tagline": "Official documentation and web platform for chatflow-agent, the lightweight async Python framework for conversational AI agents.",
     "license": "Released under the MIT License.",
     "builtWith": "Built with Next.js, Fumadocs, and next-intl.",
     "copyright": "© {year} Gustavo Baranda & chatflow-agent contributors.",
@@ -64,7 +64,7 @@
     }
   },
   "about": {
-    "metaTitle": "About chatflow-agent — Creator, Vision & Open Source",
+    "metaTitle": "About — Creator, Vision & Open Source",
     "metaDescription": "Learn about chatflow-agent, the lightweight async multi-agent Python framework created by Gustavo Baranda, its design principles, and its open source community.",
     "title": "About chatflow-agent",
     "subtitle": "A lightweight, asynchronous Python multi-agent framework designed for building conversational workflows with native handoffs and multi-channel connectivity.",
@@ -95,8 +95,9 @@
   },
   "home": {
     "badge": "chatflow-agent v0.3.4 • Python >= 3.10",
-    "heroTitle": "Build Contextual Multi-Agent Systems in Python",
-    "heroSubtitle": "Lightweight, async-first Python framework for conversational AI agents with native handoffs, SQLite-backed session persistence, and production-ready channel integrations.",
+    "heroTitle": "Build Chatflows and Contextual Multi-Agent Systems in Python",
+    "heroSubtitle": "Build chatflows in Python with agents that use tools, delegate tasks through handoffs, and preserve conversation context across sessions.",
+    "chatflowConcepts": "How a chatflow works in Python",
     "getStarted": "Get Started",
     "documentation": "Documentation",
     "github": "GitHub",
@@ -172,7 +173,7 @@
     "pypiCommand": "pip install chatflow-agent"
   },
   "community": {
-    "metaTitle": "Community — chatflow-agent Open Source Ecosystem",
+    "metaTitle": "Community — Open Source Ecosystem",
     "metaDescription": "Join the chatflow-agent open source community. Contribute code, report issues, request features, explore discussions, and build conversational AI with developers worldwide.",
     "badge": "Community & Ecosystem",
     "title": "chatflow-agent Community",

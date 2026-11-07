@@ -1,11 +1,19 @@
 ---
-title: "Core Concepts"
-description: "Understand the core architecture of chatflow-agent: Agents, Engines, Tools, Runner, Memory, and Handoffs."
+title: 'Core Concepts'
+description: 'Understand how chatflows develop in chatflow-agent and how Agents, Engines, Tools, Runner, Memory, and Handoffs work together.'
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
 
 `chatflow-agent` is built upon six foundational architectural primitives that together enable lightweight, modular, and fault-tolerant conversational AI systems:
+
+## What is a chatflow?
+
+In `chatflow-agent`, a **chatflow** is the path a conversation develops as agents process messages, use tools, and transfer tasks to other agents. The `Runner` coordinates each turn, loads and persists session state, and invokes the active agent. Agents interpret the current request and decide whether to respond, use a tool, or hand off the conversation; tools perform the deterministic operations defined by the application.
+
+The path develops from the user's requests and persisted [session state](/en/docs/v0.3/guides/sessions-state), rather than requiring a fixed sequence. The [tools guide](/en/docs/v0.3/guides/tools) and [handoffs guide](/en/docs/v0.3/guides/multi-agent-handoffs) explain those capabilities in detail. Channel integrations such as [Telegram](/en/docs/v0.3/integrations/telegram), [WhatsApp](/en/docs/v0.3/integrations/whatsapp), and [webhooks](/en/docs/v0.3/integrations/webhook) carry messages between external platforms and the runner.
+
+**Conceptual example:** An application built with the library could let a user ask for an appointment. One agent identifies the specialty, another checks availability through an application-defined tool, and the application records the booking after the user confirms it. The appointment system and its business tools belong to the application; they are not built-in `chatflow-agent` features.
 
 ---
 
@@ -50,7 +58,9 @@ agent = Agent(
 ```
 
 <Callout type="info" title="Swarm Identity Validation in v0.4.0rc1">
-In <VersionBadge version="0.4.0rc1" status="prerelease" />, the <code>Runner</code> strictly validates that all agents within a swarm possess distinct <code>name</code> attributes, raising a <code>ValueError</code> if duplicate names are detected to prevent tool generation collisions.
+  In <VersionBadge version="0.4.0rc1" status="prerelease" />, the <code>Runner</code> strictly
+  validates that all agents within a swarm possess distinct <code>name</code> attributes, raising a{' '}
+  <code>ValueError</code> if duplicate names are detected to prevent tool generation collisions.
 </Callout>
 
 ---
@@ -115,7 +125,10 @@ asyncio.run(main())
 ```
 
 <Callout type="info" title="turn_timeout in v0.4.0rc1">
-In <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>Runner.run_async</code> introduces an optional <code>turn_timeout: float | None = None</code> keyword parameter (e.g. <code>turn_timeout=30.0</code>). If a turn exceeds the deadline, it is cancelled and rolls back state atomically.
+  In <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>Runner.run_async</code>{' '}
+  introduces an optional <code>turn_timeout: float | None = None</code> keyword parameter (e.g.{' '}
+  <code>turn_timeout=30.0</code>). If a turn exceeds the deadline, it is cancelled and rolls back
+  state atomically.
 </Callout>
 
 ---
@@ -124,9 +137,9 @@ In <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>Runner.run_asy
 
 All model communication in `chatflow-agent` is decoupled behind the `BaseEngine` interface. In v0.3.4, the OpenAI-compatible and Anthropic engines call their REST APIs with `httpx`, while `GeminiEngine` uses the `google-genai` client:
 
-* **`OpenAIEngine`**: Supports OpenAI models and any OpenAI-compatible API (Groq, DeepSeek, xAI Grok, Ollama, vLLM) via `base_url`.
-* **`AnthropicEngine`**: Direct REST integration with Anthropic Claude models.
-* **`GeminiEngine`**: Google Gemini integration through `google-genai`. In <VersionBadge version="0.4.0rc1" status="prerelease" />, it was rewritten to call the Gemini REST API with `httpx`.
+- **`OpenAIEngine`**: Supports OpenAI models and any OpenAI-compatible API (Groq, DeepSeek, xAI Grok, Ollama, vLLM) via `base_url`.
+- **`AnthropicEngine`**: Direct REST integration with Anthropic Claude models.
+- **`GeminiEngine`**: Google Gemini integration through `google-genai`. In <VersionBadge version="0.4.0rc1" status="prerelease" />, it was rewritten to call the Gemini REST API with `httpx`.
 
 ```python
 from chatflow_agent import Agent, OpenAIEngine
@@ -188,8 +201,11 @@ Before processing a turn, stable v0.3.4 records the current history length. If a
 
 ### Event-Loop Protection & Concurrency Shields
 
-* **Stable v0.3.4 Session Locking:** Turns that share the same in-memory `SessionContext` are serialized by an `asyncio.Lock`; concurrent external calls wait rather than raising `ReentrantTurnError`. This is an event-loop guarantee, not thread or multi-process safety.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Prerelease Protections:** File-backed SQLite I/O is offloaded through `_run_blocking`, and `ReentrantTurnError` rejects a nested same-session turn started by code already running inside that turn. Independent external calls still queue.
+- **Stable v0.3.4 Session Locking:** Turns that share the same in-memory `SessionContext` are serialized by an `asyncio.Lock`; concurrent external calls wait rather than raising `ReentrantTurnError`. This is an event-loop guarantee, not thread or multi-process safety.
+- <VersionBadge version="0.4.0rc1" status="prerelease" /> **Prerelease Protections:** File-backed
+  SQLite I/O is offloaded through `_run_blocking`, and `ReentrantTurnError` rejects a nested
+  same-session turn started by code already running inside that turn. Independent external calls
+  still queue.
 
 ---
 
@@ -237,5 +253,5 @@ The final responding agent is visible via `response.active_agent_name`. Transfer
 
 Now that you understand the architectural foundations of `chatflow-agent`:
 
-* Check out [Installation](/en/docs/v0.3/getting-started/installation) to install the framework.
-* Explore the [Quickstart](/en/docs/v0.3/getting-started/quickstart) to build a hands-on project.
+- Check out [Installation](/en/docs/v0.3/getting-started/installation) to install the framework.
+- Explore the [Quickstart](/en/docs/v0.3/getting-started/quickstart) to build a hands-on project.

@@ -22,6 +22,29 @@ import {
 } from '@/lib/structured-data';
 
 describe('Schema.org Structured Data (JSON-LD) Suite', () => {
+  describe('BreadcrumbList Generation', () => {
+    it('omits navigation categories without valid URLs and renumbers the remaining items', () => {
+      const data = createBreadcrumbList([
+        { name: 'Home', url: 'https://chatflowagent.org/en' },
+        { name: 'Getting Started' },
+        { name: 'Invalid', url: 'not-a-url' },
+        {
+          name: 'Core Concepts',
+          url: 'https://chatflowagent.org/en/docs/v0.3/getting-started/core-concepts',
+        },
+      ]);
+      const items = data['itemListElement'] as Array<{
+        position: number;
+        item: string;
+      }>;
+
+      expect(items).toHaveLength(2);
+      expect(items.map(({ position }) => position)).toEqual([1, 2]);
+      expect(items.every(({ item }) => URL.canParse(item))).toBe(true);
+      expect(items.every(({ item }) => item.startsWith('https://'))).toBe(true);
+    });
+  });
+
   describe('Safe JSON-LD Serialization', () => {
     it('escapes "<" characters to prevent script breaking or XSS', () => {
       const malicious = {
@@ -194,7 +217,7 @@ describe('Schema.org Structured Data (JSON-LD) Suite', () => {
       expect(article['about']).toEqual({ '@id': SOURCE_CODE_ID });
     });
 
-    it('creates 4-level breadcrumb with translated section for guides/agents in Spanish', () => {
+    it('omits a translated navigation category without an index page', () => {
       const data = getDocStructuredData({
         title: 'Agentes Conversacionales',
         description: 'Guía para construir agentes.',
@@ -206,19 +229,52 @@ describe('Schema.org Structured Data (JSON-LD) Suite', () => {
 
       const graph = data['@graph'] as Array<Record<string, unknown>>;
       const breadcrumbs = graph.find((e) => e['@type'] === 'BreadcrumbList') as Record<string, unknown>;
-      const items = breadcrumbs['itemListElement'] as Array<{ position: number; name: string; item?: string }>;
+      const items = breadcrumbs['itemListElement'] as Array<{ position: number; name: string; item: string }>;
 
-      expect(items).toHaveLength(4);
+      expect(items).toHaveLength(3);
       expect(items[0]).toEqual({ '@type': 'ListItem', position: 1, name: 'Inicio', item: 'https://chatflowagent.org/es' });
       expect(items[1]).toEqual({ '@type': 'ListItem', position: 2, name: 'Documentación (v0.3)', item: 'https://chatflowagent.org/es/docs/v0.3' });
-      expect(items[2]).toEqual({ '@type': 'ListItem', position: 3, name: 'Guías' });
-      expect(items[3]).toEqual({
+      expect(items[2]).toEqual({
         '@type': 'ListItem',
-        position: 4,
+        position: 3,
         name: 'Agentes Conversacionales',
         item: 'https://chatflowagent.org/es/docs/v0.3/guides/agents',
       });
     });
+
+    it.each([
+      ['en', 'v0.3'],
+      ['es', 'v0.3'],
+      ['pt-BR', 'v0.3'],
+      ['en', 'v0.4'],
+      ['es', 'v0.4'],
+      ['pt-BR', 'v0.4'],
+    ] as const)(
+      'emits only linked breadcrumb items for core concepts in %s %s',
+      (locale, track) => {
+        const canonicalUrl = `https://chatflowagent.org/${locale}/docs/${track}/getting-started/core-concepts`;
+        const data = getDocStructuredData({
+          title: 'Core Concepts',
+          description: 'Core concepts.',
+          canonicalUrl,
+          locale,
+          track,
+          cleanSlug: ['getting-started', 'core-concepts'],
+        });
+
+        const graph = data['@graph'] as Array<Record<string, unknown>>;
+        const breadcrumbs = graph.find((entry) => entry['@type'] === 'BreadcrumbList') as Record<string, unknown>;
+        const items = breadcrumbs['itemListElement'] as Array<{
+          position: number;
+          item: string;
+        }>;
+
+        expect(items).toHaveLength(3);
+        expect(items.map(({ position }) => position)).toEqual([1, 2, 3]);
+        expect(items.every(({ item }) => URL.canParse(item))).toBe(true);
+        expect(items.at(-1)?.item).toBe(canonicalUrl);
+      }
+    );
 
     it('creates breadcrumb with section URL when section has its own index (providers)', () => {
       const data = getDocStructuredData({

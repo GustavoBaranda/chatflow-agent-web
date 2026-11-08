@@ -121,8 +121,8 @@ test.describe('Schema.org Structured Data (JSON-LD) E2E Suite', () => {
     expect(article['url']).toBe('https://chatflowagent.org/en/docs/v0.3');
   });
 
-  test('should render 4-level BreadcrumbList on specific guide (/en/docs/v0.3/guides/agents)', async ({ page }) => {
-    await page.goto('/en/docs/v0.3/guides/agents');
+  test('should omit unlinked categories from BreadcrumbList (/en/docs/v0.3/getting-started/core-concepts)', async ({ page }) => {
+    await page.goto('/en/docs/v0.3/getting-started/core-concepts');
     await page.waitForLoadState('domcontentloaded');
 
     const jsonLdScript = page.locator('script[type="application/ld+json"]');
@@ -132,9 +132,9 @@ test.describe('Schema.org Structured Data (JSON-LD) E2E Suite', () => {
     const graph = data['@graph'] as Array<Record<string, unknown>>;
 
     const breadcrumbs = graph.find((e) => e['@type'] === 'BreadcrumbList')!;
-    const items = breadcrumbs['itemListElement'] as Array<{ position: number; name: string; item?: string }>;
+    const items = breadcrumbs['itemListElement'] as Array<{ position: number; name: string; item: string }>;
 
-    expect(items).toHaveLength(4);
+    expect(items).toHaveLength(3);
     expect(items[0]).toEqual({
       '@type': 'ListItem',
       position: 1,
@@ -150,14 +150,10 @@ test.describe('Schema.org Structured Data (JSON-LD) E2E Suite', () => {
     expect(items[2]).toEqual({
       '@type': 'ListItem',
       position: 3,
-      name: 'Guides',
+      name: 'Core Concepts',
+      item: 'https://chatflowagent.org/en/docs/v0.3/getting-started/core-concepts',
     });
-    expect(items[3]).toEqual({
-      '@type': 'ListItem',
-      position: 4,
-      name: 'Agents & Dynamic Instructions',
-      item: 'https://chatflowagent.org/en/docs/v0.3/guides/agents',
-    });
+    expect(items.every(({ item }) => URL.canParse(item))).toBe(true);
   });
 
   test('should preserve noindex on prerelease v0.4 while emitting structured data (/en/docs/v0.4)', async ({

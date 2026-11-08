@@ -20,26 +20,24 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
 
-  let title = 'chatflow-agent — Conversational AI Agents in Python';
+  let title = 'Python Chatflows & Multi-Agent Workflows';
   let description =
-    'Official documentation and website for chatflow-agent, an open-source Python library for conversational AI agents, tools, sessions, and channels.';
+    'Build chatflows and conversational AI agents in Python with chatflow-agent, a lightweight async Python framework for tools, handoffs, session context, and channel integrations.';
   if (locale === 'es') {
-    title = 'chatflow-agent — Agentes de IA Conversacional en Python';
+    title = 'Chatflows y agentes de IA en Python';
     description =
-      'Plataforma oficial de documentación para chatflow-agent, la librería Python para agentes conversacionales, herramientas, sesiones y canales.';
+      'Construí chatflows y agentes conversacionales en Python con chatflow-agent, un framework ligero y asíncrono de Python para herramientas, handoffs, contexto de sesión e integraciones de canales.';
   } else if (locale === 'pt-BR') {
-    title = 'chatflow-agent — Agentes de IA Conversacional em Python';
+    title = 'Chatflows e agentes de IA em Python';
     description =
-      'Plataforma oficial de documentação para chatflow-agent, a biblioteca Python para agentes de IA conversacional, ferramentas, sessões e canais.';
+      'Crie chatflows e agentes conversacionais em Python com chatflow-agent, um framework leve e assíncrono em Python para ferramentas, handoffs, contexto de sessão e integrações de canais.';
   }
 
-  const languages = Object.fromEntries(
-    routing.locales.map((l) => [l, `/${l}`])
-  );
+  const languages = Object.fromEntries(routing.locales.map((l) => [l, `/${l}`]));
   languages['x-default'] = `/${routing.defaultLocale}`;
 
   const social = createSocialMetadata({
-    title,
+    title: `${title} | chatflow-agent`,
     description,
     url: `${SITE_ORIGIN}/${locale}`,
     locale,

@@ -1,7 +1,7 @@
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { GitHubIcon } from '@/components/ui/icons';
-import { ArrowDown, BookOpen, Sparkles } from 'lucide-react';
+import { ArrowDown, ArrowRight, BookOpen, Sparkles } from 'lucide-react';
 
 export function HeroSection() {
   const t = useTranslations('home');
@@ -17,15 +17,23 @@ export function HeroSection() {
       {/* Main Hero Heading */}
       <h1
         id="hero-title"
-        className="mt-4 sm:mt-6 text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-foreground max-w-4xl mx-auto leading-tight"
+        className="mt-4 sm:mt-6 text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-foreground max-w-5xl mx-auto leading-tight text-balance"
       >
         {t('heroTitle')}
       </h1>
 
       {/* Subtitle / Value Proposition */}
-      <p className="mt-4 sm:mt-6 max-w-2xl mx-auto text-base sm:text-lg lg:text-xl text-muted-foreground leading-relaxed">
+      <p className="mt-4 sm:mt-6 max-w-2xl mx-auto text-base sm:text-lg lg:text-xl text-muted-foreground leading-relaxed text-pretty">
         {t('heroSubtitle')}
       </p>
+
+      <Link
+        href="/docs/v0.3/getting-started/core-concepts"
+        className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-primary"
+      >
+        <span>{t('chatflowConcepts')}</span>
+        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+      </Link>
 
       {/* Action Buttons */}
       <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 max-w-xs sm:max-w-none mx-auto w-full">

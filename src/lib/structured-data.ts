@@ -182,18 +182,30 @@ export function getWebSiteEntity(): Record<string, unknown> {
 export function createBreadcrumbList(
   items: Array<{ name: string; url?: string }>
 ): Record<string, unknown> {
+  const linkedItems = items.filter(
+    (item): item is { name: string; url: string } => {
+      if (!item.url) {
+        return false;
+      }
+
+      try {
+        const url = new URL(item.url);
+        return url.protocol === 'https:' || url.protocol === 'http:';
+      } catch {
+        return false;
+      }
+    }
+  );
+
   return {
     '@type': 'BreadcrumbList',
-    itemListElement: items.map((item, index) => {
-      const entry: Record<string, unknown> = {
+    itemListElement: linkedItems.map((item, index) => {
+      return {
         '@type': 'ListItem',
         position: index + 1,
         name: item.name,
+        item: item.url,
       };
-      if (item.url) {
-        entry.item = item.url;
-      }
-      return entry;
     }),
   };
 }

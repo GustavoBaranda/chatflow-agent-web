@@ -2,7 +2,27 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /
+    # Version updates follow the dev-to-main promotion flow. GitHub always
+    # targets security updates at the default branch, independently of this.
+    target-branch: dev
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     versioning-strategy: increase
+    groups:
+      nextjs-toolchain:
+        applies-to: version-updates
+        patterns:
+          - next
+          - eslint-config-next
+        update-types:
+          - minor
+          - patch
+      tailwind-toolchain:
+        applies-to: version-updates
+        patterns:
+          - tailwindcss
+          - '@tailwindcss/postcss'
+        update-types:
+          - minor
+          - patch

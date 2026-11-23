@@ -128,10 +128,9 @@ export function resolveDocSeo({
   const canonicalUrl = `${SITE_ORIGIN}${canonicalPath}`;
 
   // 2. Robots directives:
-  // - Prerelease (v0.4): noindex, follow
   // - English fallback on localized routes: noindex, follow
-  // - Stable canonical (v0.3): index, follow
-  const isIndexable = track === DEFAULT_STABLE_TRACK && !isFallback;
+  // - Latest Stable (v0.4) & Previous Stable (v0.3): index, follow
+  const isIndexable = (track === DEFAULT_STABLE_TRACK || track === 'v0.3') && !isFallback;
   const robots: Metadata['robots'] = isIndexable
     ? {
         index: true,

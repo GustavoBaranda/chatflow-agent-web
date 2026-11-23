@@ -10,7 +10,6 @@ import { source, resolveDocPage } from '@/lib/source';
 import { TranslationNotice } from '@/components/docs/TranslationNotice';
 import { OutdatedNotice } from '@/components/docs/OutdatedNotice';
 import { VersionBadge } from '@/components/docs/VersionBadge';
-import { PrereleaseBanner } from '@/components/docs/PrereleaseBanner';
 import { DEFAULT_STABLE_TRACK } from '@/config/docs-versions';
 import { resolveDocSeo, createSocialMetadata } from '@/config/docs-seo';
 import { JsonLd } from '@/components/seo/JsonLd';
@@ -141,10 +140,6 @@ export default async function Page({ params }: PageProps) {
 
         {isOutdatedTranslation && (
           <OutdatedNotice sourceRevision={page.data.sourceRevision} slug={cleanNoticeSlug} />
-        )}
-
-        {track === 'v0.4' && (
-          <PrereleaseBanner locale={locale} currentSlug={cleanSlug} />
         )}
 
         <DocsBody>

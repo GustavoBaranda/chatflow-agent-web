@@ -6,7 +6,7 @@ import {
   isGenuineTranslation,
   resolveDocSeo,
 } from '@/config/docs-seo';
-import { DEFAULT_STABLE_TRACK } from '@/config/docs-versions';
+import { DEFAULT_STABLE_TRACK, PREVIOUS_STABLE_TRACK } from '@/config/docs-versions';
 
 /**
  * Dynamic localized sitemap generator for chatflow-agent-web.
@@ -45,74 +45,43 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }
   }
 
-  // 2. Stable Documentation Pages (v0.3)
-  // Query all authoritative English pages for the stable track
-  const englishPages = source
-    .getPages('en')
-    .filter((page) => page.slugs[0] === DEFAULT_STABLE_TRACK);
+  // 2. Stable Documentation Pages (v0.4 Latest / Stable and v0.3 Previous Stable)
+  const tracksToIndex = [
+    { track: DEFAULT_STABLE_TRACK, overviewPriority: 0.9, pagePriority: 0.8, changeFrequency: 'weekly' as const },
+    { track: PREVIOUS_STABLE_TRACK, overviewPriority: 0.6, pagePriority: 0.5, changeFrequency: 'monthly' as const },
+  ];
 
-  for (const page of englishPages) {
-    const cleanSlug = page.slugs.slice(1);
+  for (const { track, overviewPriority, pagePriority, changeFrequency } of tracksToIndex) {
+    const englishPages = source
+      .getPages('en')
+      .filter((page) => page.slugs[0] === track);
 
-    // English canonical entry (authoritative, indexable)
-    const enSeo = resolveDocSeo({
-      track: DEFAULT_STABLE_TRACK,
-      cleanSlug,
-      locale: 'en',
-      isExplicitTrack: true,
-      isFallback: false,
-    });
+    for (const page of englishPages) {
+      const cleanSlug = page.slugs.slice(1);
 
-    entries.push({
-      url: enSeo.canonicalUrl,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: cleanSlug.length === 0 ? 0.9 : 0.7,
-      alternates: {
-        languages: enSeo.languages,
-      },
-    });
+      for (const locale of SUPPORTED_LOCALES) {
+        if (locale !== 'en' && !isGenuineTranslation(track, cleanSlug, locale)) {
+          continue;
+        }
 
-    // Genuine Spanish translation (if existing)
-    if (isGenuineTranslation(DEFAULT_STABLE_TRACK, cleanSlug, 'es')) {
-      const esSeo = resolveDocSeo({
-        track: DEFAULT_STABLE_TRACK,
-        cleanSlug,
-        locale: 'es',
-        isExplicitTrack: true,
-        isFallback: false,
-      });
+        const seo = resolveDocSeo({
+          track,
+          cleanSlug,
+          locale,
+          isExplicitTrack: true,
+          isFallback: false,
+        });
 
-      entries.push({
-        url: esSeo.canonicalUrl,
-        lastModified: new Date(),
-        changeFrequency: 'weekly',
-        priority: cleanSlug.length === 0 ? 0.9 : 0.7,
-        alternates: {
-          languages: esSeo.languages,
-        },
-      });
-    }
-
-    // Genuine Brazilian Portuguese translation (if existing)
-    if (isGenuineTranslation(DEFAULT_STABLE_TRACK, cleanSlug, 'pt-BR')) {
-      const ptSeo = resolveDocSeo({
-        track: DEFAULT_STABLE_TRACK,
-        cleanSlug,
-        locale: 'pt-BR',
-        isExplicitTrack: true,
-        isFallback: false,
-      });
-
-      entries.push({
-        url: ptSeo.canonicalUrl,
-        lastModified: new Date(),
-        changeFrequency: 'weekly',
-        priority: cleanSlug.length === 0 ? 0.9 : 0.7,
-        alternates: {
-          languages: ptSeo.languages,
-        },
-      });
+        entries.push({
+          url: seo.canonicalUrl,
+          lastModified: new Date(),
+          changeFrequency,
+          priority: cleanSlug.length === 0 ? overviewPriority : pagePriority,
+          alternates: {
+            languages: seo.languages,
+          },
+        });
+      }
     }
   }
 

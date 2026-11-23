@@ -77,6 +77,10 @@ export default function proxy(request: NextRequest) {
 export const config = {
   // Match all pathnames except for
   // - … if they start with `/api`, `/_next` or `/_vercel`
-  // - … the ones containing a dot (e.g. `favicon.ico`)
-  matcher: ['/((?!api|_next|_vercel|.*\\..*).*)'],
+  // - … static files containing a dot (e.g. `favicon.ico`), while explicitly
+  //   matching versioned docs routes (`/en/docs/v0.4/...`, `/en/docs/v0.4.0rc1/...`)
+  matcher: [
+    '/((?!api|_next|_vercel|.*\\..*).*)',
+    '/(en|es|pt-BR)/docs/:path*',
+  ],
 };

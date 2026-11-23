@@ -208,7 +208,7 @@ def main() -> int:
                 "provenance": "pypi-wheel",
             }
         except Exception as e:
-            if args.allow_offline_git-fallback:
+            if args.allow_offline_git_fallback:
                 print(
                     f"\n[WARNING] OFFLINE SOURCE FALLBACK ACTIVE FOR {v} - THIS IS NOT EQUIVALENT TO PYPI RELEASE VALIDATION!\n"
                     f"Reason: {e}\n",

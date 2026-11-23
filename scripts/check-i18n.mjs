@@ -166,7 +166,8 @@ if (!fs.existsSync(CONTENT_DOCS_DIR)) {
 
         if (!fs.existsSync(localizedPath)) {
           missing++;
-          console.log(`    ⚠️  MISSING: ${relativePath}`);
+          hasErrors = true;
+          console.error(`    ❌ MISSING: ${relativePath}`);
           continue;
         }
 
@@ -178,10 +179,16 @@ if (!fs.existsSync(CONTENT_DOCS_DIR)) {
 
         if (!frontmatter.title || !frontmatter.description || body.trim().length === 0) {
           incomplete++;
-          console.log(`    ⚠️  INCOMPLETE: ${relativePath} (Missing title/description frontmatter or body)`);
-        } else if (frontmatter.sourceHash && frontmatter.sourceHash !== enHash) {
+          hasErrors = true;
+          console.error(`    ❌ INCOMPLETE: ${relativePath} (Missing title/description frontmatter or body)`);
+        } else if (!frontmatter.sourceHash) {
+          incomplete++;
+          hasErrors = true;
+          console.error(`    ❌ INCOMPLETE: ${relativePath} (Missing sourceHash frontmatter)`);
+        } else if (frontmatter.sourceHash !== enHash) {
           outdated++;
-          console.log(`    ⚠️  OUTDATED: ${relativePath} (sourceHash differs from current English hash)`);
+          hasErrors = true;
+          console.error(`    ❌ OUTDATED: ${relativePath} (sourceHash differs from current English hash)`);
         } else {
           upToDate++;
         }

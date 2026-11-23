@@ -2,7 +2,7 @@
 title: "Runner e Ciclo de Execução"
 description: "Guia detalhado sobre o loop conversacional de múltiplos turnos, resolução de motores, fluxo de execução de ferramentas, limites de tempo e reversão transacional no chatflow-agent."
 sourceRevision: "0ffb562"
-sourceHash: "670fac158ba6fc9828b30a03993dd914ef77df5679816fdfee570b12958f88c2"
+sourceHash: "59575e24548cbbd753dad21edd24cd664e92f35eaf6fe5133423c8f30ceb9452"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -132,7 +132,7 @@ except Exception:
   * Os metadados da sessão não são restaurados.
   * O cancelamento (`asyncio.CancelledError`, levantado por exemplo por `asyncio.wait_for` ao atingir o tempo limite) não é uma `Exception`, portanto um turno cancelado **não** é revertido: as mensagens que ele já anexou permanecem no histórico.
 
-A reversão completa do histórico, do agente ativo e dos metadados, inclusive em cancelamentos e com `turn_timeout`, é um recurso da versão <VersionBadge version="0.4.0rc1" status="prerelease" />.
+A reversão completa do histórico, do agente ativo e dos metadados, inclusive em cancelamentos e com `turn_timeout`, é um recurso da versão <VersionBadge version="0.4.0" status="stable" />.
 
 ---
 
@@ -184,7 +184,7 @@ Não chame <code>runner.run()</code> dentro de um loop de eventos asyncio em exe
 
 ---
 
-## Diferenças de Versão e Recursos de Pré-lançamento
+## Diferenças de Versão e Recursos da v0.4.0
 
 O motor de execução do `Runner` recebeu melhorias significativas de desempenho e concorrência:
 
@@ -207,8 +207,8 @@ async def handle_requests():
     res2 = await runner.run_async("s1", "Second query")
 ```
 
-<Callout type="info" title="Nota de Prévia: Melhorias da v0.4.0rc1">
-Pool de conexões assíncronas via <code>async with runner:</code> (para requisições ao Gemini), proteção contra reentrância com <code>ReentrantTurnError</code>, serialização por sessão para stores SQLite, reversão completa do estado inclusive em cancelamentos e rastreamento de cancelamento de threads foram introduzidos na versão preliminar <strong>v0.4.0rc1</strong>. Na versão estável v0.3.4, execute turnos diretamente na instância compartilhada do runner.
+<Callout type="info" title="Nota de Prévia: Melhorias da v0.4.0">
+Pool de conexões assíncronas via <code>async with runner:</code> (para requisições ao Gemini), proteção contra reentrância com <code>ReentrantTurnError</code>, serialização por sessão para stores SQLite, reversão completa do estado inclusive em cancelamentos e rastreamento de cancelamento de threads foram introduzidos na versão v0.4.0 <strong>v0.4.0</strong>. Na versão estável v0.3.4, execute turnos diretamente na instância compartilhada do runner.
 </Callout>
 
 ---
@@ -231,7 +231,7 @@ async def handle_post(session_id: str, msg: str):
 
 ### 2. Chamar o `run()` Síncrono Dentro de Rotas Assíncronas
 ```python
-# [INCORRETO]: Falha com RuntimeError dentro de um loop de eventos em execução (v0.3.4 e v0.4.0rc1)
+# [INCORRETO]: Falha com RuntimeError dentro de um loop de eventos em execução (v0.3.4 e v0.4.0)
 # async def api_endpoint(req):
 #     return runner.run(req.session_id, req.message)
 

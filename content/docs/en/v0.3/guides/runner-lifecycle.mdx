@@ -130,7 +130,7 @@ except Exception:
   * Session metadata is not restored.
   * Cancellation (`asyncio.CancelledError`, raised for example by `asyncio.wait_for` on timeout) is not an `Exception`, so a cancelled turn is **not** rolled back: messages it already appended remain in the history.
 
-Full rollback of history, active agent, and metadata, including on cancellation and `turn_timeout`, is a <VersionBadge version="0.4.0rc1" status="prerelease" /> feature.
+Full rollback of history, active agent, and metadata, including on cancellation and `turn_timeout`, is a <VersionBadge version="0.4.0" status="stable" /> feature.
 
 ---
 
@@ -182,7 +182,7 @@ Do not call <code>runner.run()</code> from inside an active asyncio event loop (
 
 ---
 
-## Version Differences & Prerelease Features
+## Version Differences (v0.3.4 vs v0.4.0)
 
 The `Runner` execution engine includes major concurrency and performance upgrades across releases:
 
@@ -205,8 +205,8 @@ async def handle_requests():
     res2 = await runner.run_async("s1", "Second query")
 ```
 
-<Callout type="info" title="Preview Note: v0.4.0rc1 Upgrades">
-Asynchronous connection pooling via <code>async with runner:</code> (for Gemini requests), reentrant turn prevention with <code>ReentrantTurnError</code>, per-session serialization for SQLite stores, full-state rollback including cancellation, and worker thread cancellation tracking are introduced in prerelease <strong>v0.4.0rc1</strong>. In stable v0.3.4, execute turns directly on the shared runner instance.
+<Callout type="info" title="Preview Note: v0.4.0 Upgrades">
+Asynchronous connection pooling via <code>async with runner:</code> (for Gemini requests), reentrant turn prevention with <code>ReentrantTurnError</code>, per-session serialization for SQLite stores, full-state rollback including cancellation, and worker thread cancellation tracking are introduced in v0.4.0 <strong>v0.4.0</strong>. In stable v0.3.4, execute turns directly on the shared runner instance.
 </Callout>
 
 ---
@@ -229,7 +229,7 @@ async def handle_post(session_id: str, msg: str):
 
 ### 2. Calling Synchronous `run()` Inside Async Handlers
 ```python
-# [INCORRECT]: Fails with RuntimeError inside a running event loop (v0.3.4 and v0.4.0rc1)
+# [INCORRECT]: Fails with RuntimeError inside a running event loop (v0.3.4 and v0.4.0)
 # async def api_endpoint(req):
 #     return runner.run(req.session_id, req.message)
 

@@ -2,7 +2,7 @@
 title: "Agentes e Instruções Dinâmicas"
 description: "Aprofunde-se na abstração do Agent, callables de instrução dinâmica em tempo de execução, vinculação de ferramentas e parâmetros de configuração no chatflow-agent."
 sourceRevision: "0ffb562"
-sourceHash: "6e638cf75b663b725af86706bb656b2c4c9064ae1fbe010b9ff37835d5992ea1"
+sourceHash: "f41fc166a36b792e67286c2c41cc00967c7ade523220c806b26d72cee5999fb5"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -164,7 +164,7 @@ assert any(t.name == "query_active_users" for t in agent.tools)
 
 ---
 
-## Diferenças de Versão e Recursos de Pré-lançamento
+## Diferenças de Versão e Recursos da v0.4.0
 
 O `chatflow-agent` mantém consistência mecânica enquanto introduz validações rigorosas e normalização de caracteres em versões mais recentes:
 
@@ -172,22 +172,22 @@ O `chatflow-agent` mantém consistência mecânica enquanto introduz validaçõe
 * <VersionBadge version="0.3.4" status="stable" /> O construtor não valida `name`; a única verificação é que `add_handoff()` rejeita um handoff para o próprio agente.
 * Ferramentas sintéticas de handoff são nomeadas no formato `transfer_to_<sanitized_name>`.
 
-### Melhorias de Pré-lançamento (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Validação de Nome Não Vazio:** O construtor rejeita explicitamente nomes vazios ou compostos apenas por espaços em branco:
+### Melhorias na v0.4.0 (`v0.4.0`)
+* <VersionBadge version="0.4.0" status="stable" /> **Validação de Nome Não Vazio:** O construtor rejeita explicitamente nomes vazios ou compostos apenas por espaços em branco:
 
 ```python
 from chatflow_agent import Agent
 
-# Na v0.4.0rc1: levanta ValueError("Agent name must be a non-empty string.")
+# Na v0.4.0: levanta ValueError("Agent name must be a non-empty string.")
 try:
     Agent(name="   ", instructions="test")
 except ValueError as err:
     print("Caught expected validation error:", err)
 ```
 
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Transliteração Unicode NFKD:** Nomes de agentes com acentos (ex.: `AtenciónAlCliente`) são transliterados de forma limpa para identificadores ASCII válidos (`transfer_to_atencionalcliente`).
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Desambiguação de Colisões:** Se múltiplos destinos de handoff gerarem nomes de ferramentas equivalentes após sanitização, sufixos numéricos (`_2`, `_3`) são automaticamente anexados.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Limite de Comprimento de Nomes de Ferramentas:** Nomes sintéticos são limitados estritamente a 60 caracteres para conformidade com os limites de APIs dos provedores.
+* <VersionBadge version="0.4.0" status="stable" /> **Transliteração Unicode NFKD:** Nomes de agentes com acentos (ex.: `AtenciónAlCliente`) são transliterados de forma limpa para identificadores ASCII válidos (`transfer_to_atencionalcliente`).
+* <VersionBadge version="0.4.0" status="stable" /> **Desambiguação de Colisões:** Se múltiplos destinos de handoff gerarem nomes de ferramentas equivalentes após sanitização, sufixos numéricos (`_2`, `_3`) são automaticamente anexados.
+* <VersionBadge version="0.4.0" status="stable" /> **Limite de Comprimento de Nomes de Ferramentas:** Nomes sintéticos são limitados estritamente a 60 caracteres para conformidade com os limites de APIs dos provedores.
 
 ---
 
@@ -217,7 +217,7 @@ agent.current_user = "user_123"  # Vazará entre sessões concorrentes!
 # )
 ```
 
-Na v0.3.4, os `metadata` passados para `run()` / `run_async()` são aplicados somente quando a sessão é criada; chamadas posteriores para a mesma sessão não os atualizam. A mesclagem de metadados a cada turno foi adicionada na versão <VersionBadge version="0.4.0rc1" status="prerelease" />.
+Na v0.3.4, os `metadata` passados para `run()` / `run_async()` são aplicados somente quando a sessão é criada; chamadas posteriores para a mesma sessão não os atualizam. A mesclagem de metadados a cada turno foi adicionada na versão <VersionBadge version="0.4.0" status="stable" />.
 
 ### 3. Registro de Handoff para Si Próprio
 Um agente não pode registrar uma transferência para si mesmo. Fazer isso gera um erro imediato:

@@ -27,8 +27,8 @@ In stable v0.3.4, the engine reads credentials from the following sources, in or
 1. `api_key` passed directly to `GeminiEngine(api_key="...")` or `Agent(api_key="...")`.
 2. `GEMINI_API_KEY` environment variable.
 
-<Callout type="info" title="Prerelease credential options">
-<VersionBadge version="0.4.0rc1" status="prerelease" /> adds the `GOOGLE_API_KEY` fallback and the `api_key_in_query` option. Those options are not available in stable v0.3.4.
+<Callout type="info" title="v0.4.0 credential options">
+<VersionBadge version="0.4.0" status="stable" /> adds the `GOOGLE_API_KEY` fallback and the `api_key_in_query` option. Those options are not available in stable v0.3.4.
 </Callout>
 
 ```python
@@ -55,13 +55,13 @@ assistant = Agent(
 
 <div className="flex gap-2 my-3">
   <VersionBadge version="0.3.4" status="stable" />
-  <VersionBadge version="0.4.0rc1" status="prerelease" />
+  <VersionBadge version="0.4.0" status="stable" />
 </div>
 
 The Gemini implementation underwent an architectural shift between releases:
 
 * **In `v0.3.4` (Stable):** The engine uses Google's official `google-genai` SDK (`from google import genai`), which is installed automatically as a core dependency. There is no connection pooling.
-* **In `v0.4.0rc1` (Prerelease):** The engine was rewritten using native asynchronous `httpx` against `https://generativelanguage.googleapis.com/v1beta`. This removes the `google-genai` dependency and, inside an `async with runner:` scope, lets Gemini requests share one pooled HTTP client.
+* **In `v0.4.0` (Latest Stable):** The engine was rewritten using native asynchronous `httpx` against `https://generativelanguage.googleapis.com/v1beta`. This removes the `google-genai` dependency and, inside an `async with runner:` scope, lets Gemini requests share one pooled HTTP client.
 
 In v0.3.4, run turns directly on a shared runner:
 
@@ -86,14 +86,14 @@ async def main():
 asyncio.run(main())
 ```
 
-### Custom Proxy Configuration (Prerelease)
+### Custom Proxy Configuration (v0.4.0)
 
-<VersionBadge version="0.4.0rc1" status="prerelease" /> To route Gemini requests through an enterprise proxy or gateway in the prerelease, set the `GOOGLE_GEMINI_BASE_URL` environment variable. Stable v0.3.4 does not support this environment variable:
+<VersionBadge version="0.4.0" status="stable" /> To route Gemini requests through an enterprise proxy or gateway in v0.4.0, set the `GOOGLE_GEMINI_BASE_URL` environment variable. Stable v0.3.4 does not support this environment variable:
 
 ```bash
 export GOOGLE_GEMINI_BASE_URL="https://gemini-proxy.internal.corp"
 ```
-The v0.4.0rc1 engine automatically appends `/v1beta` to the base URL.
+The v0.4.0 engine automatically appends `/v1beta` to the base URL.
 
 ---
 
@@ -178,4 +178,4 @@ runner = Runner(starting_agent=researcher)
 In this swarm:
 1. The **Researcher** runs on Gemini 2.5 Flash for rapid ingestion and search.
 2. Once data is collected, the session hands off to the **Synthesizer** on Claude 3.5 Sonnet.
-3. <VersionBadge version="0.4.0rc1" status="prerelease" /> Historical messages and tool call IDs are normalized in the prerelease to prevent cross-provider format mismatches. Stable v0.3.4 does not provide this normalization guarantee.
+3. <VersionBadge version="0.4.0" status="stable" /> Historical messages and tool call IDs are normalized in v0.4.0 to prevent cross-provider format mismatches. Stable v0.3.4 does not provide this normalization guarantee.

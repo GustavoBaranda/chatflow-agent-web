@@ -26,40 +26,40 @@ python --version
 
 ## Installing the Core Package
 
-`chatflow-agent` keeps its core dependencies small: in v0.3.4 they are `google-genai` (used by `GeminiEngine`), `pydantic`, and `httpx`. Choose between the stable release or the prerelease candidate:
+`chatflow-agent` keeps its core dependencies small: in `v0.3.4` they are `google-genai` (used by `GeminiEngine`), `pydantic`, and `httpx`. To pin the `v0.3.4` legacy stable release (or install the latest stable `v0.4.0` release):
 
 <Tabs items={['pip', 'uv', 'poetry']}>
   <Tab value="pip">
 ```bash
-# Install current stable release (v0.3.4 - recommended for production)
-pip install chatflow-agent
+# Install the v0.3.4 release
+pip install "chatflow-agent==0.3.4"
 
-# Or install the prerelease candidate (v0.4.0rc1, the only published 0.4 release)
-pip install "chatflow-agent==0.4.0rc1"
+# Or install the latest stable release (v0.4.0 - recommended for new projects)
+pip install chatflow-agent
 ```
   </Tab>
   <Tab value="uv">
 ```bash
-# Install current stable release with uv
-uv add chatflow-agent
+# Install the v0.3.4 release with uv
+uv add "chatflow-agent==0.3.4"
 
-# Or install the prerelease candidate
-uv add "chatflow-agent==0.4.0rc1"
+# Or install the latest stable release (v0.4.0)
+uv add chatflow-agent
 ```
   </Tab>
   <Tab value="poetry">
 ```bash
-# Install current stable release with poetry
-poetry add chatflow-agent
+# Install the v0.3.4 release with poetry
+poetry add "chatflow-agent==0.3.4"
 
-# Or install the prerelease candidate
-poetry add chatflow-agent@0.4.0rc1
+# Or install the latest stable release (v0.4.0)
+poetry add chatflow-agent
 ```
   </Tab>
 </Tabs>
 
 <Callout type="info" title="Core Dependencies">
-In **v0.3.4**, core dependencies are `google-genai>=0.1.1`, `pydantic>=2.6.0`, and `httpx>=0.27.0`; `google-genai` is installed automatically. In the **v0.4.0rc1** prerelease, `google-genai` is no longer a dependency: Gemini, Anthropic, and OpenAI-compatible engines all communicate over REST via `httpx`. SQLite persistence uses Python's built-in `sqlite3` library without requiring third-party database drivers.
+In **v0.3.4**, core dependencies are `google-genai>=0.1.1`, `pydantic>=2.6.0`, and `httpx>=0.27.0`; `google-genai` is installed automatically. Starting in **v0.4.0** (Latest Stable), `google-genai` is no longer a dependency: Gemini, Anthropic, and OpenAI-compatible engines all communicate over REST via `httpx`. SQLite persistence uses Python's built-in `sqlite3` library without requiring third-party database drivers.
 </Callout>
 
 ---
@@ -90,7 +90,6 @@ Expected output:
 ```text
 0.3.4
 ```
-*(or `0.4.0rc1` if installed with the prerelease flag)*.
 
 ---
 

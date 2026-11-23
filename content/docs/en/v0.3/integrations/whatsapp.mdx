@@ -163,7 +163,7 @@ Stable v0.3.4 exposes the following inbound model deadline:
 | :--- | :--- | :--- |
 | `llm_timeout_seconds` | `30.0` | Deadline applied by `WhatsAppChannel` while awaiting the runner turn. |
 
-`queue_timeout_seconds` and a `120.0`-second default are prerelease v0.4.0rc1 features. `max_concurrent_tasks` is not a constructor parameter in either v0.3.4 or v0.4.0rc1. In v0.3.4, same-session turns wait on the session lock without a queue deadline. A timeout cancels the awaiting task and returns the configured `fallback_message`, but v0.3.4 does not guarantee rollback for cancellation.
+`queue_timeout_seconds` and a `120.0`-second default are v0.4.0 features. `max_concurrent_tasks` is not a constructor parameter in either v0.3.4 or v0.4.0. In v0.3.4, same-session turns wait on the session lock without a queue deadline. A timeout cancels the awaiting task and returns the configured `fallback_message`, but v0.3.4 does not guarantee rollback for cancellation.
 
 ## 24-Hour Customer Care Window Tracking
 

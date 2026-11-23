@@ -2,7 +2,7 @@
 title: 'Conceptos Fundamentales'
 description: 'Comprende cómo se desarrollan los chatflows en chatflow-agent y cómo trabajan juntos Agents, Engines, Tools, Runner, Memory y Handoffs.'
 sourceRevision: '6f2be16'
-sourceHash: 'd12424288ff016684506622c80ab0380305d76b4e171276646ffeb45c8437a8d'
+sourceHash: "fd03d239b7bd1d3833ae4c9099110234d9320fcc9ee8a990850084276457b16f"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -59,8 +59,8 @@ agent = Agent(
 )
 ```
 
-<Callout type="info" title="Validación de Identidad en Enjambres en v0.4.0rc1">
-  En <VersionBadge version="0.4.0rc1" status="prerelease" />, el <code>Runner</code> valida
+<Callout type="info" title="Validación de Identidad en Enjambres en v0.4.0">
+  En <VersionBadge version="0.4.0" status="stable" />, el <code>Runner</code> valida
   estrictamente que todos los agentes dentro de un enjambre posean atributos <code>name</code>{' '}
   distintos, generando un <code>ValueError</code> si se detectan nombres duplicados para evitar
   colisiones en la síntesis de herramientas.
@@ -127,8 +127,8 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-<Callout type="info" title="turn_timeout en v0.4.0rc1">
-  En <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>Runner.run_async</code>{' '}
+<Callout type="info" title="turn_timeout en v0.4.0">
+  En <VersionBadge version="0.4.0" status="stable" />, <code>Runner.run_async</code>{' '}
   introduce un parámetro opcional <code>turn_timeout: float | None = None</code> (por ejemplo,{' '}
   <code>turn_timeout=30.0</code>). Si un turno supera el tiempo límite, se cancela y revierte el
   estado de forma atómica.
@@ -142,7 +142,7 @@ Toda la comunicación con modelos en `chatflow-agent` está desacoplada tras la 
 
 - **`OpenAIEngine`**: Compatible con modelos de OpenAI y cualquier API compatible con OpenAI (Groq, DeepSeek, xAI Grok, Ollama, vLLM) mediante `base_url`.
 - **`AnthropicEngine`**: Integración REST directa con modelos Claude de Anthropic.
-- **`GeminiEngine`**: Integración con Google Gemini a través de `google-genai`. En <VersionBadge version="0.4.0rc1" status="prerelease" />, se reescribió para llamar a la API REST de Gemini con `httpx`.
+- **`GeminiEngine`**: Integración con Google Gemini a través de `google-genai`. En <VersionBadge version="0.4.0" status="stable" />, se reescribió para llamar a la API REST de Gemini con `httpx`.
 
 ```python
 from chatflow_agent import Agent, OpenAIEngine
@@ -205,7 +205,7 @@ Antes de procesar un turno, la versión estable v0.3.4 registra la longitud actu
 ### Protección del Bucle de Eventos y Bloqueos de Concurrencia
 
 - **Bloqueo por Sesión en v0.3.4:** Los turnos que comparten el mismo `SessionContext` en memoria se serializan con un `asyncio.Lock`; las llamadas externas concurrentes esperan y no generan `ReentrantTurnError`. Es una garantía del bucle de eventos, no de seguridad entre hilos o procesos.
-- <VersionBadge version="0.4.0rc1" status="prerelease" /> **Protecciones de la Prerelease:** El I/O
+- <VersionBadge version="0.4.0" status="stable" /> **Protecciones de la v0.4.0:** El I/O
   de SQLite en archivo se descarga mediante `_run_blocking`, y `ReentrantTurnError` rechaza un turno
   anidado de la misma sesión iniciado desde código que ya se ejecuta dentro de ese turno. Las
   llamadas externas independientes siguen esperando en cola.

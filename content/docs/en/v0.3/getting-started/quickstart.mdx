@@ -50,7 +50,7 @@ python quickstart.py
 ```
 
 <Callout type="info" title="Event Loop Guard">
-<code>runner.run()</code> is a synchronous convenience method designed for scripts and CLI utilities. If you are inside an existing asynchronous event loop (e.g. FastAPI, Jupyter Notebook, or asyncio), use <code>await runner.run_async()</code> instead. In v0.3.4, calling <code>runner.run()</code> inside an active loop fails with asyncio's generic <code>RuntimeError</code> ("asyncio.run() cannot be called from a running event loop"); the explicit message pointing to <code>run_async()</code> was added in <VersionBadge version="0.4.0rc1" status="prerelease" />.
+<code>runner.run()</code> is a synchronous convenience method designed for scripts and CLI utilities. If you are inside an existing asynchronous event loop (e.g. FastAPI, Jupyter Notebook, or asyncio), use <code>await runner.run_async()</code> instead. In v0.3.4, calling <code>runner.run()</code> inside an active loop fails with asyncio's generic <code>RuntimeError</code> ("asyncio.run() cannot be called from a running event loop"); the explicit message pointing to <code>run_async()</code> was added in <VersionBadge version="0.4.0" status="stable" />.
 </Callout>
 
 ---
@@ -186,8 +186,8 @@ groq_agent = Agent(
 )
 ```
 
-<Callout type="warn" title="Provider Differences in v0.3.4 vs v0.4.0rc1">
-In <VersionBadge version="0.3.4" status="stable" />, <code>GeminiEngine</code> relies on the <code>google-genai</code> package. In <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>GeminiEngine</code> was refactored to pure HTTP REST via <code>httpx</code>, eliminating external Google SDK dependencies.
+<Callout type="warn" title="Provider Differences in v0.3.4 vs v0.4.0">
+In <VersionBadge version="0.3.4" status="stable" />, <code>GeminiEngine</code> relies on the <code>google-genai</code> package. In <VersionBadge version="0.4.0" status="stable" />, <code>GeminiEngine</code> was refactored to pure HTTP REST via <code>httpx</code>, eliminating external Google SDK dependencies.
 </Callout>
 
 ---

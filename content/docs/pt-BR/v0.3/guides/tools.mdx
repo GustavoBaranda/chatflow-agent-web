@@ -2,7 +2,7 @@
 title: "Ferramentas e Chamada de Funções"
 description: "Guia arquitetural completo sobre chamada de funções, esquemas de tipos de parâmetros, despacho síncrono/assíncrono e isolamento de erros no chatflow-agent."
 sourceRevision: "0ffb562"
-sourceHash: "999f5284505a0e27add8076c0860f32ac04c2d96db49ba72ed2b12477da66ddb"
+sourceHash: "c92f9e7e3676db794a389c1579b08b6b716bf7bbf210799689c1bd0cb8a873ca"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -77,7 +77,7 @@ Quando uma ferramenta é registrada, o `chatflow-agent` analisa sua assinatura v
 Parâmetros com valores padrão (ex.: `rate: float = 0.20`) são marcados como opcionais no esquema, enquanto parâmetros sem valor padrão são incluídos na matriz `required`.
 
 <Callout type="warn" title="Parâmetros opcionais na v0.3.4">
-Na v0.3.4, apenas <code>typing.Union</code> é reconhecido, portanto <code>int | None</code> recai em <code>"STRING"</code>. Escreva <code>Optional[int]</code> para obter um esquema <code>"INTEGER"</code>. Uniões PEP 604 são suportadas na versão <VersionBadge version="0.4.0rc1" status="prerelease" />.
+Na v0.3.4, apenas <code>typing.Union</code> é reconhecido, portanto <code>int | None</code> recai em <code>"STRING"</code>. Escreva <code>Optional[int]</code> para obter um esquema <code>"INTEGER"</code>. Uniões PEP 604 são suportadas na versão <VersionBadge version="0.4.0" status="stable" />.
 </Callout>
 
 <Callout type="tip" title="Boas Práticas para Docstrings">
@@ -123,7 +123,7 @@ Chamar <code>tool.execute()</code> de forma síncrona sobre uma ferramenta <code
 
 ---
 
-## Diferenças de Versão e Recursos de Pré-lançamento
+## Diferenças de Versão e Recursos da v0.4.0
 
 A geração de esquemas e execução de ferramentas evoluiu significativamente entre versões:
 
@@ -132,8 +132,8 @@ A geração de esquemas e execução de ferramentas evoluiu significativamente e
 * Mapeamento de tipos em nível único para tipos primitivos e coleções não parametrizadas (`list`/`dict`).
 * Funções síncronas despachadas via `asyncio.to_thread` durante `execute_async()`.
 
-### Melhorias de Pré-lançamento (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Tipagem Profunda de Coleções:** Inspeciona esquemas internos de itens para `list[T]`, `Sequence[T]`, `set[T]` e tuplas homogêneas `tuple[T, ...]`:
+### Melhorias na v0.4.0 (`v0.4.0`)
+* <VersionBadge version="0.4.0" status="stable" /> **Tipagem Profunda de Coleções:** Inspeciona esquemas internos de itens para `list[T]`, `Sequence[T]`, `set[T]` e tuplas homogêneas `tuple[T, ...]`:
 
 ```python
 from chatflow_agent import tool
@@ -146,13 +146,13 @@ def sum_metrics(values: list[float]) -> float:
 # Gera: {"type": "ARRAY", "items": {"type": "NUMBER"}}
 ```
 
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Suporte a Union e Optional:**
+* <VersionBadge version="0.4.0" status="stable" /> **Suporte a Union e Optional:**
   * `Optional[T]` ou `T | None` gera `{ "type": "...", "nullable": True }`.
   * `int | float` é expandido deterministicamente para `"NUMBER"` independentemente da ordem da declaração.
   * Uniões de múltiplos tipos geram uma lista de esquemas `anyOf`.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`to_openai_parameters()`:** Gera parâmetros formatados em JSON Schema (nomes de tipos em minúsculas, `type: "null"` e sem o atributo `nullable`) para os motores OpenAI e Anthropic.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`ToolSchemaError`:** Levantado quando a ferramenta é criada se uma anotação de união contém um membro sem mapeamento de esquema (por exemplo `int | datetime`). Outras anotações desconhecidas continuam recaindo em `"STRING"`.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Exclusão de Argumentos Variáveis:** `*args` e `**kwargs` são omitidos automaticamente dos esquemas de parâmetros.
+* <VersionBadge version="0.4.0" status="stable" /> **`to_openai_parameters()`:** Gera parâmetros formatados em JSON Schema (nomes de tipos em minúsculas, `type: "null"` e sem o atributo `nullable`) para os motores OpenAI e Anthropic.
+* <VersionBadge version="0.4.0" status="stable" /> **`ToolSchemaError`:** Levantado quando a ferramenta é criada se uma anotação de união contém um membro sem mapeamento de esquema (por exemplo `int | datetime`). Outras anotações desconhecidas continuam recaindo em `"STRING"`.
+* <VersionBadge version="0.4.0" status="stable" /> **Exclusão de Argumentos Variáveis:** `*args` e `**kwargs` são omitidos automaticamente dos esquemas de parâmetros.
 
 ---
 

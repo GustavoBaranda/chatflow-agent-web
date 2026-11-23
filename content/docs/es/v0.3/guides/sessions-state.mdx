@@ -2,7 +2,7 @@
 title: "Sesiones y Estado de Conversación"
 description: "Guía completa sobre memoria de sesión, poda de turnos con ventana deslizante, persistencia en memoria y SQLite, y deduplicación de mensajes en chatflow-agent."
 sourceRevision: "0ffb562"
-sourceHash: "038052b70a3d1289c6fee139b3e8e7056fd8baaf369508e0c4f22c45be810471"
+sourceHash: "8beb3706c3e0c137611a410bd5391761528b25a379aa776b77bc60b8baab499c"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -166,7 +166,7 @@ else:
 
 ---
 
-## Diferencias de Versión y Características de Pre-lanzamiento
+## Diferencias de Versión y Características de v0.4.0
 
 La gestión de sesiones introduce optimizaciones para alta concurrencia en versiones recientes:
 
@@ -175,11 +175,11 @@ La gestión de sesiones introduce optimizaciones para alta concurrencia en versi
 * `SessionStore` en memoria y persistencia en disco con `SQLiteSessionStore`.
 * TTL de deduplicación de mensajes de 8 días (`DEFAULT_DEDUP_TTL_HOURS = 192`).
 
-### Mejoras de Pre-lanzamiento (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Pool Dedicado para E/S Bloqueante:** En `SQLiteSessionStore`, las operaciones de lectura y escritura se delegan a un pool privado de 4 hilos trabajadores (`_BLOCKING_IO_WORKERS = 4`) vía `_run_blocking`. Esto previene que la latencia del disco bloquee el bucle de eventos asíncrono.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`SessionDeletedError`:** Si una tarea activa intenta interactuar con una sesión eliminada mediante `store.delete(session_id)`, el framework lanza un `SessionDeletedError`.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Validación Estricta:** Pasar `max_turns <= 0` o `default_max_turns <= 0` produce un `ValueError` inmediato.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Detección Efímera en SQLite:** Detecta `:memory:` y URIs compartidas para ejecutarlas directamente en el bucle sin sobrecarga de hilos.
+### Mejoras en v0.4.0 (`v0.4.0`)
+* <VersionBadge version="0.4.0" status="stable" /> **Pool Dedicado para E/S Bloqueante:** En `SQLiteSessionStore`, las operaciones de lectura y escritura se delegan a un pool privado de 4 hilos trabajadores (`_BLOCKING_IO_WORKERS = 4`) vía `_run_blocking`. Esto previene que la latencia del disco bloquee el bucle de eventos asíncrono.
+* <VersionBadge version="0.4.0" status="stable" /> **`SessionDeletedError`:** Si una tarea activa intenta interactuar con una sesión eliminada mediante `store.delete(session_id)`, el framework lanza un `SessionDeletedError`.
+* <VersionBadge version="0.4.0" status="stable" /> **Validación Estricta:** Pasar `max_turns <= 0` o `default_max_turns <= 0` produce un `ValueError` inmediato.
+* <VersionBadge version="0.4.0" status="stable" /> **Detección Efímera en SQLite:** Detecta `:memory:` y URIs compartidas para ejecutarlas directamente en el bucle sin sobrecarga de hilos.
 
 ---
 

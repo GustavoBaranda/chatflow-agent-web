@@ -69,9 +69,9 @@ The engine returns an `EngineTurnResult` containing:
 | `tool_calls` | `list[ToolCall]` | Structured tool execution requests requested by the model. |
 | `raw_response` | `Any \| None` | Native provider response payload for debugging or token inspection. |
 
-### Tool Call ID Normalization (Prerelease)
+### Tool Call ID Normalization (v0.4.0)
 
-<VersionBadge version="0.4.0rc1" status="prerelease" /> adds deterministic replacement of incompatible historical tool call IDs. Stable v0.3.4 does not provide this cross-provider normalization guarantee:
+<VersionBadge version="0.4.0" status="stable" /> adds deterministic replacement of incompatible historical tool call IDs. Stable v0.3.4 does not provide this cross-provider normalization guarantee:
 
 ```python
 # [no-exec: illustrative tool call normalization]
@@ -117,8 +117,8 @@ flowchart TD
 5. **Model Prefix Heuristics:** Recognizes Gemini, Claude, OpenAI, Grok, and Ollama-family prefixes. Stable v0.3.4 does **not** recognize `deepseek-`; use `provider="deepseek"` or an explicit engine. A Groq Llama model also needs `provider="groq"` or an explicit Groq engine, otherwise the `llama` prefix selects local Ollama.
 6. **Ultimate Fallback:** `GeminiEngine(api_key=...)`.
 
-<Callout type="info" title="Resolution changes in v0.4.0rc1">
-<VersionBadge version="0.4.0rc1" status="prerelease" /> adds the `prefer_default_engine` option and a `deepseek-` model-prefix heuristic. These rules do not apply to stable v0.3.4.
+<Callout type="info" title="Resolution changes in v0.4.0">
+<VersionBadge version="0.4.0" status="stable" /> adds the `prefer_default_engine` option and a `deepseek-` model-prefix heuristic. These rules do not apply to stable v0.3.4.
 </Callout>
 
 ## Security Rules and Credential Isolation
@@ -149,19 +149,19 @@ local_engine = OpenAIEngine(
 )
 ```
 
-## Version Evolution: v0.3.4 vs v0.4.0rc1
+## Version Evolution: v0.3.4 vs v0.4.0
 
 Understanding architectural differences between releases helps choose the right configuration:
 
-| Architectural Area | Baseline `v0.3.4` (Stable) | Prerelease `v0.4.0rc1` |
+| Architectural Area | Baseline `v0.3.4` (Stable) | Latest Stable `v0.4.0` |
 | :--- | :--- | :--- |
 | **Gemini Engine Runtime** | Powered by the Google `google-genai` SDK (`from google import genai`). | **Zero-SDK Lock-in**: Re-engineered with native asynchronous `httpx` directly against `https://generativelanguage.googleapis.com/v1beta`. |
 | **Connection Pooling** | Separate connection handles per request. | **Runner Lifespan Client Pool**: `_ClientPool` manages shared keepalive connections across turns via `async with runner:`. |
 | **Provider Presets** | OpenAI, Grok/xAI, Ollama/Gemma, DeepSeek, and Groq. | Retains the presets and improves model-prefix resolution. |
 | **Credential Guard** | `_resolve_api_key` restricts environment keys to exact official endpoints and requires explicit credentials for custom remote URLs. | Retains fail-closed credential isolation. |
 
-<Callout type="info" title="Preview Note: Connection Pooling in v0.4.0rc1">
-In stable `v0.3.4`, turns are executed directly via `await runner.run_async(...)`. In prerelease `v0.4.0rc1`, wrap runner executions inside `async with runner:` to enable HTTP connection keepalive pooling across turns:
+<Callout type="info" title="Preview Note: Connection Pooling in v0.4.0">
+In stable `v0.3.4`, turns are executed directly via `await runner.run_async(...)`. In `v0.4.0`, wrap runner executions inside `async with runner:` to enable HTTP connection keepalive pooling across turns:
 
 ```python
 # [no-exec: requires real provider engine for turn execution]

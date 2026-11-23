@@ -2,7 +2,7 @@
 title: "Configuração e Ambiente"
 description: "Gerencie variáveis de ambiente, predefinições de provedores, timeouts e configuração de aplicações Twelve-Factor em implantações do chatflow-agent."
 sourceRevision: "0ca4592"
-sourceHash: "e306a198bf0cc51478db6a20487926f34a2b039b5a50374d3ebbe4e91768e34a"
+sourceHash: "8bad954a9c143162d4b9daccfa7d3f5e64eed2ff80823774e4d9c94b77fcb295"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -46,14 +46,14 @@ O próprio SDK lê apenas as variáveis de provedores abaixo. As variáveis de c
 | `DEEPSEEK_API_KEY` | DeepSeek | Token Bearer para a API da DeepSeek (`provider="deepseek"`). | `None` (Obrigatório para DeepSeek) |
 | `XAI_API_KEY` | xAI Grok | Token Bearer para endpoints da xAI Grok (`provider="grok"`). | `None` (Obrigatório para Grok) |
 | `GEMINI_API_KEY` | Google Gemini | Chave usada pelo cliente `google-genai` da versão estável v0.3.4. | `None` (Obrigatória para Gemini) |
-| `GOOGLE_API_KEY` | Google Gemini | Chave alternativa disponível **somente na v0.4.0rc1 prerelease**. | A v0.3.4 não a lê |
-| `GOOGLE_GEMINI_BASE_URL` | Google Gemini | URL de proxy customizada disponível **somente na v0.4.0rc1 prerelease**. | A v0.3.4 não a lê |
+| `GOOGLE_API_KEY` | Google Gemini | Chave alternativa disponível **somente na v0.4.0**. | A v0.3.4 não a lê |
+| `GOOGLE_GEMINI_BASE_URL` | Google Gemini | URL de proxy customizada disponível **somente na v0.4.0**. | A v0.3.4 não a lê |
 | `ANTHROPIC_API_KEY` | Anthropic | Chave de API para a Messages API da Claude (`x-api-key`). | `None` (Obrigatório para Anthropic) |
 | `OLLAMA_API_KEY` | Ollama | Token opcional para gateways autenticados do Ollama. | `"ollama"` (Chave dummy segura) |
 | `{PROVIDER}_BASE_URL` | Predefinições compatíveis com OpenAI | Sobrescrita da URL base lida pelo `OpenAIEngine` para o seu provedor, ex.: `OPENAI_BASE_URL`, `GROQ_BASE_URL`, `OLLAMA_BASE_URL`. Uma URL remota não oficial passa então a exigir uma `api_key` explícita. | URL oficial da predefinição |
 
 <Callout type="info" title="Gemini no Vertex AI na v0.3.4">
-Na v0.3.4, o <code>GeminiEngine</code> lê <code>GEMINI_API_KEY</code> e a repassa ao cliente <code>google-genai</code>. Qualquer outro tratamento de ambiente, incluindo a configuração do Vertex AI (por exemplo <code>GOOGLE_GENAI_USE_VERTEXAI</code>, <code>GOOGLE_CLOUD_PROJECT</code>, <code>GOOGLE_CLOUD_LOCATION</code>), é feito pelo próprio <code>google-genai</code>, não pelo chatflow-agent; consulte a documentação do <code>google-genai</code> para a versão instalada. O Vertex AI não é suportado pelo motor baseado em REST da versão <VersionBadge version="0.4.0rc1" status="prerelease" />.
+Na v0.3.4, o <code>GeminiEngine</code> lê <code>GEMINI_API_KEY</code> e a repassa ao cliente <code>google-genai</code>. Qualquer outro tratamento de ambiente, incluindo a configuração do Vertex AI (por exemplo <code>GOOGLE_GENAI_USE_VERTEXAI</code>, <code>GOOGLE_CLOUD_PROJECT</code>, <code>GOOGLE_CLOUD_LOCATION</code>), é feito pelo próprio <code>google-genai</code>, não pelo chatflow-agent; consulte a documentação do <code>google-genai</code> para a versão instalada. O Vertex AI não é suportado pelo motor baseado em REST da versão <VersionBadge version="0.4.0" status="stable" />.
 </Callout>
 
 ### Credenciais de Canais de Integração

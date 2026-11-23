@@ -2,7 +2,7 @@
 title: "Inicio Rápido"
 description: "Construye y ejecuta tu primer agente de IA conversacional con chatflow-agent en menos de 5 minutos."
 sourceRevision: "8be3a1c"
-sourceHash: "b4df701cf0161a0c9dc7726e32f5b52eec9a838ab65d7a813ddf90a9fa6076aa"
+sourceHash: "3c2c230feeaad3ecce0ba97c5caf98a0148089494f183706e0eea515bd0fda8b"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -52,7 +52,7 @@ python quickstart.py
 ```
 
 <Callout type="info" title="Protección del Bucle de Eventos">
-<code>runner.run()</code> es un método síncrono de conveniencia diseñado para scripts y utilidades CLI. Si te encuentras dentro de un bucle de eventos asíncrono activo (por ejemplo, FastAPI, Jupyter Notebook o asyncio), utiliza <code>await runner.run_async()</code> en su lugar. En v0.3.4, invocar <code>runner.run()</code> dentro de un bucle activo falla con el <code>RuntimeError</code> genérico de asyncio ("asyncio.run() cannot be called from a running event loop"); el mensaje explícito que remite a <code>run_async()</code> se añadió en <VersionBadge version="0.4.0rc1" status="prerelease" />.
+<code>runner.run()</code> es un método síncrono de conveniencia diseñado para scripts y utilidades CLI. Si te encuentras dentro de un bucle de eventos asíncrono activo (por ejemplo, FastAPI, Jupyter Notebook o asyncio), utiliza <code>await runner.run_async()</code> en su lugar. En v0.3.4, invocar <code>runner.run()</code> dentro de un bucle activo falla con el <code>RuntimeError</code> genérico de asyncio ("asyncio.run() cannot be called from a running event loop"); el mensaje explícito que remite a <code>run_async()</code> se añadió en <VersionBadge version="0.4.0" status="stable" />.
 </Callout>
 
 ---
@@ -189,8 +189,8 @@ groq_agent = Agent(
 )
 ```
 
-<Callout type="warn" title="Diferencias de Proveedores en v0.3.4 vs v0.4.0rc1">
-En <VersionBadge version="0.3.4" status="stable" />, <code>GeminiEngine</code> depende del paquete <code>google-genai</code>. En <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>GeminiEngine</code> fue rediseñado a REST HTTP puro mediante <code>httpx</code>, eliminando las dependencias externas del SDK de Google.
+<Callout type="warn" title="Diferencias de Proveedores en v0.3.4 vs v0.4.0">
+En <VersionBadge version="0.3.4" status="stable" />, <code>GeminiEngine</code> depende del paquete <code>google-genai</code>. En <VersionBadge version="0.4.0" status="stable" />, <code>GeminiEngine</code> fue rediseñado a REST HTTP puro mediante <code>httpx</code>, eliminando las dependencias externas del SDK de Google.
 </Callout>
 
 ---

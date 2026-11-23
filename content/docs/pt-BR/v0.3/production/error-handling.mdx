@@ -2,7 +2,7 @@
 title: "Tratamento de Erros e Recuperação"
 description: "Estratégias de tratamento de erros em produção no chatflow-agent v0.3.4, a hierarquia de exceções do SDK, o isolamento de erros de ferramentas e a reversão do histórico em turnos que falham."
 sourceRevision: "0ca4592"
-sourceHash: "68bb97ce7e62c732596a8f721c884f4dad7954f889cf4efed6015551261f87af"
+sourceHash: "6578acaa629712fcac38d47b4c932e4c730510cfbdce56df9c75dff04e049b68"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -23,11 +23,11 @@ Todas as exceções no `chatflow-agent` herdam de `ChatFlowError`. Isso permite 
 ChatFlowError (Base)
 ├── DependencyError (Dependências opcionais ausentes de canais)
 ├── ToolExecutionError (Erro não capturado durante a execução de ferramenta)
-├── ToolSchemaError (Anotação de união com um membro não mapeável) [v0.4.0rc1]
+├── ToolSchemaError (Anotação de união com um membro não mapeável) [v0.4.0]
 ├── AgentHandoffError (Destino de handoff desconhecido)
 ├── ProviderError (Erro de status de API de LLM, falha de rede ou timeout)
-├── ReentrantTurnError (Turno aninhado da mesma sessão iniciado por um turno ativo) [v0.4.0rc1]
-└── SessionDeletedError (Mensagem despachada para uma sessão excluída) [v0.4.0rc1]
+├── ReentrantTurnError (Turno aninhado da mesma sessão iniciado por um turno ativo) [v0.4.0]
+└── SessionDeletedError (Mensagem despachada para uma sessão excluída) [v0.4.0]
 ```
 
 ### Tabela de Referência de Exceções
@@ -37,11 +37,11 @@ ChatFlowError (Base)
 | `ChatFlowError` | `Exception` | Classe base para todas as exceções do SDK. | Tratar nos pontos de entrada das requisições. |
 | `DependencyError` | `ChatFlowError` | Um extra opcional de canal (ex.: `[telegram]`, `[whatsapp]`) não está instalado. | Instalar o extra necessário com `pip install "chatflow-agent[extra]"`. |
 | `ToolExecutionError` | `ChatFlowError` | Uma função de ferramenta lança uma exceção não tratada durante a execução. | Dentro de um turno, o `Runner` a registra nos logs e retorna ao modelo um `ToolResult(is_error=True)` genérico. |
-| `ToolSchemaError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Uma ferramenta é criada com uma anotação de união que contém um membro sem mapeamento de esquema. Parâmetros sem anotação são permitidos. | Corrigir assinaturas de tipo da função em tempo de desenvolvimento. |
+| `ToolSchemaError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | Uma ferramenta é criada com uma anotação de união que contém um membro sem mapeamento de esquema. Parâmetros sem anotação são permitidos. | Corrigir assinaturas de tipo da função em tempo de desenvolvimento. |
 | `AgentHandoffError` | `ChatFlowError` | O agente de destino do handoff não existe no registro do `Runner`. Exceder `max_handoffs_per_turn` não levanta exceção: em vez disso, adiciona um resultado de erro de ferramenta. | Verificar destinos de handoff. |
 | `ProviderError` | `ChatFlowError` | O provedor upstream do modelo retorna um código de erro HTTP (ex.: 429, 500, 503). | Implementar retentativas com backoff exponencial ou fallback para outro motor. |
-| `ReentrantTurnError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError`, `RuntimeError` | Código executando dentro de um turno inicia outro turno na mesma sessão. | Utilizar filas de processamento em segundo plano ou despachantes sequenciais. |
-| `SessionDeletedError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Uma mensagem é processada para uma sessão expurgada durante a execução. | Recriar a sessão ou orientar o usuário a reiniciar o fluxo. |
+| `ReentrantTurnError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError`, `RuntimeError` | Código executando dentro de um turno inicia outro turno na mesma sessão. | Utilizar filas de processamento em segundo plano ou despachantes sequenciais. |
+| `SessionDeletedError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | Uma mensagem é processada para uma sessão expurgada durante a execução. | Recriar a sessão ou orientar o usuário a reiniciar o fluxo. |
 
 ## Autocorreção Autônoma de Ferramentas
 
@@ -175,7 +175,7 @@ async def run_with_external_timeout(runner: Runner):
 ```
 
 <Callout type="info" title="Timeout transacional na prévia">
-<VersionBadge version="0.4.0rc1" status="prerelease" /> introduz o parâmetro explícito `turn_timeout` e restaura histórico, agente ativo e metadados quando ele expira. Essa garantia não se aplica à versão estável v0.3.4.
+<VersionBadge version="0.4.0" status="stable" /> introduz o parâmetro explícito `turn_timeout` e restaura histórico, agente ativo e metadados quando ele expira. Essa garantia não se aplica à versão estável v0.3.4.
 </Callout>
 
 ## Lista de Verificação de Melhores Práticas

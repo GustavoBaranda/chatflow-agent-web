@@ -2,7 +2,7 @@
 title: "Google Gemini y Anthropic Claude"
 description: "Google Gemini mediante google-genai y Anthropic Claude mediante Messages API en chatflow-agent v0.3.4."
 sourceRevision: "3c5ab27"
-sourceHash: "8df069a969d2f8a3e8c0e8612bca1e9514624d4583c7bd3b9417ac11c0239cb0"
+sourceHash: "309aa135e34450033786eee149a8e15e8438844d67270ef5090981707bbf4c74"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -29,8 +29,8 @@ En la versión estable v0.3.4, el motor lee las credenciales desde las siguiente
 1. `api_key` pasado directamente a `GeminiEngine(api_key="...")` o `Agent(api_key="...")`.
 2. Variable de entorno `GEMINI_API_KEY`.
 
-<Callout type="info" title="Opciones de credenciales en prerelease">
-<VersionBadge version="0.4.0rc1" status="prerelease" /> agrega el fallback `GOOGLE_API_KEY` y la opción `api_key_in_query`. Estas opciones no están disponibles en la versión estable v0.3.4.
+<Callout type="info" title="Opciones de credenciales en v0.4.0">
+<VersionBadge version="0.4.0" status="stable" /> agrega el fallback `GOOGLE_API_KEY` y la opción `api_key_in_query`. Estas opciones no están disponibles en la versión estable v0.3.4.
 </Callout>
 
 ```python
@@ -57,13 +57,13 @@ assistant = Agent(
 
 <div className="flex gap-2 my-3">
   <VersionBadge version="0.3.4" status="stable" />
-  <VersionBadge version="0.4.0rc1" status="prerelease" />
+  <VersionBadge version="0.4.0" status="stable" />
 </div>
 
 La implementación de Gemini experimentó una evolución arquitectónica entre versiones:
 
 * **En `v0.3.4` (Estable):** El motor usa el SDK oficial `google-genai` de Google (`from google import genai`), que se instala automáticamente como dependencia principal. No hay pool de conexiones.
-* **En `v0.4.0rc1` (Pre-lanzamiento):** El motor fue reescrito utilizando `httpx` asíncrono nativo contra `https://generativelanguage.googleapis.com/v1beta`. Esto elimina la dependencia de `google-genai` y, dentro de un ámbito `async with runner:`, permite que las peticiones a Gemini compartan un único cliente HTTP con pool de conexiones.
+* **En `v0.4.0` (Última Estable):** El motor fue reescrito utilizando `httpx` asíncrono nativo contra `https://generativelanguage.googleapis.com/v1beta`. Esto elimina la dependencia de `google-genai` y, dentro de un ámbito `async with runner:`, permite que las peticiones a Gemini compartan un único cliente HTTP con pool de conexiones.
 
 En v0.3.4, ejecuta los turnos directamente sobre un runner compartido:
 
@@ -88,14 +88,14 @@ async def main():
 asyncio.run(main())
 ```
 
-### Configuración de Proxies Personalizados (Prerelease)
+### Configuración de Proxies Personalizados (v0.4.0)
 
-<VersionBadge version="0.4.0rc1" status="prerelease" /> Para enrutar peticiones de Gemini mediante un proxy corporativo en la prerelease, define `GOOGLE_GEMINI_BASE_URL`. La versión estable v0.3.4 no admite esta variable:
+<VersionBadge version="0.4.0" status="stable" /> Para enrutar peticiones de Gemini mediante un proxy corporativo en v0.4.0, define `GOOGLE_GEMINI_BASE_URL`. La versión estable v0.3.4 no admite esta variable:
 
 ```bash
 export GOOGLE_GEMINI_BASE_URL="https://gemini-proxy.internal.corp"
 ```
-El motor v0.4.0rc1 añade automáticamente `/v1beta` a la URL base.
+El motor v0.4.0 añade automáticamente `/v1beta` a la URL base.
 
 ---
 
@@ -180,4 +180,4 @@ runner = Runner(starting_agent=researcher)
 En este enjambre:
 1. El **Investigador** se ejecuta sobre Gemini 2.5 Flash para ingestión y búsqueda de alto rendimiento.
 2. Una vez recopilados los datos, la sesión se transfiere al **Sintetizador** sobre Claude 3.5 Sonnet.
-3. <VersionBadge version="0.4.0rc1" status="prerelease" /> En la prerelease se normalizan los mensajes históricos y los IDs de llamadas a herramientas. La versión estable v0.3.4 no ofrece esta garantía.
+3. <VersionBadge version="0.4.0" status="stable" /> En la v0.4.0 se normalizan los mensajes históricos y los IDs de llamadas a herramientas. La versión estable v0.3.4 no ofrece esta garantía.

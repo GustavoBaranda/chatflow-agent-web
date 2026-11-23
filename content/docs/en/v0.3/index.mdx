@@ -21,13 +21,13 @@ Created and led by **Gustavo Baranda**, `chatflow-agent` focuses on a compact Py
 
 <Cards>
   <Card title="Multiple Provider Engines">
-    Uses `google-genai` for Gemini in stable v0.3.4 and dedicated HTTP clients for Anthropic and OpenAI-compatible providers. REST-only Gemini is a v0.4.0rc1 prerelease feature.
+    Uses `google-genai` for Gemini in stable v0.3.4 and dedicated HTTP clients for Anthropic and OpenAI-compatible providers. REST-only Gemini is a v0.4.0 feature.
   </Card>
   <Card title="Native Multi-Agent Handoffs">
     Declare collaborative swarms. Agents delegate tasks dynamically using synthesized `transfer_to_*` tools, with transfers per turn capped by `max_handoffs_per_turn`.
   </Card>
   <Card title="Session Memory">
-    Persists conversations with in-memory or SQLite stores. For ordinary exceptions, v0.3.4 restores conversation history length; it does not promise full-state or cancellation rollback. SQLite thread-pool offloading is a v0.4.0rc1 prerelease feature.
+    Persists conversations with in-memory or SQLite stores. For ordinary exceptions, v0.3.4 restores conversation history length; it does not promise full-state or cancellation rollback. SQLite thread-pool offloading is a v0.4.0 feature.
   </Card>
   <Card title="Multi-Channel Readiness">
     Deploy your agents seamlessly to terminal REPLs, Telegram bots, or WhatsApp Business Cloud API with HMAC SHA-256 signature verification.
@@ -41,18 +41,18 @@ Created and led by **Gustavo Baranda**, `chatflow-agent` focuses on a compact Py
 `chatflow-agent` strictly adheres to Semantic Versioning (SemVer). The documentation is version-aware:
 
 * <VersionBadge version="0.3.4" status="stable" /> **Current Stable Release (Default):** Recommended for all production deployments. Published on PyPI on October 23, 2026.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Prerelease Candidate 1:** Available on PyPI for testing upcoming architecture enhancements, including REST-native Gemini execution and swarm duplicate validation.
+* <VersionBadge version="0.4.0" status="stable" /> **v0.4.0 Candidate 1:** Available on PyPI for testing upcoming architecture enhancements, including REST-native Gemini execution and swarm duplicate validation.
 
 ```bash
 # Install stable release (default)
 pip install chatflow-agent
 
-# Install prerelease candidate
-pip install "chatflow-agent==0.4.0rc1"
+# Install v0.4.0 candidate
+pip install "chatflow-agent==0.4.0"
 ```
 
 <Callout type="info" title="Stable-First Documentation">
-All code snippets and API signatures in this documentation default to the stable <code>v0.3.4</code> release. Enhancements or breaking changes introduced in <code>v0.4.0rc1</code> are explicitly highlighted with the <VersionBadge version="0.4.0rc1" status="prerelease" /> badge.
+All code snippets and API signatures in this documentation default to the stable <code>v0.3.4</code> release. Enhancements or breaking changes introduced in <code>v0.4.0</code> are explicitly highlighted with the <VersionBadge version="0.4.0" status="stable" /> badge.
 </Callout>
 
 ---

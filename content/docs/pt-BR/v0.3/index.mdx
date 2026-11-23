@@ -2,7 +2,7 @@
 title: "Visão Geral da Documentação"
 description: "Documentação oficial estável do chatflow-agent v0.3.4: um framework leve e assíncrono para múltiplos agentes com handoffs nativos em Python."
 sourceRevision: "8be3a1c"
-sourceHash: "1b0c12671cb8775947f81d4dbced1d0723d898753da30b01ea566751bd6a7b4a"
+sourceHash: "6b2579815a19093b2474560d18b2c363f22e82928110eb2e1df32e48fb9d74ae"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -23,13 +23,13 @@ Criado e liderado por **Gustavo Baranda**, o `chatflow-agent` concentra-se em um
 
 <Cards>
   <Card title="Motores para Vários Provedores">
-    Usa `google-genai` para Gemini na versão estável v0.3.4 e clientes HTTP dedicados para Anthropic e provedores compatíveis com OpenAI. Gemini somente por REST é recurso da v0.4.0rc1 prerelease.
+    Usa `google-genai` para Gemini na versão estável v0.3.4 e clientes HTTP dedicados para Anthropic e provedores compatíveis com OpenAI. Gemini somente por REST é recurso da v0.4.0.
   </Card>
   <Card title="Handoffs Multiagente Nativos">
     Declare enxames colaborativos. Os agentes delegam tarefas dinamicamente usando ferramentas sintetizadas `transfer_to_*`, com as transferências por turno limitadas por `max_handoffs_per_turn`.
   </Card>
   <Card title="Memória de Sessão">
-    Persiste conversas em memória ou SQLite. Para exceções comuns, a v0.3.4 restaura o tamanho do histórico; não garante rollback de todo o estado nem em cancelamentos. O pool de threads para SQLite pertence à v0.4.0rc1 prerelease.
+    Persiste conversas em memória ou SQLite. Para exceções comuns, a v0.3.4 restaura o tamanho do histórico; não garante rollback de todo o estado nem em cancelamentos. O pool de threads para SQLite pertence à v0.4.0.
   </Card>
   <Card title="Pronto para Múltiplos Canais">
     Implante seus agentes facilmente em terminais REPL, bots do Telegram ou na API do WhatsApp Business Cloud com verificação de assinatura HMAC SHA-256.
@@ -43,18 +43,18 @@ Criado e liderado por **Gustavo Baranda**, o `chatflow-agent` concentra-se em um
 O `chatflow-agent` segue rigorosamente o Versionamento Semântico (SemVer). A documentação é organizada por faixas de versão:
 
 * <VersionBadge version="0.3.4" status="stable" /> **Versão Estável Atual (Padrão):** Recomendada para todas as implantações em produção. Publicada no PyPI em 23 de outubro de 2026.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Versão Candidata 1 (Pré-lançamento):** Disponível no PyPI para testes de novos aprimoramentos arquiteturais, incluindo execução nativa do Gemini via REST e validação de nomes duplicados em enxames.
+* <VersionBadge version="0.4.0" status="stable" /> **Versão Candidata 1 (v0.4.0):** Disponível no PyPI para testes de novos aprimoramentos arquiteturais, incluindo execução nativa do Gemini via REST e validação de nomes duplicados em enxames.
 
 ```bash
 # Instalar a versão estável atual (padrão)
 pip install chatflow-agent
 
-# Instalar a versão candidata de pré-lançamento
-pip install "chatflow-agent==0.4.0rc1"
+# Instalar a versão candidata da v0.4.0
+pip install "chatflow-agent==0.4.0"
 ```
 
 <Callout type="info" title="Documentação Orientada à Versão Estável">
-Todos os trechos de código e assinaturas de API nesta documentação correspondem por padrão à versão estável <code>v0.3.4</code>. Aprimoramentos ou mudanças disruptivas introduzidas na versão <code>v0.4.0rc1</code> são explicitamente destacados com a insígnia <VersionBadge version="0.4.0rc1" status="prerelease" />.
+Todos os trechos de código e assinaturas de API nesta documentação correspondem por padrão à versão estável <code>v0.3.4</code>. Aprimoramentos ou mudanças disruptivas introduzidas na versão <code>v0.4.0</code> são explicitamente destacados com a insígnia <VersionBadge version="0.4.0" status="stable" />.
 </Callout>
 
 ---

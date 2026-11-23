@@ -2,7 +2,7 @@
 title: "Herramientas y Llamadas a Funciones"
 description: "Guía arquitectónica completa sobre llamadas a funciones, esquemas de tipos de parámetros, despacho síncrono/asíncrono y aislamiento de errores en chatflow-agent."
 sourceRevision: "0ffb562"
-sourceHash: "999f5284505a0e27add8076c0860f32ac04c2d96db49ba72ed2b12477da66ddb"
+sourceHash: "c92f9e7e3676db794a389c1579b08b6b716bf7bbf210799689c1bd0cb8a873ca"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -77,7 +77,7 @@ Cuando se registra una herramienta, `chatflow-agent` inspecciona su firma median
 Los parámetros con valores predeterminados (ej. `rate: float = 0.20`) se marcan como opcionales en el esquema, mientras que aquellos sin valor predeterminado se colocan en el arreglo `required`.
 
 <Callout type="warn" title="Parámetros opcionales en v0.3.4">
-En v0.3.4 solo se reconoce <code>typing.Union</code>, por lo que <code>int | None</code> recurre a <code>"STRING"</code>. Escribe <code>Optional[int]</code> para obtener un esquema <code>"INTEGER"</code>. Las uniones PEP 604 son compatibles en <VersionBadge version="0.4.0rc1" status="prerelease" />.
+En v0.3.4 solo se reconoce <code>typing.Union</code>, por lo que <code>int | None</code> recurre a <code>"STRING"</code>. Escribe <code>Optional[int]</code> para obtener un esquema <code>"INTEGER"</code>. Las uniones PEP 604 son compatibles en <VersionBadge version="0.4.0" status="stable" />.
 </Callout>
 
 <Callout type="tip" title="Buena Práctica para Docstrings">
@@ -123,7 +123,7 @@ Invocar <code>tool.execute()</code> de manera síncrona sobre una herramienta <c
 
 ---
 
-## Diferencias de Versión y Características de Pre-lanzamiento
+## Diferencias de Versión y Características de v0.4.0
 
 La generación de esquemas y la ejecución de herramientas han evolucionado de forma significativa entre versiones:
 
@@ -132,8 +132,8 @@ La generación de esquemas y la ejecución de herramientas han evolucionado de f
 * Mapeo de tipos de un solo nivel para primitivos y colecciones sin parametrizar `list`/`dict`.
 * Funciones síncronas delegadas a hilos secundarios vía `asyncio.to_thread` durante `execute_async()`.
 
-### Mejoras de Pre-lanzamiento (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Tipado Profundo en Colecciones:** Introspecciona esquemas de elementos para `list[T]`, `Sequence[T]`, `set[T]` y tuplas homogéneas `tuple[T, ...]`:
+### Mejoras en v0.4.0 (`v0.4.0`)
+* <VersionBadge version="0.4.0" status="stable" /> **Tipado Profundo en Colecciones:** Introspecciona esquemas de elementos para `list[T]`, `Sequence[T]`, `set[T]` y tuplas homogéneas `tuple[T, ...]`:
 
 ```python
 from chatflow_agent import tool
@@ -146,13 +146,13 @@ def sum_metrics(values: list[float]) -> float:
 # Genera: {"type": "ARRAY", "items": {"type": "NUMBER"}}
 ```
 
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Soporte para Union y Optional:**
+* <VersionBadge version="0.4.0" status="stable" /> **Soporte para Union y Optional:**
   * `Optional[T]` o `T | None` genera `{ "type": "...", "nullable": True }`.
   * `int | float` se amplía de manera determinista a `"NUMBER"` sin importar el orden de declaración.
   * Uniones de múltiples tipos generan una lista de esquemas `anyOf`.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`to_openai_parameters()`:** Genera parámetros formateados en JSON Schema (nombres de tipo en minúsculas, `type: "null"` y sin la palabra clave `nullable`) para motores OpenAI y Anthropic.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`ToolSchemaError`:** Se lanza al crear la herramienta si una anotación de unión contiene un miembro sin mapeo de esquema (por ejemplo `int | datetime`). Las demás anotaciones desconocidas siguen recurriendo a `"STRING"`.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Exclusión de Argumentos Variables:** `*args` y `**kwargs` se omiten automáticamente de los esquemas de parámetros.
+* <VersionBadge version="0.4.0" status="stable" /> **`to_openai_parameters()`:** Genera parámetros formateados en JSON Schema (nombres de tipo en minúsculas, `type: "null"` y sin la palabra clave `nullable`) para motores OpenAI y Anthropic.
+* <VersionBadge version="0.4.0" status="stable" /> **`ToolSchemaError`:** Se lanza al crear la herramienta si una anotación de unión contiene un miembro sin mapeo de esquema (por ejemplo `int | datetime`). Las demás anotaciones desconocidas siguen recurriendo a `"STRING"`.
+* <VersionBadge version="0.4.0" status="stable" /> **Exclusión de Argumentos Variables:** `*args` y `**kwargs` se omiten automáticamente de los esquemas de parámetros.
 
 ---
 

@@ -57,8 +57,8 @@ agent = Agent(
 )
 ```
 
-<Callout type="info" title="Swarm Identity Validation in v0.4.0rc1">
-  In <VersionBadge version="0.4.0rc1" status="prerelease" />, the <code>Runner</code> strictly
+<Callout type="info" title="Swarm Identity Validation in v0.4.0">
+  In <VersionBadge version="0.4.0" status="stable" />, the <code>Runner</code> strictly
   validates that all agents within a swarm possess distinct <code>name</code> attributes, raising a{' '}
   <code>ValueError</code> if duplicate names are detected to prevent tool generation collisions.
 </Callout>
@@ -124,8 +124,8 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-<Callout type="info" title="turn_timeout in v0.4.0rc1">
-  In <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>Runner.run_async</code>{' '}
+<Callout type="info" title="turn_timeout in v0.4.0">
+  In <VersionBadge version="0.4.0" status="stable" />, <code>Runner.run_async</code>{' '}
   introduces an optional <code>turn_timeout: float | None = None</code> keyword parameter (e.g.{' '}
   <code>turn_timeout=30.0</code>). If a turn exceeds the deadline, it is cancelled and rolls back
   state atomically.
@@ -139,7 +139,7 @@ All model communication in `chatflow-agent` is decoupled behind the `BaseEngine`
 
 - **`OpenAIEngine`**: Supports OpenAI models and any OpenAI-compatible API (Groq, DeepSeek, xAI Grok, Ollama, vLLM) via `base_url`.
 - **`AnthropicEngine`**: Direct REST integration with Anthropic Claude models.
-- **`GeminiEngine`**: Google Gemini integration through `google-genai`. In <VersionBadge version="0.4.0rc1" status="prerelease" />, it was rewritten to call the Gemini REST API with `httpx`.
+- **`GeminiEngine`**: Google Gemini integration through `google-genai`. In <VersionBadge version="0.4.0" status="stable" />, it was rewritten to call the Gemini REST API with `httpx`.
 
 ```python
 from chatflow_agent import Agent, OpenAIEngine
@@ -202,7 +202,7 @@ Before processing a turn, stable v0.3.4 records the current history length. If a
 ### Event-Loop Protection & Concurrency Shields
 
 - **Stable v0.3.4 Session Locking:** Turns that share the same in-memory `SessionContext` are serialized by an `asyncio.Lock`; concurrent external calls wait rather than raising `ReentrantTurnError`. This is an event-loop guarantee, not thread or multi-process safety.
-- <VersionBadge version="0.4.0rc1" status="prerelease" /> **Prerelease Protections:** File-backed
+- <VersionBadge version="0.4.0" status="stable" /> **v0.4.0 Protections:** File-backed
   SQLite I/O is offloaded through `_run_blocking`, and `ReentrantTurnError` rejects a nested
   same-session turn started by code already running inside that turn. Independent external calls
   still queue.

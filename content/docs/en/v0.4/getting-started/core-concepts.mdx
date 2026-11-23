@@ -48,7 +48,7 @@ The `Runner` (`chatflow_agent.core.runner.Runner`) coordinates execution across 
 
 1. **Agent Registry Discovery:** At initialization, `Runner` performs a breadth-first traversal starting from `starting_agent` across all `.handoffs` edges, registering every reachable `Agent`. If two distinct `Agent` instances share the same `.name`, `Runner` raises `ValueError` immediately.
 2. **Per-Session Concurrency Lock:** Calls to `run_async()` for the same `session_id` acquire a dedicated `asyncio.Lock`, preventing concurrent turns from corrupting conversation history. In `v0.4.0`, if a tool or background task spawned inside a turn attempts to call `run()` or `run_async()` on the **same** `session_id`, `Runner` immediately raises `ReentrantTurnError` instead of deadlocking.
-3. **Session-Safe Reset (`reset_session_async`):** `await runner.reset_session_async(session_id)` and `runner.reset_session(session_id)` coordinate history clearing with the session turn lock, sync-work barrier, and reentrancy guard.
+3. **Session-Safe Reset (`reset_session_async`):** `await runner.reset_session_async(session_id) -> bool` and `runner.reset_session(session_id) -> bool` coordinate history clearing with the session turn lock, sync-work barrier, and reentrancy guard, returning `True` if an existing session was cleared and `False` otherwise.
 4. **Bounded Execution Loop:** Within a single turn, `Runner` enforces `max_tool_iterations` (default `10`) and `max_handoffs_per_turn` (default `5`) so runaway tool loops or circular handoffs never hang your service.
 5. **Transactional Turn Rollback:** If an engine raises `ProviderError`, a handoff fails, or a turn is cancelled or exceeds `turn_timeout`, `Runner` restores the session's message history, `active_agent`, and `metadata` to the exact pre-turn state.
 
@@ -75,7 +75,7 @@ Out of the box, `chatflow-agent` ships three production engines—all powered by
 
 A `Tool` (`chatflow_agent.core.tools.Tool`) wraps a sync or async Python function:
 
-* Inspects Python type hints (`str`, `int`, `float`, `bool`, `list[T]`, `dict[K, V]`, `Literal[...]`, `Enum`, `Optional[T]`, nested Pydantic `BaseModel`) via `pydantic.TypeAdapter` to compile a strict JSON Schema. Raises `ToolSchemaError` at definition time if a parameter type cannot be converted.
+* Inspects Python type hints (`str`, `int`, `float`, `bool`, `list[T]`, `Sequence[T]`, `set[T]`, `frozenset[T]`, `tuple[T, ...]`, `dict`, `Optional[T]` / `T | None`, unions of supported types, and `Annotated[T, ...]`) to compile function-calling schemas. Raises `ToolSchemaError` at definition time if a union annotation contains an unmappable member (e.g., `CustomClass | None`), while non-union unsupported types retain the backward-compatible `STRING` / `string` fallback.
 * Validates and coerces model-supplied arguments at runtime before calling the function (`validate_args=True` by default), raising `ToolArgumentValidationError` (a `ToolExecutionError` subclass) on invalid arguments.
 * Dispatches sync functions directly and awaits coroutine functions (`inspect.iscoroutinefunction`).
 * If a tool raises an exception at runtime, `Runner` catches it, logs a correlation `trace_id` with stack trace, and returns a sanitized `ToolResult` (`is_error=True`) to the LLM so the agent can recover gracefully without leaking internal stack traces to end users.

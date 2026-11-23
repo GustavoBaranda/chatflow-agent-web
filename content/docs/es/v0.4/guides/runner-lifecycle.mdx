@@ -2,7 +2,7 @@
 title: "Runner y Ciclo de Vida de Ejecución"
 description: "Guía detallada del bucle conversacional multi-turno, resolución de motores, flujo de ejecución de herramientas, tiempos límite y reversión transaccional en chatflow-agent."
 sourceRevision: "f8f8bac"
-sourceHash: "dde4a68ee99ac6880cffcc715c778494d976468da1acaad062de7d11c076bc2b"
+sourceHash: "e55c84f4ce7231fbbd3988540a9f37bcb28a51e9d60caeef1e97f9dd8604d588"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -123,13 +123,15 @@ Las interrupciones de red, los límites de cuota y las excepciones en herramient
 * **Garantía de Integridad:** El historial, el agente activo y los metadatos vuelven a su estado previo al turno, por lo que las llamadas huérfanas a herramientas nunca llegan a solicitudes posteriores al proveedor. Una reversión que falla se notifica como error, nunca como éxito.
 * **Límites:** Una reversión no puede deshacer los efectos secundarios externos de una herramienta (pagos, correos electrónicos, llamadas a APIs). Una herramienta síncrona que sigue ejecutándose en un hilo de trabajo tras un tiempo límite continúa ejecutándose; los turnos posteriores de la misma sesión esperan a que termine.
 
-### Parámetros de `run_async()` y `spawn_turn()`
+### Parámetros de `run_async()`, `spawn_turn()` y `reset_session_async()`
 
 | Método | Firma | Notas |
 | :--- | :--- | :--- |
-| `run_async` | `run_async(session_id, user_message, metadata=None, *, turn_timeout=None)` | `turn_timeout` solo se acepta como argumento con nombre (*keyword-only*) y debe ser un número finito positivo. Empieza a contar cuando el turno obtiene el bloqueo de la sesión. Al expirar, el turno se revierte y se lanza `TimeoutError` (`asyncio.TimeoutError`). |
-| `run` | `run(session_id, user_message, metadata=None)` | Envoltorio síncrono; lanza `RuntimeError` si se invoca desde un bucle de eventos en ejecución. |
+| `run_async` | `run_async(session_id, user_message, metadata=None, *, turn_timeout=None) -> AgentResponse` | `turn_timeout` solo se acepta como argumento con nombre (*keyword-only*) y debe ser un número finito positivo (los booleanos se rechazan con `ValueError`). Empieza a contar cuando el turno obtiene el bloqueo de la sesión. Al expirar, el turno se revierte y se lanza `TimeoutError` (`asyncio.TimeoutError`). |
+| `run` | `run(session_id, user_message, metadata=None) -> AgentResponse` | Envoltorio síncrono (**no** acepta `turn_timeout`); lanza `RuntimeError` si se invoca desde un bucle de eventos en ejecución. |
 | `spawn_turn` | `spawn_turn(session_id, user_message, metadata=None) -> asyncio.Task[AgentResponse]` | Inicia un turno como tarea independiente, por ejemplo un turno posterior encolado por una herramienta para su propia sesión. Se ejecuta después de que termine el turno actual; no lo esperes con `await` dentro de ese turno (provocaría un interbloqueo). |
+| `reset_session_async` | `reset_session_async(session_id) -> bool` | Limpia el historial bajo el bloqueo de turno de la sesión, espera trabajo síncrono pendiente, rechaza llamadas reentrantes con `ReentrantTurnError` y ejecuta escrituras SQLite vía `asyncio.to_thread()`. Devuelve `True` si existía una sesión y fue limpiada, o `False` si no existía sesión para `session_id`. |
+| `reset_session` | `reset_session(session_id) -> bool` | Envoltorio síncrono de `reset_session_async()`; devuelve `True` si limpió una sesión existente o `False` si no existía, y lanza `RuntimeError` dentro de un bucle de eventos activo. |
 
 ```python
 # [min-version: 0.4.0]
@@ -206,7 +208,7 @@ No invoques <code>runner.run()</code> dentro de un bucle de eventos activo de as
 
 ---
 
-## Diferencias de Versión y Funciones Preliminares
+## Diferencias de Versión (v0.3.4 vs v0.4.0)
 
 El motor de ejecución `Runner` incorpora mejoras críticas de concurrencia y rendimiento entre versiones:
 

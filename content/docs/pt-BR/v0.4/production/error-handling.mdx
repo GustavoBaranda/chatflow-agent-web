@@ -2,7 +2,7 @@
 title: "Tratamento de Erros e Recuperação"
 description: "Estratégias de tratamento de erros em produção no chatflow-agent v0.4.0, a hierarquia de exceções do SDK, validação de argumentos de ferramentas e reversão transacional de turnos."
 sourceRevision: "feba63b"
-sourceHash: "3c062873f25a53c704d69c6ced5c97bcb5fdd5749e0fa908fe732043dea16049"
+sourceHash: "062c67643bd449df30c56d026dc2f6ae6ab086cffda69ff2bd2f3c11896f8089"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -26,7 +26,7 @@ ChatFlowError (Base)
 ├── JsonCodecError (Non-JSON-serializable object in session metadata) [v0.4.0]
 ├── ToolExecutionError (Uncaught error during tool execution)
 │   └── ToolArgumentValidationError (Runtime Pydantic tool argument failure) [v0.4.0]
-├── ToolSchemaError (Unresolvable annotation or unsupported schema type) [v0.4.0]
+├── ToolSchemaError (Union annotation with an unmappable member) [v0.4.0]
 ├── AgentHandoffError (Unknown or unauthorized handoff target)
 ├── ProviderError (Sanitized LLM API status error, network failure, or timeout)
 ├── ReentrantTurnError (Nested same-session turn or reset from an active turn) [v0.4.0]
@@ -43,7 +43,7 @@ ChatFlowError (Base)
 | `JsonCodecError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | `metadata` da sessão contém um objeto não serializável em JSON (`datetime`, `date` e `time` são serializados automaticamente como ISO-8601). | Armazene apenas valores serializáveis em JSON em `metadata`. |
 | `ToolExecutionError` | `ChatFlowError` | Uma função de ferramenta levanta uma exceção não tratada durante a execução. | Dentro de um turno, o `Runner` a registra no log e retorna ao modelo um `ToolResult(is_error=True)` genérico. |
 | `ToolArgumentValidationError` <VersionBadge version="0.4.0" status="stable" /> | `ToolExecutionError` | Argumentos passados a uma ferramenta falham na validação do Pydantic em tempo de execução (`validate_args=True`). | Capturado pelo `Runner` durante os turnos para que o modelo se autocorrija, ou passe `validate_args=False`. |
-| `ToolSchemaError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | Uma ferramenta é criada com uma anotação futura não resolvida ou tipo sem mapeamento para JSON Schema. | Corrija as assinaturas de tipo da função em tempo de desenvolvimento. |
+| `ToolSchemaError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | Uma ferramenta é criada com uma anotação de união contendo um membro sem mapeamento concreto de schema (ex.: `CustomClass \| None` ou `int \| datetime`). Tipos não-união desconhecidos mantêm o fallback `"STRING"` / `"string"`. | Substitua membros não mapeáveis da união por primitivos ou coleções suportadas em tempo de desenvolvimento. |
 | `AgentHandoffError` | `ChatFlowError` | O destino do handoff não existe ou não está declarado nos `handoffs` do agente atual. Exceder `max_handoffs_per_turn` não lança exceção: em vez disso, adiciona um resultado de ferramenta com erro. | Verifique os alvos de transferência. |
 | `ProviderError` | `ChatFlowError` | O provedor do modelo upstream retorna um código de erro HTTP (ex.: 429, 500, 503) com credenciais redigidas. | Implemente recuo exponencial ou comutação por falha (*failover*) para um motor reserva. |
 | `ReentrantTurnError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError`, `RuntimeError` | Código iniciado por um turno em execução inicia outro turno ou reset na mesma sessão. | Use `Runner.spawn_turn()` para enfileirar um turno de acompanhamento. |

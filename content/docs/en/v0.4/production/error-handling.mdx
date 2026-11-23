@@ -24,7 +24,7 @@ ChatFlowError (Base)
 ├── JsonCodecError (Non-JSON-serializable object in session metadata or payload) [v0.4.0]
 ├── ToolExecutionError (Uncaught error during tool execution)
 │   └── ToolArgumentValidationError (Runtime Pydantic tool argument failure) [v0.4.0]
-├── ToolSchemaError (Unresolvable annotation or unsupported schema type) [v0.4.0]
+├── ToolSchemaError (Union annotation with an unmappable member) [v0.4.0]
 ├── AgentHandoffError (Unknown or unauthorized handoff target)
 ├── ProviderError (Sanitized LLM API status error, network failure, or timeout)
 ├── ReentrantTurnError (Nested same-session turn or reset from an active turn) [v0.4.0]
@@ -41,7 +41,7 @@ ChatFlowError (Base)
 | `JsonCodecError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | Session `metadata` contains an object that cannot be serialized to JSON (`datetime`, `date`, and `time` are supported automatically as ISO-8601). | Store only JSON-serializable values in `metadata`. |
 | `ToolExecutionError` | `ChatFlowError` | A tool function raises an uncaught exception during execution. | Inside a turn, `Runner` logs it with a `trace_id` and returns a sanitized `ToolResult(is_error=True)` to the model. |
 | `ToolArgumentValidationError` <VersionBadge version="0.4.0" status="stable" /> | `ToolExecutionError` | Model-supplied or caller-supplied tool arguments fail runtime Pydantic validation (`validate_args=True`). | Caught by `Runner` during turns and reported as a tool error so the LLM can self-correct; or pass `validate_args=False` to opt out. |
-| `ToolSchemaError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | A tool is created with an unresolved forward annotation or a parameter type with no JSON Schema mapping. | Fix function type signatures at development time. |
+| `ToolSchemaError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | A tool is created with a union annotation containing a member with no concrete schema mapping (e.g., `CustomClass \| None` or `int \| datetime`). Non-union unknown types retain the `"STRING"` / `"string"` fallback. | Replace unmappable union members with supported primitives or collections at development time. |
 | `AgentHandoffError` | `ChatFlowError` | The handoff target does not exist or is not declared in the current agent's `handoffs`. Exceeding `max_handoffs_per_turn` does not raise: it adds an error tool result instead. | Verify handoff targets. |
 | `ProviderError` | `ChatFlowError` | Upstream model provider returns an HTTP error code (e.g. 429, 500, 503). Secrets are redacted and raw `httpx`/`JSONDecodeError` `__cause__` chains are suppressed. | Implement exponential backoff or failover to a fallback engine. |
 | `ReentrantTurnError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError`, `RuntimeError` | Code started by a running turn starts another turn or reset for the same session. | Use `Runner.spawn_turn()` to queue a follow-up turn. |

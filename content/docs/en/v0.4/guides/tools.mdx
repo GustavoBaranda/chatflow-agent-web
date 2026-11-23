@@ -151,12 +151,13 @@ except ToolArgumentValidationError as exc:
     assert "values" in str(exc)
 ```
 
-* <VersionBadge version="0.4.0" status="stable" /> **Deep Collection, Union & Optional Typing:**
-  * Introspects item schemas for `list[T]`, `Sequence[T]`, `set[T]`, homogeneous tuples `tuple[T, ...]`, `dict[str, V]`, `Literal[...]`, `Enum`, and nested Pydantic `BaseModel` classes.
-  * `Optional[T]` or `T | None` generates `{ "type": "...", "nullable": True }` for Gemini and standard JSON Schema nullable unions for OpenAI/Anthropic.
+* <VersionBadge version="0.4.0" status="stable" /> **Collection, Union & Optional Typing:**
+  * Introspects item schemas for `list[T]`, `Sequence[T]`, `set[T]`, `frozenset[T]`, homogeneous tuples `tuple[T, ...]`, bare `tuple`, `dict`, and `typing.Annotated[T, ...]`.
+  * `Optional[T]` or `T | None` (where `T` is a supported type) generates `{ "type": "...", "nullable": True }` for Gemini and standard JSON Schema nullable unions for OpenAI/Anthropic.
   * `int | float` broadens deterministically to `"NUMBER"` regardless of declaration order.
+  * Non-union unsupported annotations (such as custom classes, `BaseModel`, `TypedDict`, `dataclass`, `Enum`, or `Literal`) retain the backward-compatible `"STRING"` / `"string"` schema fallback and `Any` runtime validation rather than deep schema introspection.
 * <VersionBadge version="0.4.0" status="stable" /> **`to_openai_parameters()`:** Public helper returning a deep copy of the JSON Schema formatted parameters (`{"type": "object", "properties": ..., "required": ...}`) for OpenAI and Anthropic engines.
-* <VersionBadge version="0.4.0" status="stable" /> **Fail-Fast `ToolSchemaError`:** Raised immediately when the tool is created if an annotation contains an unresolved forward reference or a type with no JSON Schema mapping.
+* <VersionBadge version="0.4.0" status="stable" /> **Fail-Fast `ToolSchemaError` on Unmappable Unions:** Raised immediately when the tool is created if a union annotation contains a member with no concrete schema mapping (for example `CustomClass | None`, `BaseModel | None`, or `int | datetime`). Non-union unknown annotations and unannotated parameters continue to fall back to `"STRING"` / `"string"`.
 * <VersionBadge version="0.4.0" status="stable" /> **Static `@overload` Typing & `Tool.clone()`:** `@tool` and `@agent.tool` provide `@overload` signatures returning `Tool`, and `Tool.clone(validate_args=...)` creates an isolated shallow copy when shared across agents.
 * <VersionBadge version="0.4.0" status="stable" /> **Varargs Exclusion:** `*args` and `**kwargs` are automatically omitted from parameter schemas.
 

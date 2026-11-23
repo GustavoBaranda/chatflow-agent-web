@@ -125,11 +125,11 @@ Network dropouts, rate limits, and tool exceptions can leave conversational stat
 
 | Method | Signature | Notes |
 | :--- | :--- | :--- |
-| `run_async` | `run_async(session_id, user_message, metadata=None, *, turn_timeout=None)` | `turn_timeout` is keyword-only and must be a positive finite number (booleans are rejected with `ValueError`). It starts once the turn holds the session lock. On expiry the turn is rolled back and `TimeoutError` (`asyncio.TimeoutError`) is raised. |
-| `run` | `run(session_id, user_message, metadata=None, *, turn_timeout=None)` | Synchronous wrapper; raises `RuntimeError` if called from a running event loop. |
+| `run_async` | `run_async(session_id, user_message, metadata=None, *, turn_timeout=None) -> AgentResponse` | `turn_timeout` is keyword-only and must be a positive finite number (booleans are rejected with `ValueError`). It starts once the turn holds the session lock. On expiry the turn is rolled back and `TimeoutError` (`asyncio.TimeoutError`) is raised. |
+| `run` | `run(session_id, user_message, metadata=None) -> AgentResponse` | Synchronous convenience wrapper (does **not** accept `turn_timeout`); raises `RuntimeError` if called from a running event loop. |
 | `spawn_turn` | `spawn_turn(session_id, user_message, metadata=None) -> asyncio.Task[AgentResponse]` | Starts a turn as an independent task, for example a follow-up queued by a tool for its own session. It runs after the current turn ends; do not await it inside that turn (it would deadlock). |
-| `reset_session_async` | `reset_session_async(session_id) -> None` | Clears session history under the session turn lock, waits for any escaping synchronous thread work, rejects reentrant calls with `ReentrantTurnError`, and offloads SQLite writes via `asyncio.to_thread()`. |
-| `reset_session` | `reset_session(session_id) -> None` | Synchronous wrapper around `reset_session_async()`; raises `RuntimeError` inside an active event loop. |
+| `reset_session_async` | `reset_session_async(session_id) -> bool` | Clears session history under the session turn lock, waits for any escaping synchronous thread work, rejects reentrant calls with `ReentrantTurnError`, and offloads SQLite writes via `asyncio.to_thread()`. Returns `True` if an existing session was cleared, or `False` if no session existed for `session_id`. |
+| `reset_session` | `reset_session(session_id) -> bool` | Synchronous wrapper around `reset_session_async()`; returns `True` if an existing session was cleared or `False` if none existed, and raises `RuntimeError` inside an active event loop. |
 
 ```python
 # [min-version: 0.4.0]

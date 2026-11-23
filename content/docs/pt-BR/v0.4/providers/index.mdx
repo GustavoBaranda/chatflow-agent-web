@@ -153,7 +153,7 @@ local_engine = OpenAIEngine(
 
 Compreender as diferenças arquiteturais entre as versões ajuda a escolher a configuração ideal:
 
-| Área Arquitetural | Linha Base `v0.3.4` (Estável) | Pré-lançamento `v0.4.0` |
+| Área Arquitetural | Linha Base `v0.3.4` (Estável) | Última Estável `v0.4.0` |
 | :--- | :--- | :--- |
 | **Runtime do Gemini Engine** | Baseado no SDK `google-genai` do Google (`from google import genai`). | **Zero Bloqueio de SDK**: Reformulado com `httpx` assíncrono nativo diretamente contra `https://generativelanguage.googleapis.com/v1beta`. |
 | **Pools de Conexões** | Handles de conexão separados por requisição. | **Pool de Clientes no Ciclo de Vida do Runner** para o `GeminiEngine`: dentro de `async with runner:`, as requisições Gemini compartilham um único cliente `httpx` em pool. Os motores compatíveis com OpenAI e Anthropic continuam usando um cliente por tentativa de requisição. |

@@ -62,7 +62,7 @@ assistant = Agent(
 A implementação do Gemini passou por uma reformulação arquitetural significativa entre as versões:
 
 * **Na `v0.3.4` (Estável):** O motor importava o SDK oficial `google-genai` do Google (`from google import genai`), exigindo a instalação da biblioteca de cliente externa.
-* **Na `v0.4.0` (Pré-lançamento):** O motor foi totalmente reescrito usando `httpx` assíncrono nativo contra `https://generativelanguage.googleapis.com/v1beta`. Isso elimina dependências pesadas e viabiliza o **pool de conexões** entre os turnos dos agentes:
+* **Na `v0.4.0` (Última Estável):** O motor foi totalmente reescrito usando `httpx` assíncrono nativo contra `https://generativelanguage.googleapis.com/v1beta`. Isso elimina dependências pesadas e viabiliza o **pool de conexões** entre os turnos dos agentes:
 
 ```python
 # [min-version: 0.4.0]

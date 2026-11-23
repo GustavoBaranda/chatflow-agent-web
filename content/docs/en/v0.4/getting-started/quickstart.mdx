@@ -1,191 +1,147 @@
 ---
-title: "Quickstart"
-description: "Build and run your first conversational AI agent with chatflow-agent in under 5 minutes."
+title: Quickstart
+description: Build and run your first conversational AI agent with tools and persistent session memory in under 5 minutes.
 ---
 
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { VersionBadge } from '@/components/docs/VersionBadge';
 
----
+<div className="mb-4">
+  <VersionBadge version="0.4.0" status="stable" />
+</div>
 
-## 1. Create a Basic Agent
+This guide walks you through creating a conversational agent equipped with a custom Python tool, executing multi-turn conversations through a `Runner`, and persisting session state to SQLite.
 
-In `chatflow-agent`, an **`Agent`** represents a persona with dedicated instructions and capabilities, while the **`Runner`** orchestrates conversational turns and tool evaluation loops.
+## 1. Minimal Agent in 10 Lines
 
-Create a new file named `quickstart.py`:
+When you create an `Agent` and pass it to a `Runner`, `chatflow-agent` automatically selects the right engine from the model name (`gpt-*`, `o1*`, `o3*` → `OpenAIEngine`, `claude-*` → `AnthropicEngine`, `gemini-*` → `GeminiEngine`):
 
 ```python
-# [min-version: 0.3.0]
-# [no-exec: requires real openai api key for live response]
-import os
 from chatflow_agent import Agent, Runner
 
-# 1. Define the agent persona, instructions, and target model.
-# In v0.4.0rc1 the "gpt-" model prefix selects OpenAIEngine (OPENAI_API_KEY)
-# when the Runner has no explicit engine=.
-agent = Agent(
+assistant = Agent(
     name="Assistant",
-    instructions="You are a concise and helpful AI technical assistant.",
+    instructions="You are a concise, helpful technical assistant.",
     model="gpt-4o",
 )
 
-# 2. Initialize the Runner with your starting agent
-runner = Runner(starting_agent=agent)
+runner = Runner(starting_agent=assistant)
 
-# 3. Execute a conversational turn
-response = runner.run(
-    session_id="quickstart_session",
-    user_message="Explain async Python in two concise sentences.",
-)
-
-# 4. Display the output
-print("Agent Response:")
-print(response.content)
+if __name__ == "__main__":
+    response = runner.run(
+        session_id="user-session-1",
+        user_message="Explain Python asyncio in two sentences.",
+    )
+    print(f"[{response.active_agent_name}]: {response.content}")
 ```
 
-Run the script from your terminal:
+## 2. Adding Custom Tools (`@tool`)
 
-```bash
-python quickstart.py
-```
-
-<Callout type="info" title="Event Loop Guard">
-<code>runner.run()</code> is a synchronous convenience method designed for scripts and CLI utilities. If you are inside an existing asynchronous event loop (e.g. FastAPI, Jupyter Notebook, or asyncio), use <code>await runner.run_async()</code> instead. Calling <code>runner.run()</code> inside an active loop raises a clear <code>RuntimeError</code>.
-</Callout>
-
----
-
-## 2. Adding Tools with `@tool`
-
-Agents become exponentially more powerful when given access to deterministic functions. Use the `@tool` decorator to turn any Python function into an introspectable tool:
+Agents become far more useful when they can invoke deterministic Python functions. Decorate any sync or async function with `@tool`—`chatflow-agent` inspects its type annotations and docstring to build an OpenAI-compatible JSON Schema automatically and validates model-supplied arguments at runtime with Pydantic (`validate_args=True` by default):
 
 ```python
-# [min-version: 0.3.0]
-# [no-exec: requires real openai api key for live response]
-import os
+# [executable]
 from chatflow_agent import Agent, Runner, tool
 
-# 1. Define a tool. Parameter schemas come from the type annotations and
-# defaults; description= is the tool description (it overrides the docstring).
-@tool(name="calculate_discount", description="Calculate discounted price from original amount and percentage.")
+@tool(name="calculate_discount", description="Calculate final price and savings after a percentage discount.")
 def calculate_discount(price: float, discount_percent: float) -> str:
-    """Calculate the final price after applying a percentage discount."""
     savings = price * (discount_percent / 100.0)
     final_price = price - savings
-    return f"Original: ${price:.2f}, Savings: ${savings:.2f}, Final Price: ${final_price:.2f}"
+    return f"Final price: ${final_price:.2f} (You save ${savings:.2f})"
 
-# 2. Attach the tool to the Agent
-agent = Agent(
-    name="SalesBot",
-    instructions="You help customers with purchase calculations. Always use calculate_discount for math.",
+sales_agent = Agent(
+    name="SalesAssistant",
+    instructions=(
+        "You help customers with pricing questions. "
+        "Always use the calculate_discount tool for math calculations."
+    ),
     model="gpt-4o",
     tools=[calculate_discount],
 )
 
-runner = Runner(starting_agent=agent)
+runner = Runner(starting_agent=sales_agent)
 
-# 3. Ask a question requiring tool execution
-response = runner.run(
-    session_id="sales_session_1",
-    user_message="What is the final price for a jacket priced at $120 with a 25% discount?",
-)
-print(response.content)
+if __name__ == "__main__" and False:  # Set API key to execute live turn
+    result = runner.run(
+        session_id="cart-session-42",
+        user_message="How much is a $240 jacket with a 15% discount?",
+    )
+    print("Content:", result.content)
+    print("Tools executed:", result.tool_calls_executed)
 ```
 
-### Inspecting Tool Execution
+<Callout type="info" title="Inspecting Executed Tools">
+Every `AgentResponse` returned by `runner.run()` or `await runner.run_async()` includes `response.tool_calls_executed` (a `list[str]` of tool names invoked during the turn), `response.active_agent_name`, and `response.handoff` (an `AgentHandoff` record if control transferred to another agent).
+</Callout>
 
-The returned `AgentResponse` object retains full transparency into the conversational turn:
+## 3. Asynchronous Execution & Persistent SQLite Memory
 
-```python
-# Inspect executed tool names
-for tool_name in response.tool_calls_executed:
-    print(f"Tool executed: {tool_name}")
-```
-
----
-
-## 3. Asynchronous Execution with `Runner.run_async`
-
-For high-concurrency web services, chatbots, and event loops, use the native asynchronous API:
+For web servers (FastAPI), Telegram bots, or WhatsApp webhooks, use `await runner.run_async()` combined with `SQLiteSessionStore`. In `v0.4.0`, `Runner` supports the `async with runner:` context manager (which automatically closes the runner's pooled Gemini HTTP client on exit) and `turn_timeout`:
 
 ```python
+# [min-version: 0.4.0]
 import asyncio
-import os
-from chatflow_agent import Agent, Runner
+from chatflow_agent import Agent, Runner, SQLiteSessionStore
 
 async def main() -> None:
-    agent = Agent(
-        name="AsyncBot",
-        instructions="Provide concise answers.",
-        model="gpt-4o",
+    # Persist conversation history and metadata in SQLite (or ":memory:")
+    store = SQLiteSessionStore(
+        db_path=":memory:",
+        default_max_turns=40,
     )
 
-    runner = Runner(starting_agent=agent)
-
-    # Asynchronous turn
-    response = await runner.run_async(
-        session_id="async_session_1",
-        user_message="List three key advantages of asynchronous Python.",
+    tutor = Agent(
+        name="PythonTutor",
+        instructions="You are a friendly Python tutor. Remember the student's name and goals.",
+        model="gemini-2.5-flash",
     )
 
-    print(response.content)
+    runner = Runner(
+        starting_agent=tutor,
+        session_store=store,
+    )
+
+    async with runner:
+        # Turn 1: Introduce context
+        r1 = await runner.run_async(
+            session_id="student-ada",
+            user_message="Hi! My name is Ada and I am learning async generators.",
+            turn_timeout=30.0,
+        )
+        print("Turn 1:", r1.content)
+
+        # Turn 2: Context is automatically recalled from SQLiteSessionStore
+        r2 = await runner.run_async(
+            session_id="student-ada",
+            user_message="What was my name and what topic am I studying?",
+            turn_timeout=30.0,
+        )
+        print("Turn 2:", r2.content)
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
----
+## 4. Testing Interactively in the Terminal (`CLIChannel`)
 
-## 4. Multi-Provider Flexibility
-
-Because `chatflow-agent` uses direct REST engines, switching between providers is instantaneous without changing your agent logic:
+You can test any `Runner` interactively from your terminal without writing a loop by attaching `CLIChannel`:
 
 ```python
-import os
-from chatflow_agent import Agent, OpenAIEngine
+from chatflow_agent import Agent, CLIChannel, Runner
 
-# Option 1: Direct model configuration. In v0.4.0rc1 the model prefix
-# (gpt-, claude-, gemini-, ...) selects the engine when no provider or engine is set.
-openai_agent = Agent(
-    name="OpenAIBot",
-    instructions="You are powered by GPT-4o.",
-    model="gpt-4o",
-)
-
-claude_agent = Agent(
-    name="ClaudeBot",
-    instructions="You are powered by Claude 3.5 Sonnet.",
-    model="claude-3-5-sonnet-20241022",
-)
-
-gemini_agent = Agent(
-    name="GeminiBot",
-    instructions="You are powered by Google Gemini.",
+agent = Agent(
+    name="LocalHelper",
+    instructions="You are a helpful CLI assistant.",
     model="gemini-2.5-flash",
 )
 
-# Option 2: Custom endpoints via OpenAIEngine (Groq, Ollama, DeepSeek)
-groq_engine = OpenAIEngine(
-    base_url="https://api.groq.com/openai/v1",
-    api_key=os.getenv("GROQ_API_KEY"),
-    provider="groq",
-)
+runner = Runner(starting_agent=agent)
+cli = CLIChannel(session_id="local-dev-session")
+cli.attach(runner)
 
-groq_agent = Agent(
-    name="GroqBot",
-    instructions="You are powered by LLaMA 3.3 on Groq.",
-    model="llama-3.3-70b-versatile",
-    engine=groq_engine,
-)
+if __name__ == "__main__":
+    # Type messages in the console; type '/reset' to clear history or 'exit' to quit
+    cli.run(prompt_prefix="You")
 ```
-
-<Callout type="warn" title="Provider Differences in v0.3.4 vs v0.4.0rc1">
-In <VersionBadge version="0.3.4" status="stable" />, <code>GeminiEngine</code> relies on the <code>google-genai</code> package. In <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>GeminiEngine</code> was refactored to pure HTTP REST via <code>httpx</code>, eliminating external Google SDK dependencies.
-</Callout>
-
----
-
-## Next Steps
-
-Now that you have executed your first agents, dive into the foundational concepts:
-
-* [Core Concepts](/en/docs/v0.4/getting-started/core-concepts): Learn about State Management, Memory, Handoffs, and Concurrency.

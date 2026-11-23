@@ -126,7 +126,7 @@ When `runner.run_async()` processes a turn:
 ```
 
 1. **Tool Invocation:** The LLM emits a tool call for `transfer_to_billingspecialist`.
-2. **Authorization Check:** In v0.4.0rc1 the target must be declared in the **current agent's** `handoffs`; being registered in the `Runner` is not enough. Otherwise `AgentHandoffError` is raised (`"Agent 'X' is not authorized to hand off to 'Y'."`). Peers added with `add_handoff()` after the `Runner` was created are registered automatically when they are first used.
+2. **Authorization Check:** In v0.4.0 the target must be declared in the **current agent's** `handoffs`; being registered in the `Runner` is not enough. Otherwise `AgentHandoffError` is raised (`"Agent 'X' is not authorized to hand off to 'Y'."`). Peers added with `add_handoff()` after the `Runner` was created are registered automatically when they are first used.
 3. **Active Agent Swap:** The `Runner` updates `session.set_active_agent(target_agent)`.
 4. **Handoff Result Injection:** A `ToolResult` containing `status: "HANDOFF_SUCCESS"` and the transfer reason is appended to the session history.
 5. **Immediate Turn Continuation:** Within the same `runner.run()` call, the new active agent is prompted with the updated conversation history to formulate its response.
@@ -138,7 +138,7 @@ When `runner.run_async()` processes a turn:
 Uncontrolled handoffs between agents could trigger infinite loops if prompts are ambiguous. `chatflow-agent` protects your execution with built-in safeguards:
 
 * **`max_handoffs_per_turn` (Default: 5):**
-  The maximum number of agent transfers permitted within a single user message turn. In v0.4.0rc1 the limit is checked before switching agents: the transfer that would exceed it is not applied, its call receives the error result `"Maximum agent transfers exceeded for a single turn."`, and each remaining call of that model message receives a "Tool skipped" result.
+  The maximum number of agent transfers permitted within a single user message turn. In v0.4.0 the limit is checked before switching agents: the transfer that would exceed it is not applied, its call receives the error result `"Maximum agent transfers exceeded for a single turn."`, and each remaining call of that model message receives a "Tool skipped" result.
 * **`max_tool_iterations` (Default: 10):**
   The maximum number of model/tool rounds per turn. One round is a model generation plus every tool call it requested, so a round can run several tools. When the limit is reached, the turn ends with an "Execution iteration limit reached" fallback response.
 
@@ -157,21 +157,22 @@ runner = Runner(
 
 ---
 
-## Version Differences & Prerelease Features
+## Version Evolution (`v0.3.4` → `v0.4.0`)
 
-Handoff generation and sanitization include major reliability enhancements in newer versions:
+Handoff generation and sanitization include major reliability enhancements in `v0.4.0`:
 
-### Stable Release (`v0.3.4`)
+### Previous Stable Baseline (`v0.3.4`)
 * <VersionBadge version="0.3.4" status="stable" /> Basic regex sanitization: `clean = re.sub(r"[^a-zA-Z0-9_]", "_", name.strip().lower())`.
 * Shared session history maintains full conversational context across handoffs.
 
-### Prerelease Enhancements (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **NFKD Unicode Transliteration:** Automatically normalizes accented characters into clean ASCII (e.g., `AtenciónAlCliente` becomes `transfer_to_atencionalcliente`).
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Deterministic Hash Fallbacks:** Agent names in non-Latin scripts (e.g., Japanese, Arabic, Cyrillic) or emojis fall back to a deterministic SHA-256 hash prefix (`transfer_to_u<hash>`) to guarantee valid identifier syntax.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Disambiguation on Collisions:** If two agents produce conflicting sanitized names, numeric suffixes (`_2`, `_3`) are automatically appended to prevent schema overwrites.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Length Capping:** Handoff tool identifiers are capped at 60 characters to satisfy provider constraints.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Context Updates Forwarding:** `session.set_active_agent(agent, context_updates)` stores `Handoff.context_updates` in the session metadata when the handoff happens. The built-in `transfer_to_*` tools never fill `context_updates`; only a custom tool that returns its own `Handoff` can.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Unique Agent Names (breaking change):** Building a `Runner` whose handoff graph contains two distinct `Agent` instances with the same `name` raises `ValueError` (`"Duplicate agent name 'Billing': distinct Agent instances cannot share a name in one Runner tree."`). The same check applies to peers added later with `add_handoff()`. In v0.3.4 the second instance was silently ignored. Empty or whitespace-only names raise `ValueError` when the `Agent` is created.
+### Latest Stable Enhancements (`v0.4.0`)
+* <VersionBadge version="0.4.0" status="stable" /> **NFKD Unicode Transliteration:** Automatically normalizes accented characters into clean ASCII (e.g., `AtenciónAlCliente` becomes `transfer_to_atencionalcliente`).
+* <VersionBadge version="0.4.0" status="stable" /> **Deterministic Hash Fallbacks:** Agent names in non-Latin scripts (e.g., Japanese, Arabic, Cyrillic) or emojis fall back to a deterministic SHA-256 hash prefix (`transfer_to_u<hash>`) to guarantee valid identifier syntax.
+* <VersionBadge version="0.4.0" status="stable" /> **Disambiguation on Collisions:** If two agents produce conflicting sanitized names, numeric suffixes (`_2`, `_3`) are automatically appended to prevent schema overwrites.
+* <VersionBadge version="0.4.0" status="stable" /> **Length Capping:** Handoff tool identifiers are capped at 60 characters to satisfy provider constraints.
+* <VersionBadge version="0.4.0" status="stable" /> **Context Updates Forwarding:** `session.set_active_agent(agent, context_updates)` stores a deep copy of `Handoff.context_updates` in the session metadata when the handoff happens. The built-in `transfer_to_*` tools never fill `context_updates`; only a custom tool that returns its own `Handoff` can.
+* <VersionBadge version="0.4.0" status="stable" /> **Collision-Resistant Cross-Provider Tool-Call IDs:** When an agent hands off across providers that omit tool call IDs, `OpenAIEngine` (`call_<24 hex>`) and `GeminiEngine` (`cf_gemini_<24 hex>`) generate unique stateless synthetic IDs so multi-turn handoffs never collide in shared history.
+* <VersionBadge version="0.4.0" status="stable" /> **Unique Agent Names:** Building a `Runner` whose handoff graph contains two distinct `Agent` instances with the same `name` raises `ValueError` (`"Duplicate agent name 'Billing': distinct Agent instances cannot share a name in one Runner tree."`). The same check applies to peers added later with `add_handoff()`. In v0.3.4 the second instance was silently ignored. Empty or whitespace-only names raise `ValueError` when the `Agent` is created.
 
 ---
 
@@ -242,7 +243,7 @@ print("Handoff:", response.handoff)
 ## Common Pitfalls & Best Practices
 
 ### 1. Handoff Targets Must Be Declared on the Current Agent
-The `Runner` automatically indexes all agents reachable via the `starting_agent` handoff tree. In v0.4.0rc1, registering an agent with `runner.register_agent(...)` does **not** make it a handoff target: an agent can only hand off to peers in its own `handoffs`. To add a target dynamically, declare it on the agent that will transfer to it; the `Runner` registers it on first use:
+The `Runner` automatically indexes all agents reachable via the `starting_agent` handoff tree. In v0.4.0, registering an agent with `runner.register_agent(...)` does **not** make it a handoff target: an agent can only hand off to peers in its own `handoffs`. To add a target dynamically, declare it on the agent that will transfer to it; the `Runner` registers it on first use:
 ```python
 # Make specialist_agent reachable from triage_agent at runtime:
 triage_agent.add_handoff(specialist_agent)

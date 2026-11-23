@@ -11,7 +11,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 Operating multi-agent swarms in production requires comprehensive visibility. When an agent hands off a conversation, invokes external APIs, or triggers fallbacks, operators need structured logs and correlation IDs to diagnose latency, investigate anomalies, and audit decisions.
 
-`chatflow-agent` v0.4.0rc1 uses Python standard-library loggers for the runner, tools, session stores, provider engines, and channel integrations. Applications can attach their own structured formatter.
+`chatflow-agent` v0.4.0 uses Python standard-library loggers for the runner, tools, session stores, provider engines, and channel integrations. Applications can attach their own structured formatter.
 
 ## Logger Hierarchy
 
@@ -145,6 +145,6 @@ if session:
 ```
 
 <Callout type="warn" title="Sensitive Data in Logs">
-<code>chatflow-agent</code> does not install any log filter. Its engines do not log request headers, <code>GeminiEngine</code> removes its API key from error messages and logs, and <code>WhatsAppChannel</code> masks phone numbers in its own messages. Other content can still reach your logs: exception messages from tools, provider error bodies included in <code>ProviderError</code> (bounded in size), and Meta error responses. Logging alone does not make a deployment compliant with SOC 2, GDPR, or similar frameworks; add redaction filters and retention policies that match your requirements.
+<code>chatflow-agent</code> does not install a global log filter, but in <code>v0.4.0</code> all provider engines (<code>OpenAIEngine</code>, <code>AnthropicEngine</code>, <code>GeminiEngine</code>) and <code>WhatsAppChannel</code> outbound requests share an automatic secret-redaction pipeline (covering plain, JSON-escaped, and percent-encoded credentials), never log request headers, and mask phone numbers in <code>WhatsAppChannel</code> logs and webhook JSON responses. Other content can still reach your logs, such as exception messages raised inside custom tools. Logging alone does not make a deployment compliant with SOC 2, GDPR, or similar frameworks; add redaction filters and retention policies that match your requirements.
 </Callout>
 

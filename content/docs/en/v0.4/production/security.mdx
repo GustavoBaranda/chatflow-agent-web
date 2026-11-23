@@ -25,13 +25,13 @@ Untrusted Input (Webhooks / Chat Channels)
 2. Session Concurrency & Reentrancy Guards (Session Lock / ReentrantTurnError)
           │
           ▼
-3. Agent Boundaries (Per-Agent Tool Scoping / Iteration and Handoff Limits)
+3. Agent Boundaries (Per-Agent Tool Scoping / Runtime Pydantic Validation / Iteration Limits)
           │
           ▼
-4. Credential Isolation & Egress Guards (ValueError on Custom Host / No API Key Leak)
+4. Credential Isolation & Egress Guards (ConfigurationError on Custom Host / Shared Redaction)
 ```
 
-The SDK does not sandbox tools: they run in the application process with its full privileges, and in v0.4.0rc1 model-supplied tool arguments are passed to the function without runtime validation. Inbound authentication for custom channels, such as Bearer tokens, is implemented by your application.
+The SDK does not sandbox tools: they run in the application process with its full privileges, though in `v0.4.0` model-supplied tool arguments are validated against Python type hints with Pydantic before calling the function (`validate_args=True` by default). Inbound authentication for custom channels, such as Bearer tokens, is implemented by your application.
 
 ## Credential Protection & Egress Guards
 
@@ -59,8 +59,8 @@ local_engine = OpenAIEngine(
 )
 ```
 
-<Callout type="warn" title="Automatic ValueError Protection">
-If you supply a custom remote `base_url` without providing an explicit `api_key`, `OpenAIEngine` refuses to reuse `OPENAI_API_KEY` (or any other provider key) from the environment and raises `ValueError`. This prevents accidental credential exfiltration to untrusted proxies. Loopback hosts (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`) are exempt and get a placeholder key instead. In v0.4.0rc1, `GeminiEngine` also never follows HTTP redirects and removes the API key from its error messages.
+<Callout type="warn" title="Automatic ConfigurationError Protection">
+If you supply a custom remote `base_url` without providing an explicit `api_key`, `OpenAIEngine` and `AnthropicEngine` refuse to reuse `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` from the environment and raise `ConfigurationError` (a `ValueError` subclass). This prevents accidental credential exfiltration to untrusted proxies. Loopback hosts (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`) are exempt and get a placeholder key instead. In `v0.4.0`, `GeminiEngine` and `WhatsAppChannel` also never follow HTTP redirects (`follow_redirects=False`), and all engines redact secrets (plain, JSON-escaped, and percent-encoded) from error messages and logs.
 </Callout>
 
 ## Channel Security Protocols
@@ -89,13 +89,13 @@ With `verify_signature=True` (the default), constructing the channel without an 
 
 ### Automatic Phone Number Masking
 
-Customer phone numbers received through WhatsApp are Personally Identifiable Information (PII). `WhatsAppChannel` masks values in its own log messages by retaining the first four and last three input characters; for example, the Meta sender `14155552671` becomes `1415***671`. The raw number still appears in the webhook's JSON response (`"sender"`), in the session ID and metadata stored by the session store, in the argument passed to `on_24h_window_expired`, and in Meta error responses that are logged as received. Applications and external tools must apply their own redaction policies.
+Customer phone numbers received through WhatsApp are Personally Identifiable Information (PII). In `v0.4.0`, `WhatsAppChannel` masks values both in its own log messages and in the webhook's JSON HTTP response (`"sender"`) by retaining the first four and last three input characters; for example, the Meta sender `14155552671` becomes `1415***671`. The raw number is still used as the session ID and metadata stored by the session store and passed to `on_24h_window_expired`. Applications and external tools must apply their own redaction policies to persisted session data.
 
 ### Telegram Group Chat Administration
 
 In group chats, multiple users interact with the same bot. Allowing any arbitrary member to execute `/reset` could disrupt ongoing workflows for other participants.
 
-`TelegramChannel` enforces authorization checks on `/reset`: it queries `get_chat_member` and permits the reset only if the sender has `creator` or `administrator` status in the group chat.
+`TelegramChannel` enforces authorization checks on `/reset`: it queries `get_chat_member` and permits the reset only if the sender has `creator` or `administrator` status in the group chat, then delegates to `await runner.reset_session_async(session_id)` under the session turn lock.
 
 ## Prompt Injection & Tool Boundaries
 
@@ -104,7 +104,7 @@ Prompt injection occurs when untrusted user input tricks the LLM into overriding
 To mitigate prompt injection risks:
 
 1. **Principle of Least Privilege:** Grant each specialized agent only the tools it strictly needs. A `BillingAgent` should not have access to database deletion or server restart tools.
-2. **Validate Arguments Inside Each Tool:** v0.4.0rc1 does not validate or coerce model-supplied arguments at runtime; type hints only shape the schema the model sees. Check every input inside the tool before acting on it:
+2. **Combine Runtime Type Validation with Domain Checks:** In `v0.4.0`, `@tool` validates and coerces argument types at runtime via Pydantic (`validate_args=True` by default, raising `ToolArgumentValidationError` on invalid types). Always pair type annotations with domain-specific business validation inside the tool before acting on sensitive inputs:
 
 ```python
 from chatflow_agent import tool
@@ -112,8 +112,8 @@ from chatflow_agent import tool
 @tool
 def update_email(user_id: int, new_email: str) -> str:
     """Update a user's verified email address."""
-    if not isinstance(user_id, int):
-        raise ValueError("user_id must be an integer.")
+    if user_id <= 0:
+        raise ValueError("user_id must be a positive integer.")
     if "@" not in new_email or "." not in new_email:
         raise ValueError("Invalid email format.")
     # Execute update
@@ -124,14 +124,14 @@ def update_email(user_id: int, new_email: str) -> str:
 
 ## Reentrancy and Concurrency Security
 
-<VersionBadge version="0.4.0rc1" status="prerelease" />
+<VersionBadge version="0.4.0" status="stable" />
 
-Starting in `v0.4.0rc1`, `Runner` protects sessions against reentrant turns:
-- If code started by a running turn (a tool, or a task or thread it starts: `create_task`, `gather`, `wait_for`, `TaskGroup`, `asyncio.to_thread`) calls `runner.run_async` or `runner.run` for the same session, `Runner` raises `ReentrantTurnError` immediately instead of deadlocking. Use `Runner.spawn_turn()` to queue a follow-up turn.
-- Independent requests for the same session are serialized by the session lock (per store instance, session ID, and event loop).
+In `v0.4.0`, `Runner` protects sessions against reentrant turns and concurrent reset races:
+- If code started by a running turn (a tool, or a task or thread it starts: `create_task`, `gather`, `wait_for`, `TaskGroup`, `asyncio.to_thread`) calls `runner.run_async`, `runner.run`, `runner.reset_session_async`, or `runner.reset_session` for the same session, `Runner` raises `ReentrantTurnError` immediately instead of deadlocking. Use `Runner.spawn_turn()` to queue a follow-up turn.
+- Independent requests for the same session—including `Runner.reset_session_async(session_id)` (`TelegramChannel` `/reset` and `CLIChannel` `/reset`)—are serialized by the session lock (per store instance, session ID, and event loop).
 
-Known limitations in v0.4.0rc1:
-- Serialization is not provided across store instances on the same file, across processes, or across threads running their own event loops.
-- A tool that waits for work done by a task that was not started from the turn can still deadlock if that work runs a turn of the same session; awaiting a `spawn_turn()` task inside the turn that spawned it deadlocks as well.
-- `clear_history()` and `delete()` (and therefore Telegram's `/reset`) are not coordinated with running turns beyond the rollback and `SessionDeletedError` guarantees.
+Architectural boundaries in `v0.4.0`:
+- Serialization is scoped to a single store instance and event loop; multi-process or distributed deployments require external coordination.
+- A tool that waits for work done by an external task that was not started from the turn can still deadlock if that work runs a turn of the same session; awaiting a `spawn_turn()` task inside the turn that spawned it deadlocks as well.
+- Direct calls to `store.clear_history()` or `store.delete()` bypass `Runner.reset_session_async()` and are only guarded by turn rollback and `SessionDeletedError`. Always prefer `await runner.reset_session_async(session_id)` to clear a session while turns may be active.
 

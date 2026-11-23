@@ -1,0 +1,273 @@
+---
+title: Migrating from 0.3.4 to 0.4.0
+description: Step-by-step migration guide for upgrading chatflow-agent from v0.3.4 to v0.4.0, covering all breaking changes, before/after examples, and verification checks.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+<div className="mb-4 flex flex-wrap items-center gap-2">
+  <VersionBadge version="0.4.0" status="stable" />
+  <span className="text-xs text-slate-500 dark:text-slate-400">Upgrade Path: v0.3.4 → v0.4.0</span>
+</div>
+
+This guide covers everything required to upgrade an existing **`chatflow-agent` `0.3.4`** application to **`0.4.0`**. Most applications using the high-level `Agent`, `Runner`, `@tool`, and `SQLiteSessionStore` APIs require zero or minimal code changes, while gaining runtime tool-argument validation, full transactional turn rollbacks, and direct `httpx` Gemini transport automatically.
+
+## 1. Prerequisites & Upgrade Command
+
+* **Python:** `>= 3.10` (`3.10`, `3.11`, `3.12`, or `3.13`)
+* **Core Dependencies:** `pydantic>=2.6.0` and `httpx>=0.27.0,<1.0` (automatically upgraded by `pip` or `uv`; `google-genai` is no longer required).
+
+<Tabs items={['pip', 'uv', 'With Extras']}>
+  <Tab value="pip">
+```bash
+pip install --upgrade "chatflow-agent==0.4.0"
+```
+  </Tab>
+  <Tab value="uv">
+```bash
+uv add "chatflow-agent==0.4.0"
+```
+  </Tab>
+  <Tab value="With Extras">
+```bash
+pip install --upgrade "chatflow-agent[all]==0.4.0"
+```
+  </Tab>
+</Tabs>
+
+---
+
+## 2. Quick Compatibility Matrix (`0.3.4` vs `0.4.0`)
+
+| Area | `0.3.4` Behavior | `0.4.0` Behavior | Action Required? |
+| :--- | :--- | :--- | :--- |
+| **`GeminiEngine` transport** | Required `google-genai`; exposed `self.client` (`genai.Client`) | Uses `httpx.AsyncClient` directly (`self._client`) | **Breaking Change #1:** Only if your code accessed `gemini_engine.client` or monkey-patched `google.genai`. |
+| **`@tool` schema generation** | Unsupported type hints fell back to `{}` or failed late | Raises `ToolSchemaError` at tool creation time | **Breaking Change #2:** Fix unresolved forward references or replace arbitrary custom classes with `pydantic.BaseModel`. |
+| **`@tool` runtime execution** | Passed raw LLM arguments without type checking | Validates and coerces arguments via Pydantic (`validate_args=True` by default), raising `ToolArgumentValidationError` | **Breaking Change #3:** Only if a tool intentionally accepts values that violate its own type hints (fix the annotation or pass `validate_args=False`). |
+| **`WhatsAppChannel` constructor** | Accepted unused `dedup_ttl_hours` parameter | `dedup_ttl_hours` removed; `max_body_size`, `enable_docs`, `queue_timeout_seconds` are keyword-only | **Breaking Change #4:** Move `dedup_ttl_hours` to `SessionStore` or `SQLiteSessionStore`. |
+| **Provider / URL validation** | Raised `ValueError` on missing custom `base_url` key; silently ignored unknown `Agent(provider=...)` | Raises `ConfigurationError` (a `ValueError` subclass) on unknown provider or invalid `base_url` | Existing `except ValueError:` blocks continue to work; verify `provider` names (`openai`, `gemini`, `anthropic`, `deepseek`, `groq`, `grok`, `ollama`). |
+| **Session `metadata` serialization** | Non-JSON values were coerced with `str()` | `datetime`/`date`/`time` serialize as ISO-8601; arbitrary non-JSON objects raise `JsonCodecError` | Store only JSON-compatible types (or `datetime`/`date`/`time`) in `metadata`. |
+| **Reentrant same-session turns** | Deadlocked waiting on the per-session `asyncio.Lock` | Immediately raises `ReentrantTurnError` | Use `runner.spawn_turn()` if a tool must schedule a follow-up turn for the same session. |
+
+---
+
+## 3. Detailed Breaking Changes & Before / After Examples
+
+### Breaking Change 1: `GeminiEngine` Uses `httpx` Instead of `google-genai`
+
+`GeminiEngine` now calls the Gemini REST API (`https://generativelanguage.googleapis.com/v1beta`) directly over `httpx.AsyncClient`. The `google-genai` package has been removed from `chatflow-agent`'s dependencies, and `GeminiEngine` no longer exposes a `self.client` (`google.genai.Client`) attribute.
+
+**Before (`0.3.4`):**
+```python
+from chatflow_agent import GeminiEngine
+
+engine = GeminiEngine(api_key="AIza...")
+# Accessing engine.client (google.genai.Client) worked in 0.3.4
+# but is removed in 0.4.0.
+```
+
+**After (`0.4.0`):**
+```python
+# [min-version: 0.4.0]
+# [executable]
+import asyncio
+from chatflow_agent import Agent, GeminiEngine, Runner
+
+async def main() -> None:
+    # Configure HTTP timeouts and retry backoff directly on GeminiEngine
+    engine = GeminiEngine(
+        api_key="AIza-mock-key",
+        timeout_seconds=60.0,
+        max_retries=3,
+        base_delay=1.0,
+        max_delay=10.0,
+    )
+    agent = Agent(name="GeminiBot", instructions="Be concise.", engine=engine)
+    async with Runner(starting_agent=agent) as runner:
+        assert runner.starting_agent.name == "GeminiBot"
+
+asyncio.run(main())
+```
+
+<Callout type="tip" title="Uninstalling Unused google-genai">
+If no other package in your environment imports `google-genai`, you can remove it from your image or lockfile (`pip uninstall google-genai`) to reduce container size.
+</Callout>
+
+---
+
+### Breaking Change 2: `@tool` Raises `ToolSchemaError` for Unsupported Annotations
+
+In `0.3.4`, if a `@tool` function had an unresolvable string annotation (e.g., `"UndefinedModel"`) or an arbitrary Python class that Pydantic could not represent in JSON Schema, schema creation could silently fall back to an empty parameter schema `{}`. In `0.4.0`, `Tool` validates the parameter schema eagerly at definition time and raises **`ToolSchemaError`**.
+
+**Before (`0.3.4` — Broken schema silently ignored):**
+```python
+class CustomContext:
+    pass
+
+# In 0.3.4 this did not fail at import time, producing an invalid schema.
+# In 0.4.0 this raises ToolSchemaError immediately.
+```
+
+**After (`0.4.0` — Use `pydantic.BaseModel`, `dataclass`, `TypedDict`, or standard types):**
+```python
+# [min-version: 0.4.0]
+# [executable]
+from pydantic import BaseModel, Field
+from chatflow_agent import tool
+
+class CustomerFilter(BaseModel):
+    region: str = Field(description="ISO region code, e.g. US or EU")
+    active_only: bool = True
+
+@tool
+def list_customers(criteria: CustomerFilter) -> str:
+    """List customers matching filter criteria."""
+    return f"Region={criteria.region}, active_only={criteria.active_only}"
+
+schema = list_customers.to_openai_parameters()
+assert "criteria" in schema["properties"]
+```
+
+---
+
+### Breaking Change 3: Runtime Tool Argument Validation (`validate_args=True` by Default)
+
+In `0.4.0`, every tool validates and coerces model-supplied arguments against its Python type hints before running the function. When an argument cannot be coerced, the tool raises **`ToolArgumentValidationError`** (a subclass of `ToolExecutionError`), which `Runner` catches and reports back to the LLM as a structured tool error so the model can self-correct.
+
+If you have a legacy tool whose type annotations do not match the values it actually accepts at runtime, either widen the type hint (recommended) or opt out with `validate_args=False`:
+
+**Before (`0.3.4`):**
+```python
+from chatflow_agent import tool
+
+# Annotated as int, but callers sometimes passed raw dicts or arbitrary objects
+@tool
+def legacy_lookup(payload: int) -> str:
+    """Legacy lookup tool."""
+    return str(payload)
+```
+
+**After (`0.4.0` — Option A: Fix the type annotation, or Option B: `validate_args=False`):**
+```python
+# [min-version: 0.4.0]
+# [executable]
+from typing import Any
+from chatflow_agent import tool
+
+# Option A (Recommended): Use accurate type annotations
+@tool
+def typed_lookup(payload: int | str) -> str:
+    """Lookup by integer ID or string code."""
+    return str(payload)
+
+# Option B: Explicitly disable runtime validation for a legacy tool
+@tool(validate_args=False)
+def legacy_lookup(payload: Any) -> str:
+    """Legacy lookup without runtime Pydantic argument checking."""
+    return str(payload)
+
+assert typed_lookup.execute(payload=42) == "42"
+assert legacy_lookup.execute(payload={"raw": True}) == "{'raw': True}"
+```
+
+---
+
+### Breaking Change 4: `WhatsAppChannel` `dedup_ttl_hours` Removed
+
+In `0.3.4`, `WhatsAppChannel` accepted a `dedup_ttl_hours` parameter in its constructor that was stored on the channel instance but never used (actual message deduplication TTL was always controlled by the `SessionStore` or `SQLiteSessionStore` attached to the `Runner`).
+
+In `0.4.0`, `dedup_ttl_hours` has been removed from `WhatsAppChannel.__init__` (passing it raises `TypeError`), and `max_body_size`, `enable_docs`, and `queue_timeout_seconds` are now keyword-only parameters.
+
+**Before (`0.3.4`):**
+```python
+from chatflow_agent import Agent, Runner, SQLiteSessionStore
+from chatflow_agent.channels import WhatsAppChannel
+
+store = SQLiteSessionStore(db_path="sessions.db")
+runner = Runner(starting_agent=Agent(name="Bot", instructions="Help."), session_store=store)
+
+# Passing dedup_ttl_hours on WhatsAppChannel had no effect in 0.3.4
+# and raises TypeError in 0.4.0:
+# channel = WhatsAppChannel(..., dedup_ttl_hours=48)
+```
+
+**After (`0.4.0`):**
+```python
+# [min-version: 0.4.0]
+# [no-exec: requires whatsapp optional extra]
+from chatflow_agent import Agent, Runner, SQLiteSessionStore
+from chatflow_agent.channels import WhatsAppChannel
+
+# Configure dedup_ttl_hours on SQLiteSessionStore (or SessionStore)
+store = SQLiteSessionStore(
+    db_path=":memory:",
+    dedup_ttl_hours=48,
+)
+runner = Runner(
+    starting_agent=Agent(name="Bot", instructions="Help."),
+    session_store=store,
+)
+
+channel = WhatsAppChannel(
+    verify_token="verify-token",
+    access_token="access-token",
+    phone_number_id="1234567890",
+    app_secret="app-secret",
+    max_body_size=1_048_576,  # Keyword-only in 0.4.0
+    queue_timeout_seconds=5.0,  # Keyword-only in 0.4.0
+)
+channel.attach(runner)
+```
+
+---
+
+## 4. Recommended Post-Upgrade Enhancements
+
+Once your code runs on `0.4.0`, consider adopting these new `0.4.0` idioms:
+
+<Steps>
+  <Step>
+    ### Wrap Async Runners in `async with runner:`
+
+    Use `async with runner:` so the runner's pooled `httpx.AsyncClient` for Gemini closes cleanly when the scope exits:
+
+```python
+# [min-version: 0.4.0]
+from chatflow_agent import Agent, Runner
+
+async def run_once() -> None:
+    runner = Runner(starting_agent=Agent(name="Assistant", instructions="Be concise."))
+    async with runner:
+        response = await runner.run_async("sess-1", "Hello!", turn_timeout=30.0)
+        print(response.content)
+```
+  </Step>
+
+  <Step>
+    ### Replace Direct `store.clear_history()` in Live Endpoints with `Runner.reset_session_async()`
+
+    If your HTTP or bot endpoints expose a "reset conversation" action while turns may be in flight, use `await runner.reset_session_async(session_id)` instead of calling `store.clear_history(session_id)` directly. `Runner.reset_session_async()` acquires the per-session lock, waits for any in-flight sync thread work, and offloads SQLite I/O to a worker thread.
+  </Step>
+
+  <Step>
+    ### Use `SQLiteSessionStore(db_path=":memory:")` in Unit Tests
+
+    In `0.3.4`, `:memory:` SQLite databases lost their tables across connections, forcing tests to create temporary files on disk. In `0.4.0`, `SQLiteSessionStore(db_path=":memory:")` reuses a persistent shared connection for the store's lifetime and can be closed cleanly with `store.close()`.
+  </Step>
+</Steps>
+
+---
+
+## 5. Troubleshooting Common Upgrade Errors
+
+| Error / Exception | Cause | Fix |
+| :--- | :--- | :--- |
+| `TypeError: WhatsAppChannel.__init__() got an unexpected keyword argument 'dedup_ttl_hours'` | `dedup_ttl_hours` was passed to `WhatsAppChannel(...)` | Pass `dedup_ttl_hours=...` to `SQLiteSessionStore(...)` or `SessionStore(...)` instead. |
+| `ToolSchemaError: Failed to build JSON schema for tool '...'` | A `@tool` function uses an unresolved forward type reference or an arbitrary non-Pydantic class | Import the referenced type at module scope or convert the parameter type to a `pydantic.BaseModel`, `dataclass`, or `TypedDict`. |
+| `ToolArgumentValidationError: Invalid arguments for tool '...'` | The LLM or test caller passed arguments that violate the tool's type annotations | Widen the function's type annotation (e.g., `int \| str`) or pass `@tool(validate_args=False)` if raw unvalidated input is required. |
+| `ConfigurationError: Unsupported provider '...'` | An `Agent` or `OpenAIEngine` specified an unknown provider name without a custom `base_url` | Use one of the supported provider names (`openai`, `gemini`, `google`, `anthropic`, `claude`, `deepseek`, `groq`, `grok`, `xai`, `ollama`) or pass an explicit `base_url` and `api_key`. |
+| `ReentrantTurnError: Reentrant turn detected for session '...'` | A tool called `runner.run()` or `await runner.run_async()` for the same `session_id` currently executing | Use `runner.spawn_turn(session_id, user_message)` to queue a follow-up turn without deadlocking. |
+| `JsonCodecError: Failed to serialize session metadata` | `metadata` contains a custom object, set, or function that is not JSON-serializable | Convert custom objects in `metadata` to primitive JSON types (`dict`, `list`, `str`, `int`, `float`, `bool`, `None`) or `datetime`/`date`/`time`. |

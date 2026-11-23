@@ -24,7 +24,7 @@ Google Gemini and Anthropic Claude represent two of the most capable frontier mo
 ### Authentication and Credentials
 
 The engine reads credentials from the following sources, in order of priority:
-1. `api_key` passed directly to `GeminiEngine(api_key="...")`, or `Agent(api_key="...")` together with `provider="gemini"`. Without a provider, a Gemini-model agent run through a `Runner` uses the Runner's engine (built from `Runner(api_key=...)` or the environment), and the agent's own `api_key` is not used.
+1. `api_key` passed directly to `GeminiEngine(api_key="...")`, or `Agent(api_key="...")`. In `v0.4.0`, when an `Agent(api_key="...")` uses a Gemini model without an explicit `engine`, `provider`, or `base_url`, `Runner.resolve_engine()` automatically clones the default `GeminiEngine` with the agent's own `api_key`.
 2. `GEMINI_API_KEY` environment variable.
 3. `GOOGLE_API_KEY` environment variable.
 
@@ -53,17 +53,17 @@ assistant = Agent(
 ### Connection Pooling & Zero-SDK Architecture
 
 <div className="flex gap-2 my-3">
-  <VersionBadge version="0.4.0rc1" status="prerelease" />
+  <VersionBadge version="0.4.0" status="stable" />
   <VersionBadge version="0.3.4" status="stable" />
 </div>
 
-The Gemini implementation underwent an architectural shift between releases:
+The Gemini implementation underwent an architectural upgrade between `v0.3.4` and `v0.4.0`:
 
-* **In `v0.3.4` (Stable):** The engine imported Google's official `google-genai` SDK (`from google import genai`), requiring external client library installation.
-* **In `v0.4.0rc1` (Prerelease):** The engine was completely rewritten using native asynchronous `httpx` against `https://generativelanguage.googleapis.com/v1beta`. This eliminates heavy dependencies and enables **connection pooling** across agent turns:
+* **In `v0.3.4` (Previous Stable):** The engine imported Google's `google-genai` SDK (`from google import genai`), requiring external client library installation.
+* **In `v0.4.0` (Latest Stable):** The engine uses native asynchronous `httpx` directly against `https://generativelanguage.googleapis.com/v1beta` (`google-genai` is no longer a dependency). When Gemini omits a tool call `id`, `GeminiEngine` assigns a collision-resistant synthetic ID (`cf_gemini_<24 hex>`) in local history and omits synthetic IDs when sending `functionResponse` parts back to Gemini (while preserving real provider IDs byte-for-byte). It also supports **connection pooling** across agent turns:
 
 ```python
-# [min-version: 0.4.0rc1]
+# [min-version: 0.4.0]
 # [no-exec: requires real gemini api key]
 import asyncio
 from chatflow_agent import Agent, Runner
@@ -120,6 +120,7 @@ from chatflow_agent.core.engines.anthropic import AnthropicEngine
 claude_engine = AnthropicEngine(
     api_key=os.environ.get("ANTHROPIC_API_KEY"),
     timeout=60.0,
+    max_tokens=4096,
 )
 
 editor = Agent(
@@ -130,6 +131,8 @@ editor = Agent(
 )
 ```
 
+In `v0.4.0`, `AnthropicEngine` accepts a keyword-only `max_tokens: int = 4096` parameter (validated with `ConfigurationError` for non-positive integers or booleans) and logs a warning whenever Anthropic truncates a response with `stop_reason == "max_tokens"`.
+
 ### Automatic Retries and Jittered Backoff
 
 `AnthropicEngine` automatically retries rate limiting (`429 Too Many Requests`), temporary server errors (`500`, `502`, `503`, `504`), Anthropic's overload status (`529`), and connection errors, using exponential backoff with jitter:
@@ -137,7 +140,7 @@ editor = Agent(
 * **Base Delay:** 1.0 second.
 * **Max Delay:** 10.0 seconds.
 
-These values are fixed in v0.4.0rc1; they are not constructor parameters. When a retried response includes a numeric `Retry-After` header, that value replaces the exponential delay, but the wait is still capped at 10 seconds, so a longer requested delay is not fully honored.
+These retry values are fixed in `v0.4.0`. When a retried response includes a positive numeric `Retry-After` header, that value replaces the exponential delay (capped at 10 seconds); negative or malformed `Retry-After` headers fall back cleanly to exponential backoff.
 
 ---
 

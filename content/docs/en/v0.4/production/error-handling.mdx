@@ -1,6 +1,6 @@
 ---
 title: Error Handling & Recovery
-description: Production error handling strategies in chatflow-agent v0.4.0rc1, the SDK exception hierarchy, tool error isolation, and transactional turn rollbacks.
+description: Production error handling strategies in chatflow-agent v0.4.0, the SDK exception hierarchy, runtime tool argument validation, and transactional turn rollbacks.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -11,7 +11,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 Building robust multi-agent systems requires structured fault tolerance. LLM provider outages, network timeouts, invalid tool arguments, and unexpected exceptions must be handled gracefully without corrupting conversation state.
 
-`chatflow-agent` implements a layered recovery model: tool errors are reported to the LLM as a generic error result so the turn can continue, while a turn that fails, is cancelled, or times out has its history, active agent, and metadata restored to their pre-turn state.
+`chatflow-agent` implements a layered recovery model: model-supplied tool arguments are validated at runtime with Pydantic (`validate_args=True` by default), tool errors are reported to the LLM as a sanitized error result so the turn can continue, and a turn that fails, is cancelled, or times out has its history, active agent, and metadata restored to their pre-turn state.
 
 ## SDK Exception Hierarchy
 
@@ -19,13 +19,16 @@ All exceptions in `chatflow-agent` inherit from `ChatFlowError`. This allows you
 
 ```text
 ChatFlowError (Base)
+├── ConfigurationError (Invalid provider, endpoint, engine, or channel parameter) [v0.4.0]
 ├── DependencyError (Missing optional extra dependencies)
+├── JsonCodecError (Non-JSON-serializable object in session metadata or payload) [v0.4.0]
 ├── ToolExecutionError (Uncaught error during tool execution)
-├── ToolSchemaError (Union annotation with an unmappable member) [v0.4.0rc1]
+│   └── ToolArgumentValidationError (Runtime Pydantic tool argument failure) [v0.4.0]
+├── ToolSchemaError (Unresolvable annotation or unsupported schema type) [v0.4.0]
 ├── AgentHandoffError (Unknown or unauthorized handoff target)
-├── ProviderError (LLM API status error, network failure, or timeout)
-├── ReentrantTurnError (Nested same-session turn started from a running turn) [v0.4.0rc1]
-└── SessionDeletedError (Running turn stores a message after its session was deleted) [v0.4.0rc1]
+├── ProviderError (Sanitized LLM API status error, network failure, or timeout)
+├── ReentrantTurnError (Nested same-session turn or reset from an active turn) [v0.4.0]
+└── SessionDeletedError (Running turn commits or rolls back after session deletion) [v0.4.0]
 ```
 
 ### Exception Reference Table
@@ -33,17 +36,20 @@ ChatFlowError (Base)
 | Exception Class | Inherits From | Raised When | Recovery Strategy |
 | :--- | :--- | :--- | :--- |
 | `ChatFlowError` | `Exception` | Base class for all SDK exceptions. | Catch at top-level request boundaries. |
+| `ConfigurationError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError`, `ValueError` | Invalid provider/engine setup, missing `api_key` on custom remote `base_url`, invalid `AnthropicEngine(max_tokens=...)`, or invalid channel limits. | Fix configuration parameters at startup. |
 | `DependencyError` | `ChatFlowError` | An optional channel extra (e.g. `[telegram]`, `[whatsapp]`) is not installed. | Install the required extra via `pip install "chatflow-agent[extra]"`. |
-| `ToolExecutionError` | `ChatFlowError` | A tool function raises an uncaught exception during execution. | Inside a turn, `Runner` logs it and returns a generic `ToolResult(is_error=True)` to the model. |
-| `ToolSchemaError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | A tool is created with a union annotation that contains a member with no schema mapping. Unannotated parameters are allowed. | Fix function type signatures at development time. |
+| `JsonCodecError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | Session `metadata` contains an object that cannot be serialized to JSON (`datetime`, `date`, and `time` are supported automatically as ISO-8601). | Store only JSON-serializable values in `metadata`. |
+| `ToolExecutionError` | `ChatFlowError` | A tool function raises an uncaught exception during execution. | Inside a turn, `Runner` logs it with a `trace_id` and returns a sanitized `ToolResult(is_error=True)` to the model. |
+| `ToolArgumentValidationError` <VersionBadge version="0.4.0" status="stable" /> | `ToolExecutionError` | Model-supplied or caller-supplied tool arguments fail runtime Pydantic validation (`validate_args=True`). | Caught by `Runner` during turns and reported as a tool error so the LLM can self-correct; or pass `validate_args=False` to opt out. |
+| `ToolSchemaError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | A tool is created with an unresolved forward annotation or a parameter type with no JSON Schema mapping. | Fix function type signatures at development time. |
 | `AgentHandoffError` | `ChatFlowError` | The handoff target does not exist or is not declared in the current agent's `handoffs`. Exceeding `max_handoffs_per_turn` does not raise: it adds an error tool result instead. | Verify handoff targets. |
-| `ProviderError` | `ChatFlowError` | Upstream model provider returns an HTTP error code (e.g. 429, 500, 503). | Implement exponential backoff or failover to a fallback engine. |
-| `ReentrantTurnError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError`, `RuntimeError` | Code started by a running turn starts another turn for the same session. | Use `Runner.spawn_turn()` to queue a follow-up turn. |
-| `SessionDeletedError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | A running turn stores a message after its SQLite session was deleted. | Notify the user to restart the workflow; a later turn starts a new, empty session. |
+| `ProviderError` | `ChatFlowError` | Upstream model provider returns an HTTP error code (e.g. 429, 500, 503). Secrets are redacted and raw `httpx`/`JSONDecodeError` `__cause__` chains are suppressed. | Implement exponential backoff or failover to a fallback engine. |
+| `ReentrantTurnError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError`, `RuntimeError` | Code started by a running turn starts another turn or reset for the same session. | Use `Runner.spawn_turn()` to queue a follow-up turn. |
+| `SessionDeletedError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | A running turn stores or rolls back state after its session was deleted. | Notify the user to restart the workflow; a later turn starts a new, empty session. |
 
-## Autonomous Tool Self-Correction
+## Runtime Tool Argument Validation & Autonomous Self-Correction
 
-When a registered tool raises an exception, including a `TypeError` from arguments the function does not accept, `Runner` catches the failure and returns a structured error to the model instead of crashing the turn. v0.4.0rc1 does not validate tool arguments against the schema before calling the function:
+In `v0.4.0`, tools validate model-supplied arguments against their Python type hints via Pydantic (`validate_args=True` by default) before calling the function. If validation fails (raising `ToolArgumentValidationError`) or if the tool body itself raises an exception, `Runner` catches the failure and returns a structured error to the model instead of crashing the turn:
 
 ```python
 import logging
@@ -149,12 +155,12 @@ async def execute_turn_with_recovery(
 
 ## Turn Timeouts & Resource Boundaries
 
-<VersionBadge version="0.4.0rc1" status="prerelease" />
+<VersionBadge version="0.4.0" status="stable" />
 
-Starting in `v0.4.0rc1`, `run_async` supports an explicit `turn_timeout` parameter (in seconds). Unlike generic request timeouts, `turn_timeout` begins counting only **after** the call acquires the session lock, ensuring queued turns do not expire prematurely while waiting behind earlier turns:
+In `v0.4.0`, `run_async` and `run` support an explicit `turn_timeout` parameter (in seconds). Unlike generic request timeouts, `turn_timeout` begins counting only **after** the call acquires the session lock, ensuring queued turns do not expire prematurely while waiting behind earlier turns:
 
 ```python
-# [min-version: 0.4.0rc1]
+# [min-version: 0.4.0]
 # [no-exec: illustrative turn timeout call]
 # Limits the turn execution to 45 seconds once lock is acquired
 response = await runner.run_async(

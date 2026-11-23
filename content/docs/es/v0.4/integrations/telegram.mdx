@@ -2,7 +2,7 @@
 title: "Integración con Bots de Telegram"
 description: "Despliega asistentes de IA multi-agente en Telegram con python-telegram-bot, memoria de sesión, división de mensajes y controles de administración para grupos."
 sourceRevision: "a362b6e"
-sourceHash: "e47d9526bd20b8d74e895cd47584ae536abb28c4a6d8887e1f4cf36d38b2a7fa"
+sourceHash: "77930f3e8ec1a78d3b827902715a4c82211bd076ca68010517e88978aeb4c11c"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -128,7 +128,7 @@ Cuando llega un mensaje, `TelegramChannel` envía un único indicador `ChatActio
 
 ## Gestión del Bucle de Eventos
 
-`run()` inicia el long polling y bloquea: controla el bucle de eventos por sí mismo mediante `run_polling()` de python-telegram-bot. En v0.4.0rc1 también abre el ámbito `async with runner:` del runner asociado durante la vida de la aplicación (se abre en `post_init` y se cierra en `post_shutdown`), de modo que los turnos reutilizan conexiones agrupadas de Gemini. Pasar `close_loop=False` mantiene abierto el bucle de eventos después de que `run()` retorne:
+`run()` inicia el long polling y bloquea: controla el bucle de eventos por sí mismo mediante `run_polling()` de python-telegram-bot. En v0.4.0 también abre el ámbito `async with runner:` del runner asociado durante la vida de la aplicación (se abre en `post_init` y se cierra en `post_shutdown`), de modo que los turnos reutilizan conexiones agrupadas de Gemini. Pasar `close_loop=False` mantiene abierto el bucle de eventos después de que `run()` retorne:
 
 ```python
 telegram.run(drop_pending_updates=True, close_loop=False)

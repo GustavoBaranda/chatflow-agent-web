@@ -2,7 +2,7 @@
 title: "Inicio Rápido"
 description: "Construye y ejecuta tu primer agente conversacional de IA con chatflow-agent en menos de 5 minutos."
 sourceRevision: "737aa0d"
-sourceHash: "e4a5cb2ecb5551b122d4754558ffb283691a4ccd01b18b9ee9ceaf3a2a944f6f"
+sourceHash: "77afed73293805df4f922ad474a5dd2d2405f743a3f618e8c53a2c2c7ed88827"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -22,7 +22,7 @@ import os
 from chatflow_agent import Agent, Runner
 
 # 1. Define la personalidad del agente, sus instrucciones y el modelo objetivo.
-# En v0.4.0rc1 el prefijo de modelo "gpt-" selecciona OpenAIEngine (OPENAI_API_KEY)
+# En v0.4.0 el prefijo de modelo "gpt-" selecciona OpenAIEngine (OPENAI_API_KEY)
 # cuando el Runner no tiene un engine= explícito.
 agent = Agent(
     name="Assistant",
@@ -145,7 +145,7 @@ Dado que `chatflow-agent` implementa motores directos sobre REST, alternar entre
 import os
 from chatflow_agent import Agent, OpenAIEngine
 
-# Opción 1: Configuración directa por modelo. En v0.4.0rc1 el prefijo del modelo
+# Opción 1: Configuración directa por modelo. En v0.4.0 el prefijo del modelo
 # (gpt-, claude-, gemini-, ...) selecciona el motor cuando no se define un proveedor ni un motor.
 openai_agent = Agent(
     name="OpenAIBot",
@@ -180,8 +180,8 @@ groq_agent = Agent(
 )
 ```
 
-<Callout type="warn" title="Diferencias de Proveedores entre v0.3.4 y v0.4.0rc1">
-En <VersionBadge version="0.3.4" status="stable" />, <code>GeminiEngine</code> depende del paquete <code>google-genai</code>. En <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>GeminiEngine</code> fue refactorizado para operar sobre HTTP REST puro mediante <code>httpx</code>, eliminando cualquier dependencia de SDKs externos de Google.
+<Callout type="warn" title="Diferencias de Proveedores entre v0.3.4 y v0.4.0">
+En <VersionBadge version="0.3.4" status="stable" />, <code>GeminiEngine</code> depende del paquete <code>google-genai</code>. En <VersionBadge version="0.4.0" status="stable" />, <code>GeminiEngine</code> fue refactorizado para operar sobre HTTP REST puro mediante <code>httpx</code>, eliminando cualquier dependencia de SDKs externos de Google.
 </Callout>
 
 ---

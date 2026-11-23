@@ -2,7 +2,7 @@
 title: "Início Rápido"
 description: "Construa e execute seu primeiro agente de IA conversacional com o chatflow-agent em menos de 5 minutos."
 sourceRevision: "737aa0d"
-sourceHash: "e4a5cb2ecb5551b122d4754558ffb283691a4ccd01b18b9ee9ceaf3a2a944f6f"
+sourceHash: "77afed73293805df4f922ad474a5dd2d2405f743a3f618e8c53a2c2c7ed88827"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -22,7 +22,7 @@ import os
 from chatflow_agent import Agent, Runner
 
 # 1. Definir a persona do agente, instruções e modelo alvo.
-# Na v0.4.0rc1, o prefixo de modelo "gpt-" seleciona o OpenAIEngine (OPENAI_API_KEY)
+# Na v0.4.0, o prefixo de modelo "gpt-" seleciona o OpenAIEngine (OPENAI_API_KEY)
 # quando o Runner não tem um engine= explícito.
 agent = Agent(
     name="Assistant",
@@ -145,7 +145,7 @@ Como o `chatflow-agent` implementa motores diretos sobre REST, alternar entre pr
 import os
 from chatflow_agent import Agent, OpenAIEngine
 
-# Opção 1: Configuração direta por modelo. Na v0.4.0rc1, o prefixo do modelo
+# Opção 1: Configuração direta por modelo. Na v0.4.0, o prefixo do modelo
 # (gpt-, claude-, gemini-, ...) seleciona o motor quando nenhum provider ou engine está definido.
 openai_agent = Agent(
     name="OpenAIBot",
@@ -180,8 +180,8 @@ groq_agent = Agent(
 )
 ```
 
-<Callout type="warn" title="Diferenças de Provedores entre v0.3.4 e v0.4.0rc1">
-Na versão <VersionBadge version="0.3.4" status="stable" />, o <code>GeminiEngine</code> depende do pacote <code>google-genai</code>. Na versão <VersionBadge version="0.4.0rc1" status="prerelease" />, o <code>GeminiEngine</code> foi refatorado para operar sobre HTTP REST puro via <code>httpx</code>, eliminando qualquer dependência de SDKs externos do Google.
+<Callout type="warn" title="Diferenças de Provedores entre v0.3.4 e v0.4.0">
+Na versão <VersionBadge version="0.3.4" status="stable" />, o <code>GeminiEngine</code> depende do pacote <code>google-genai</code>. Na versão <VersionBadge version="0.4.0" status="stable" />, o <code>GeminiEngine</code> foi refatorado para operar sobre HTTP REST puro via <code>httpx</code>, eliminando qualquer dependência de SDKs externos do Google.
 </Callout>
 
 ---

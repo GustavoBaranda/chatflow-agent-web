@@ -2,7 +2,7 @@
 title: "Boas Práticas de Segurança"
 description: "Diretrizes de defesa em profundidade para o chatflow-agent, isolamento de credenciais, mitigação de injeção de prompt, assinaturas de webhook e privacidade de dados."
 sourceRevision: "db864ef"
-sourceHash: "aea7854566fe5d152b97bdb37381177103fb6fe008adc25fe7fbd9b9ae34a3fb"
+sourceHash: "7c278aa11880be670a96e0edd2882984d0e49cab3e297aaae51641d570f98bbe"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -33,7 +33,7 @@ Untrusted Input (Webhooks / Chat Channels)
 4. Credential Isolation & Egress Guards (ValueError on Custom Host / No API Key Leak)
 ```
 
-O SDK não isola as ferramentas em sandbox: elas rodam no processo da aplicação com todos os seus privilégios, e na v0.4.0rc1 os argumentos de ferramentas fornecidos pelo modelo são passados à função sem validação em tempo de execução. A autenticação de entrada para canais customizados, como tokens Bearer, é implementada pela sua aplicação.
+O SDK não isola as ferramentas em sandbox: elas rodam no processo da aplicação com todos os seus privilégios, embora na `v0.4.0` os argumentos de ferramentas fornecidos pelo modelo sejam validados e convertidos em tempo de execução com Pydantic antes de chamar a função (`validate_args=True` por padrão). A autenticação de entrada para canais customizados, como tokens Bearer, é implementada pela sua aplicação.
 
 ## Proteção de Credenciais e Bloqueio de Exfiltração
 
@@ -62,7 +62,7 @@ local_engine = OpenAIEngine(
 ```
 
 <Callout type="warn" title="Proteção Automática com ValueError">
-Se você fornecer uma `base_url` remota customizada sem uma `api_key` explícita, o `OpenAIEngine` se recusa a reutilizar a `OPENAI_API_KEY` (ou qualquer outra chave de provedor) do ambiente e levanta um `ValueError`. Isso impede a exfiltração acidental de credenciais para proxies não confiáveis. Hosts de loopback (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`) são isentos e recebem uma chave provisória. Na v0.4.0rc1, o `GeminiEngine` também nunca segue redirecionamentos HTTP e remove a chave de API de suas mensagens de erro.
+Se você fornecer uma `base_url` remota customizada sem uma `api_key` explícita, o `OpenAIEngine` se recusa a reutilizar a `OPENAI_API_KEY` (ou qualquer outra chave de provedor) do ambiente e levanta um `ValueError`. Isso impede a exfiltração acidental de credenciais para proxies não confiáveis. Hosts de loopback (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`) são isentos e recebem uma chave provisória. Na v0.4.0, o `GeminiEngine` também nunca segue redirecionamentos HTTP e remove a chave de API de suas mensagens de erro.
 </Callout>
 
 ## Protocolos de Segurança em Canais
@@ -91,7 +91,7 @@ Com `verify_signature=True` (o padrão), construir o canal sem um `app_secret` l
 
 ### Mascaramento Automático de Números de Telefone
 
-Números de telefone de clientes recebidos via WhatsApp são Informações Pessoalmente Identificáveis (PII). O `WhatsAppChannel` mascara os valores em suas próprias mensagens de log mantendo os quatro primeiros e os três últimos caracteres da entrada; por exemplo, o remetente da Meta `14155552671` torna-se `1415***671`. O número original ainda aparece na resposta JSON do webhook (`"sender"`), no ID de sessão e nos metadados armazenados pelo armazenamento de sessões, no argumento passado para `on_24h_window_expired` e nas respostas de erro da Meta que são registradas no log tal como recebidas. Aplicações e ferramentas externas devem aplicar suas próprias políticas de redação.
+Números de telefone de clientes recebidos via WhatsApp são Informações Pessoalmente Identificáveis (PII). Na `v0.4.0`, o `WhatsAppChannel` mascara os valores tanto em suas próprias mensagens de log quanto na resposta JSON HTTP do webhook (`"sender"`), mantendo os quatro primeiros e os três últimos caracteres da entrada; por exemplo, o remetente da Meta `14155552671` torna-se `1415***671`. O número original ainda é usado internamente como ID de sessão e nos metadados armazenados pelo armazenamento de sessões e no argumento passado para `on_24h_window_expired`. Aplicações e ferramentas externas devem aplicar suas próprias políticas de redação aos dados persistidos.
 
 ### Administração de Chats em Grupo no Telegram
 
@@ -106,7 +106,7 @@ A injeção de prompt ocorre quando entradas de usuários não confiáveis manip
 Para mitigar riscos de injeção de prompt:
 
 1. **Princípio do Menor Privilégio:** Conceda a cada agente especializado somente as ferramentas estritamente necessárias. Um `BillingAgent` não deve ter acesso a ferramentas de deleção de banco de dados ou reinicialização de servidores.
-2. **Valide os Argumentos Dentro de Cada Ferramenta:** A v0.4.0rc1 não valida nem converte em tempo de execução os argumentos fornecidos pelo modelo; as anotações de tipo apenas moldam o esquema que o modelo vê. Verifique cada entrada dentro da ferramenta antes de agir com base nela:
+2. **Combine a Validação de Tipos em Tempo de Execução com Regras de Domínio:** Na `v0.4.0`, `@tool` valida e converte os tipos dos argumentos em tempo de execução via Pydantic (`validate_args=True` por padrão, lançando `ToolArgumentValidationError` para tipos inválidos). Combine sempre anotações de tipo com validações de negócio dentro da ferramenta antes de executar operações sensíveis:
 
 ```python
 from chatflow_agent import tool
@@ -126,13 +126,13 @@ def update_email(user_id: int, new_email: str) -> str:
 
 ## Segurança de Concorrência e Reentrância
 
-<VersionBadge version="0.4.0rc1" status="prerelease" />
+<VersionBadge version="0.4.0" status="stable" />
 
-A partir da `v0.4.0rc1`, o `Runner` protege as sessões contra turnos reentrantes:
+A partir da `v0.4.0`, o `Runner` protege as sessões contra turnos reentrantes:
 - Se código iniciado por um turno em execução (uma ferramenta, ou uma task ou thread que ela inicia: `create_task`, `gather`, `wait_for`, `TaskGroup`, `asyncio.to_thread`) chamar `runner.run_async` ou `runner.run` para a mesma sessão, o `Runner` levanta `ReentrantTurnError` imediatamente em vez de causar um deadlock. Use `Runner.spawn_turn()` para enfileirar um turno de acompanhamento.
 - Requisições independentes para a mesma sessão são serializadas pela trava da sessão (por instância de store, ID de sessão e event loop).
 
-Limitações conhecidas na v0.4.0rc1:
+Limitações conhecidas na v0.4.0:
 - Não há serialização entre instâncias de store sobre o mesmo arquivo, entre processos ou entre threads que executam seus próprios event loops.
 - Uma ferramenta que aguarda um trabalho feito por uma task que não foi iniciada a partir do turno ainda pode causar deadlock se esse trabalho executar um turno da mesma sessão; aguardar uma task de `spawn_turn()` dentro do turno que a criou também causa deadlock.
 - `clear_history()` e `delete()` (e, portanto, o `/reset` do Telegram) não são coordenados com turnos em execução além das garantias de reversão e de `SessionDeletedError`.

@@ -2,7 +2,7 @@
 title: "Visão Geral dos Provedores de LLM"
 description: "Arquitetura de motores, resolução dinâmica de provedores, políticas de segurança e execução de múltiplos modelos no chatflow-agent."
 sourceRevision: "82d8ebf"
-sourceHash: "aae4021b4927ebfec7285ce16d029b60fd4011a20490636583bc2c718b0c9520"
+sourceHash: "d4d395faa5d3e051031a33c1a1e189a0f3e787d2b2c3dd9fc050ea388552b71e"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -76,7 +76,7 @@ O motor retorna um `EngineTurnResult` contendo:
 Quando ocorrem transferências (*handoffs*) multiagente entre diferentes famílias de modelos (por exemplo, transferindo do Anthropic Claude para o OpenAI GPT-4o), as mensagens históricas retêm os IDs de chamadas de ferramentas emitidos pelo modelo anterior. Como diferentes provedores impõem restrições conflitantes de validação de IDs (por exemplo, a OpenAI rejeita IDs de chamada de ferramenta com mais de 40 caracteres), o `chatflow-agent` adota uma substituição determinística:
 
 ```python
-# [min-version: 0.4.0rc1]
+# [min-version: 0.4.0]
 # [executable]
 from chatflow_agent.core.engines.base import replacement_tool_call_id
 
@@ -149,11 +149,11 @@ local_engine = OpenAIEngine(
 )
 ```
 
-## Evolução de Versões: v0.3.4 vs v0.4.0rc1
+## Evolução de Versões: v0.3.4 vs v0.4.0
 
 Compreender as diferenças arquiteturais entre as versões ajuda a escolher a configuração ideal:
 
-| Área Arquitetural | Linha Base `v0.3.4` (Estável) | Pré-lançamento `v0.4.0rc1` |
+| Área Arquitetural | Linha Base `v0.3.4` (Estável) | Pré-lançamento `v0.4.0` |
 | :--- | :--- | :--- |
 | **Runtime do Gemini Engine** | Baseado no SDK `google-genai` do Google (`from google import genai`). | **Zero Bloqueio de SDK**: Reformulado com `httpx` assíncrono nativo diretamente contra `https://generativelanguage.googleapis.com/v1beta`. |
 | **Pools de Conexões** | Handles de conexão separados por requisição. | **Pool de Clientes no Ciclo de Vida do Runner** para o `GeminiEngine`: dentro de `async with runner:`, as requisições Gemini compartilham um único cliente `httpx` em pool. Os motores compatíveis com OpenAI e Anthropic continuam usando um cliente por tentativa de requisição. |
@@ -161,11 +161,11 @@ Compreender as diferenças arquiteturais entre as versões ajuda a escolher a co
 | **Proteção de Credenciais** | `_resolve_api_key` restringe as chaves de ambiente aos endpoints oficiais exatos e exige credenciais explícitas para URLs remotas customizadas. | A mesma proteção; além disso, o `GeminiEngine` nunca segue redirecionamentos e remove sua chave dos erros. |
 | **Resolução de Motores** | O motor padrão de um `Runner` tem prioridade sobre os prefixos de nome de modelo, portanto modelos não Gemini precisam de `provider=` ou `engine=`. | Os prefixos de nome de modelo têm prioridade sobre o motor padrão implícito; um `Runner(engine=...)` explícito continua tendo prioridade sobre os prefixos. |
 
-<Callout type="info" title="Pool de Conexões do Runner na v0.4.0rc1">
-Na `v0.4.0rc1`, envolva as execuções do runner dentro de `async with runner:` para que as requisições Gemini reutilizem um único cliente HTTP em pool entre turnos. `Runner.run()`, `TelegramChannel.run()` e o app do `WhatsAppChannel` abrem esse escopo automaticamente:
+<Callout type="info" title="Pool de Conexões do Runner na v0.4.0">
+Na `v0.4.0`, envolva as execuções do runner dentro de `async with runner:` para que as requisições Gemini reutilizem um único cliente HTTP em pool entre turnos. `Runner.run()`, `TelegramChannel.run()` e o app do `WhatsAppChannel` abrem esse escopo automaticamente:
 
 ```python
-# [min-version: 0.4.0rc1]
+# [min-version: 0.4.0]
 # [no-exec: requires real provider engine for turn execution]
 import asyncio
 from chatflow_agent import Agent, Runner

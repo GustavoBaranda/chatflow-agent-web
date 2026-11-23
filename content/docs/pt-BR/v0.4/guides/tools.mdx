@@ -2,7 +2,7 @@
 title: "Ferramentas e Chamada de Funções"
 description: "Guia arquitetural completo sobre function calling, esquemas de tipos de parâmetros, despacho síncrono/assíncrono e isolamento de erros no chatflow-agent."
 sourceRevision: "f8f8bac"
-sourceHash: "2771fde127ef3fcbf427931b8c27eb09a97e426c1812403b0a9d300b6ecbe0c5"
+sourceHash: "ff718534c97e8c0d74a6a1728754c9949ae910b4de37e1fadaaa9e52ac317680"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -126,8 +126,8 @@ A geração de esquemas e execução de ferramentas evoluiu significativamente e
 * Mapeamento de tipos de nível único para tipos primitivos e `list`/`dict` não parametrizados.
 * Funções síncronas descarregadas via `asyncio.to_thread` durante `execute_async()`.
 
-### Melhorias de Pré-lançamento (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Tipagem Profunda de Coleções:** Inspeciona esquemas de itens para `list[T]`, `Sequence[T]`, `set[T]` e tuplas homogêneas `tuple[T, ...]`:
+### Melhorias da Versão Estável (`v0.4.0`)
+* <VersionBadge version="0.4.0" status="stable" /> **Tipagem Profunda de Coleções:** Inspeciona esquemas de itens para `list[T]`, `Sequence[T]`, `set[T]` e tuplas homogêneas `tuple[T, ...]`:
 
 ```python
 from chatflow_agent import tool
@@ -140,13 +140,13 @@ def sum_metrics(values: list[float]) -> float:
 # Gera: {"type": "ARRAY", "items": {"type": "NUMBER"}}
 ```
 
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Suporte a Union e Optional:**
+* <VersionBadge version="0.4.0" status="stable" /> **Suporte a Union e Optional:**
   * `Optional[T]` ou `T | None` gera `{ "type": "...", "nullable": True }`.
   * `int | float` é ampliado deterministicamente para `"NUMBER"` independentemente da ordem declarada.
   * Uniões de múltiplos tipos geram uma lista de esquemas `anyOf`.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`to_openai_parameters()`:** Gera parâmetros no formato JSON Schema (nomes de tipos em minúsculas, `type: "null"` e sem a chave `nullable`) para os motores OpenAI e Anthropic.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`ToolSchemaError`:** Lançado quando a ferramenta é criada se uma anotação de união contém um membro sem mapeamento de esquema (por exemplo `int | datetime`). Outras anotações desconhecidas, e parâmetros sem anotação, continuam recorrendo a `"STRING"`.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Exclusão de Varargs:** Argumentos `*args` e `**kwargs` são automaticamente omitidos dos esquemas de parâmetros.
+* <VersionBadge version="0.4.0" status="stable" /> **`to_openai_parameters()`:** Gera parâmetros no formato JSON Schema (nomes de tipos em minúsculas, `type: "null"` e sem a chave `nullable`) para os motores OpenAI e Anthropic.
+* <VersionBadge version="0.4.0" status="stable" /> **`ToolSchemaError`:** Lançado quando a ferramenta é criada se uma anotação de união contém um membro sem mapeamento de esquema (por exemplo `int | datetime`). Outras anotações desconhecidas, e parâmetros sem anotação, continuam recorrendo a `"STRING"`.
+* <VersionBadge version="0.4.0" status="stable" /> **Exclusão de Varargs:** Argumentos `*args` e `**kwargs` são automaticamente omitidos dos esquemas de parâmetros.
 
 ---
 

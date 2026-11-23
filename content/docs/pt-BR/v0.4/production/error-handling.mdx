@@ -1,8 +1,8 @@
 ---
 title: "Tratamento de Erros e Recuperação"
-description: "Estratégias de tratamento de erros em produção no chatflow-agent v0.4.0rc1, a hierarquia de exceções do SDK, o isolamento de erros de ferramentas e a reversão transacional de turnos."
-sourceRevision: "db864ef"
-sourceHash: "65ff8a0b6ffc6280f0d8d24377176aabb6a41278c4f21bd47273953e4aaac609"
+description: "Estratégias de tratamento de erros em produção no chatflow-agent v0.4.0, a hierarquia de exceções do SDK, validação de argumentos de ferramentas e reversão transacional de turnos."
+sourceRevision: "feba63b"
+sourceHash: "3c062873f25a53c704d69c6ced5c97bcb5fdd5749e0fa908fe732043dea16049"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -13,7 +13,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 Construir sistemas multiagente robustos exige tolerância a falhas estruturada. Indisponibilidades em provedores de LLM, timeouts de rede, argumentos inválidos de ferramentas e exceções inesperadas precisam ser tratados com elegância sem corromper o estado da conversa.
 
-O `chatflow-agent` implementa um modelo de recuperação em camadas: erros de ferramentas são reportados ao LLM como um resultado de erro genérico para que o turno possa continuar, enquanto um turno que falha, é cancelado ou excede o tempo limite tem seu histórico, agente ativo e metadados restaurados ao estado anterior ao turno.
+O `chatflow-agent` implementa um modelo de recuperação em camadas: os argumentos de ferramentas fornecidos pelo modelo são validados em tempo de execução com Pydantic (`validate_args=True` por padrão), erros de ferramentas são reportados ao LLM como um resultado de erro higienizado para que o turno possa continuar, e um turno que falha, é cancelado ou excede o tempo limite tem seu histórico, agente ativo e metadados restaurados ao estado anterior ao turno.
 
 ## Hierarquia de Exceções do SDK
 
@@ -21,13 +21,16 @@ Todas as exceções no `chatflow-agent` herdam de `ChatFlowError`. Isso permite 
 
 ```text
 ChatFlowError (Base)
+├── ConfigurationError (Invalid provider, endpoint, engine, or channel parameter) [v0.4.0]
 ├── DependencyError (Missing optional extra dependencies)
+├── JsonCodecError (Non-JSON-serializable object in session metadata) [v0.4.0]
 ├── ToolExecutionError (Uncaught error during tool execution)
-├── ToolSchemaError (Union annotation with an unmappable member) [v0.4.0rc1]
+│   └── ToolArgumentValidationError (Runtime Pydantic tool argument failure) [v0.4.0]
+├── ToolSchemaError (Unresolvable annotation or unsupported schema type) [v0.4.0]
 ├── AgentHandoffError (Unknown or unauthorized handoff target)
-├── ProviderError (LLM API status error, network failure, or timeout)
-├── ReentrantTurnError (Nested same-session turn started from a running turn) [v0.4.0rc1]
-└── SessionDeletedError (Running turn stores a message after its session was deleted) [v0.4.0rc1]
+├── ProviderError (Sanitized LLM API status error, network failure, or timeout)
+├── ReentrantTurnError (Nested same-session turn or reset from an active turn) [v0.4.0]
+└── SessionDeletedError (Running turn stores or rolls back after session deletion) [v0.4.0]
 ```
 
 ### Tabela de Referência de Exceções
@@ -35,17 +38,20 @@ ChatFlowError (Base)
 | Classe de Exceção | Herda de | Quando é Disparada | Estratégia de Recuperação |
 | :--- | :--- | :--- | :--- |
 | `ChatFlowError` | `Exception` | Classe base para todas as exceções do SDK. | Capture nas fronteiras de requisição de nível superior. |
+| `ConfigurationError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError`, `ValueError` | Configuração inválida de provedor ou motor, falta `api_key` em `base_url` remota customizada, `AnthropicEngine(max_tokens=...)` inválido ou limites de canal inválidos. | Corrija os parâmetros de configuração na inicialização. |
 | `DependencyError` | `ChatFlowError` | Um extra opcional de canal (ex.: `[telegram]`, `[whatsapp]`) não está instalado. | Instale o extra requerido via `pip install "chatflow-agent[extra]"`. |
+| `JsonCodecError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | `metadata` da sessão contém um objeto não serializável em JSON (`datetime`, `date` e `time` são serializados automaticamente como ISO-8601). | Armazene apenas valores serializáveis em JSON em `metadata`. |
 | `ToolExecutionError` | `ChatFlowError` | Uma função de ferramenta levanta uma exceção não tratada durante a execução. | Dentro de um turno, o `Runner` a registra no log e retorna ao modelo um `ToolResult(is_error=True)` genérico. |
-| `ToolSchemaError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Uma ferramenta é criada com uma anotação de união que contém um membro sem mapeamento de esquema. Parâmetros sem anotação são permitidos. | Corrija as assinaturas de tipo da função em tempo de desenvolvimento. |
+| `ToolArgumentValidationError` <VersionBadge version="0.4.0" status="stable" /> | `ToolExecutionError` | Argumentos passados a uma ferramenta falham na validação do Pydantic em tempo de execução (`validate_args=True`). | Capturado pelo `Runner` durante os turnos para que o modelo se autocorrija, ou passe `validate_args=False`. |
+| `ToolSchemaError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | Uma ferramenta é criada com uma anotação futura não resolvida ou tipo sem mapeamento para JSON Schema. | Corrija as assinaturas de tipo da função em tempo de desenvolvimento. |
 | `AgentHandoffError` | `ChatFlowError` | O destino do handoff não existe ou não está declarado nos `handoffs` do agente atual. Exceder `max_handoffs_per_turn` não lança exceção: em vez disso, adiciona um resultado de ferramenta com erro. | Verifique os alvos de transferência. |
-| `ProviderError` | `ChatFlowError` | O provedor do modelo upstream retorna um código de erro HTTP (ex.: 429, 500, 503). | Implemente recuo exponencial ou comutação por falha (*failover*) para um motor reserva. |
-| `ReentrantTurnError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError`, `RuntimeError` | Código iniciado por um turno em execução inicia outro turno na mesma sessão. | Use `Runner.spawn_turn()` para enfileirar um turno de acompanhamento. |
-| `SessionDeletedError` <VersionBadge version="0.4.0rc1" status="prerelease" /> | `ChatFlowError` | Um turno em execução armazena uma mensagem depois que sua sessão SQLite foi excluída. | Notifique o usuário para reiniciar o fluxo; um turno posterior inicia uma sessão nova e vazia. |
+| `ProviderError` | `ChatFlowError` | O provedor do modelo upstream retorna um código de erro HTTP (ex.: 429, 500, 503) com credenciais redigidas. | Implemente recuo exponencial ou comutação por falha (*failover*) para um motor reserva. |
+| `ReentrantTurnError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError`, `RuntimeError` | Código iniciado por um turno em execução inicia outro turno ou reset na mesma sessão. | Use `Runner.spawn_turn()` para enfileirar um turno de acompanhamento. |
+| `SessionDeletedError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | Um turno em execução armazena ou reverte estado depois que sua sessão foi excluída. | Notifique o usuário para reiniciar o fluxo; um turno posterior inicia uma sessão nova e vazia. |
 
-## Autocorreção Autônoma de Ferramentas
+## Validação de Argumentos e Autocorreção Autônoma de Ferramentas
 
-Quando uma ferramenta registrada levanta uma exceção, incluindo um `TypeError` causado por argumentos que a função não aceita, o `Runner` captura a falha e retorna um erro estruturado ao modelo em vez de derrubar o turno. A v0.4.0rc1 não valida os argumentos das ferramentas contra o esquema antes de chamar a função:
+Na `v0.4.0`, as ferramentas validam os argumentos fornecidos pelo modelo contra suas anotações de tipo em Python via Pydantic (`validate_args=True` por padrão) antes de chamar a função. Se a validação falhar (`ToolArgumentValidationError`) ou se a função levantar uma exceção, o `Runner` captura a falha e retorna um erro estruturado ao modelo em vez de derrubar o turno:
 
 ```python
 import logging
@@ -151,12 +157,12 @@ async def execute_turn_with_recovery(
 
 ## Timeouts de Turno e Fronteiras de Recursos
 
-<VersionBadge version="0.4.0rc1" status="prerelease" />
+<VersionBadge version="0.4.0" status="stable" />
 
-A partir da `v0.4.0rc1`, `run_async` suporta o parâmetro explícito `turn_timeout` (em segundos). Diferente de timeouts de requisição genéricos, `turn_timeout` inicia a contagem somente **após** a chamada adquirir a trava da sessão, garantindo que turnos enfileirados não expirem prematuramente enquanto aguardam turnos anteriores:
+A partir da `v0.4.0`, `run_async` suporta o parâmetro explícito `turn_timeout` (em segundos). Diferente de timeouts de requisição genéricos, `turn_timeout` inicia a contagem somente **após** a chamada adquirir a trava da sessão, garantindo que turnos enfileirados não expirem prematuramente enquanto aguardam turnos anteriores:
 
 ```python
-# [min-version: 0.4.0rc1]
+# [min-version: 0.4.0]
 # [no-exec: illustrative turn timeout call]
 # Limita a execução do turno a 45 segundos após a aquisição da trava
 response = await runner.run_async(

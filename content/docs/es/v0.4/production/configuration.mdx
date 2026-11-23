@@ -2,7 +2,7 @@
 title: "Configuración y Entorno"
 description: "Gestiona variables de entorno, preajustes de proveedores, tiempos de espera y configuración de aplicaciones Doce Factores en implementaciones de chatflow-agent."
 sourceRevision: "db864ef"
-sourceHash: "c250f35fe4385cc9b9f97f767865ced3658ff9631871258f4931d5f784919979"
+sourceHash: "7af978139980a8f50b9447cb179c57d318f8ae1582cc396dede63ba5cc7a9ab5"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -45,7 +45,7 @@ El propio SDK solo lee las variables de proveedores que se indican a continuaci�
 | `GROQ_API_KEY` | Groq Cloud | Token Bearer para LPUs de Groq (`provider="groq"`). | `None` (Requerido para Groq) |
 | `DEEPSEEK_API_KEY` | DeepSeek | Token Bearer para API de DeepSeek (`provider="deepseek"`). | `None` (Requerido para DeepSeek) |
 | `XAI_API_KEY` | xAI Grok | Token Bearer para endpoints de xAI Grok (`provider="grok"`). | `None` (Requerido para Grok) |
-| `GEMINI_API_KEY` | Google Gemini | Clave de API para los endpoints REST de la Gemini Developer API (Google AI Studio). Vertex AI y las Application Default Credentials no están soportadas en v0.4.0rc1. | `GOOGLE_API_KEY` |
+| `GEMINI_API_KEY` | Google Gemini | Clave de API para los endpoints REST de la Gemini Developer API (Google AI Studio). Vertex AI y las Application Default Credentials no están soportadas en v0.4.0. | `GOOGLE_API_KEY` |
 | `GOOGLE_API_KEY` | Google Gemini | Clave alternativa de respaldo para entornos de Google Cloud. | `None` |
 | `GOOGLE_GEMINI_BASE_URL` | Google Gemini | Anulación de URL base para proxies de Gemini. | `https://generativelanguage.googleapis.com` |
 | `ANTHROPIC_API_KEY` | Anthropic | Clave de API para Messages API de Claude (`x-api-key`). | `None` (Requerido para Anthropic) |

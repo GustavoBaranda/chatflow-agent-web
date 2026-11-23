@@ -1,0 +1,119 @@
+---
+title: "Novedades de 0.4.0"
+description: "Resumen completo de las nuevas funcionalidades, validación de argumentos de herramientas en tiempo de ejecución, motor REST directo para Gemini, reversión transaccional y mejoras en chatflow-agent v0.4.0."
+sourceRevision: "feba63b"
+sourceHash: "4644faef7f7ec0353c5ec7b46dc6035d6b802c3f37cf8236ff02544e974f2b87"
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+<div className="mb-4 flex flex-wrap items-center gap-2">
+  <VersionBadge version="0.4.0" status="stable" />
+  <span className="text-xs text-slate-500 dark:text-slate-400">Comparativa de versiones: v0.3.4 Estable → v0.4.0 Estable</span>
+</div>
+
+**`chatflow-agent` `0.4.0`** es la última versión estable de producción del framework. Consolida todas las mejoras arquitectónicas, la validación en tiempo de ejecución de herramientas, el endurecimiento de seguridad y las correcciones acumuladas del ciclo `0.4.0` en una única línea base estable.
+
+<Callout type="info" title="¿Actualizando un proyecto existente desde v0.3.4?">
+Esta página resume todas las nuevas capacidades y cambios de comportamiento entre `0.3.4` y `0.4.0`. Para instrucciones detalladas paso a paso y ejemplos antes/después de los 4 cambios incompatibles, consulta la [Guía de Migración (0.3.4 → 0.4.0)](/es/docs/v0.4/getting-started/migration).
+</Callout>
+
+## Resumen Comparativo (`0.3.4` → `0.4.0`)
+
+| Área | `v0.3.4` (Estable Anterior) | `v0.4.0` (Última Estable) |
+| :--- | :--- | :--- |
+| **Validación de argumentos en `@tool`** | Solo esquema; los argumentos del modelo se pasaban sin validar | **Validación con Pydantic en tiempo de ejecución activada por defecto (`validate_args=True`)**, lanzando `ToolArgumentValidationError` |
+| **Validación del esquema de herramientas** | Anotaciones inválidas usaban `{}` o fallaban tarde | **`ToolSchemaError` inmediato al registrar la herramienta** + helper público `Tool.to_openai_parameters()` |
+| **Transporte de Gemini** | Dependía del paquete `google-genai` | **API REST de Gemini directa mediante `httpx.AsyncClient`** (se elimina la dependencia `google-genai`) |
+| **Reversión de turnos y timeouts** | Revertía mensajes y `active_agent` solo ante `Exception` estándar | **Reversión transaccional completa de historial, `active_agent` y `metadata`** ante `Exception`, `CancelledError` y `turn_timeout` |
+| **Concurrencia de sesión** | `asyncio.Lock` por sesión (las llamadas reentrantes se bloqueaban) | **Detección de reentrada (`ReentrantTurnError`)**, `Runner.spawn_turn()` y **`Runner.reset_session_async()`** |
+| **Ciclo de vida del Runner** | Limpieza manual de motores | **`async with runner:`** (`__aenter__` / `__aexit__`) |
+| **SQLite `:memory:`** | Abría una conexión en memoria vacía por operación | **Conexión compartida persistente** para `SQLiteSessionStore(db_path=":memory:")` + lecturas en una sola transacción |
+| **Validación de configuración y JSON** | `ValueError` o `TypeError` genéricos | **`ConfigurationError`** y **`JsonCodecError`** dedicados (con soporte ISO-8601 para `datetime`/`date`/`time` en `metadata`) |
+| **Resiliencia en Telegram** | Actualizaciones secuenciales; un único intento de envío | **`concurrent_updates`**, `/reset` seguro por sesión y **reintentos ante control de flujo `RetryAfter` (`max_retry_after_seconds`)** |
+| **Endurecimiento en WhatsApp** | `dedup_ttl_hours` sin efecto; `sender` sin enmascarar en respuesta JSON | **`dedup_ttl_hours` eliminado**, `sender` enmascarado, `wamid` alternativo SHA-256, validación `2xx` estricta y `ConfigurationError` |
+
+---
+
+## 1. Validación de Argumentos de Herramientas en Tiempo de Ejecución (`validate_args=True`)
+
+En `v0.3.4`, las anotaciones de tipo en funciones `@tool` solo generaban el JSON Schema enviado al modelo; los argumentos devueltos por el LLM se pasaban directamente a la función sin validación en tiempo de ejecución.
+
+En `v0.4.0`, **la validación de argumentos en tiempo de ejecución está activada por defecto (`validate_args=True`)**:
+
+* Cada llamada a una herramienta valida y convierte los argumentos mediante un `TypeAdapter` de Pydantic en caché antes de ejecutar la función.
+* **Coerción práctica para LLMs:** Enteros y flotantes finitos sin comillas se convierten limpiamente a `str` (rechazando booleanos, listas, diccionarios y `None` para `str`); booleanos en cadena (`"true"`, `"false"`) se convierten a `bool`; parámetros `int` y `float` rechazan booleanos (`True`/`False`) y valores no finitos (`NaN`, `inf`, `-inf`).
+* **Uniones independientes del orden:** En uniones que incluyen `str` (como `str | int`), los miembros sin coerción se evalúan antes que `str` para que valores enteros como `5` se conserven como `int`.
+* **Soporte de parámetros reservados:** Parámetros con guion bajo inicial (`_id`), `model_config` o funciones simples con `self` o `cls` se validan sin colisionar con atributos internos de Pydantic.
+* **Mensajes de error saneados:** Argumentos inválidos lanzan **`ToolArgumentValidationError`** (subclase de `ToolExecutionError`) con resúmenes acotados (máximo 3 errores y 300 caracteres) y sin exponer cadenas `__cause__` / `__context__` internas.
+* **Desactivación por herramienta y clonación aislada:** Puedes pasar `validate_args=False` en `@tool`, `@agent.tool`, `agent.add_tool` o `Tool(...)`. Si una instancia compartida de `Tool` se registra en varios agentes con distinto `validate_args`, `agent.add_tool()` la clona (`Tool.clone()`) para no mutar a otros agentes.
+
+```python
+# [min-version: 0.4.0]
+# [executable]
+from chatflow_agent import ToolArgumentValidationError, tool
+
+@tool
+def create_order(sku: str, quantity: int) -> str:
+    """Create a warehouse order."""
+    return f"Ordered {quantity}x {sku}"
+
+assert create_order.execute(sku=1042, quantity="3") == "Ordered 3x 1042"
+
+try:
+    create_order.execute(sku="A-100", quantity="not-a-number")
+except ToolArgumentValidationError as exc:
+    assert "quantity" in str(exc)
+```
+
+---
+
+## 2. Validación Temprana de Esquemas (`ToolSchemaError`) y `Tool.to_openai_parameters()`
+
+* **`ToolSchemaError` al definir la herramienta:** Referencias adelantadas sin resolver o clases personalizadas arbitrarias que Pydantic no puede convertir a JSON Schema lanzan **`ToolSchemaError`** inmediatamente al evaluar `@tool` o `Tool(...)`.
+* **Helper público `Tool.to_openai_parameters()`:** Devuelve una copia profunda del objeto JSON Schema normalizado compatible con OpenAI y Anthropic (`{"type": "object", "properties": ..., "required": ...}`).
+* **Tipado estático con `@overload`:** `@tool` y `@agent.tool` definen sobrecargas `@overload` para que `mypy` y `pyright` infieran `Tool` tanto con decorador simple como parametrizado.
+
+---
+
+## 3. Ciclo de Vida del Runner, Reversión Transaccional Completa y Concurrencia
+
+* **`async with runner:`:** `Runner` implementa el protocolo de gestor de contexto asíncrono (`__aenter__` / `__aexit__`), cerrando automáticamente su cliente `httpx.AsyncClient` agrupado para Gemini al salir del bloque.
+* **`turn_timeout: float | None = None`:** Disponible en `runner.run()` y `await runner.run_async()`. Si el turno supera el límite (contado una vez adquirido el bloqueo de la sesión), se cancela, revierte todos los cambios del turno y lanza `TimeoutError`. (Valores booleanos `True`/`False` lanzan `ValueError`.)
+* **Reversión transaccional completa:** Los turnos que fallan, expiran por timeout o se cancelan (`asyncio.CancelledError`) revierten **el historial de mensajes, el `active_agent` y `session.metadata`** tanto en `SessionStore` como en `SQLiteSessionStore` (mediante `_turn_journal.prev_metadata`). Si la sesión fue eliminada durante el turno, lanza **`SessionDeletedError`**.
+* **Prevención de turnos reentrantes (`ReentrantTurnError`) y `Runner.spawn_turn()`:** Invocar `runner.run()`, `runner.run_async()` o `runner.reset_session*()` sobre el mismo `session_id` desde dentro de un turno activo lanza **`ReentrantTurnError`** de inmediato en lugar de provocar un interbloqueo. Usa `runner.spawn_turn()` para encolar un turno posterior independiente.
+* **Reinicio seguro de sesión (`reset_session_async` y `reset_session`):** Limpia el historial bajo el bloqueo de turno de la sesión, espera a cualquier hilo síncrono pendiente y delega escrituras SQLite mediante `asyncio.to_thread()`.
+
+---
+
+## 4. Motor REST Directo para Gemini y Mejoras en Proveedores
+
+* **`GeminiEngine` directo sobre `httpx` (sin `google-genai`):** `GeminiEngine` se conecta directamente a `https://generativelanguage.googleapis.com/v1beta` con `follow_redirects=False`, reintentos exponenciales, soporte de `Retry-After` y redacción automática de la clave API.
+* **Respeto de `Agent(api_key=...)` en el fallback a Gemini:** Cuando un agente usa el modelo Gemini por defecto sin `engine`, `provider` ni `base_url` explícitos, `Runner.resolve_engine()` clona el `GeminiEngine` por defecto con la `api_key` del agente.
+* **`AnthropicEngine(max_tokens=4096)` configurable:** Acepta el parámetro keyword-only `max_tokens: int = 4096` (validado con `ConfigurationError`) y registra una advertencia cuando `stop_reason == "max_tokens"`.
+* **IDs sintéticos de llamadas a herramientas sin colisiones:** Cuando un proveedor omite el `id` de una llamada a herramienta, `OpenAIEngine` genera `call_<24 hex>` (29 caracteres) y `GeminiEngine` genera `cf_gemini_<24 hex>` (34 caracteres, omitido al reenviar `functionResponse` a Gemini pero conservando IDs reales intactos).
+* **Validación estricta con `ConfigurationError` y redacción compartida:** Proveedores desconocidos o URLs remotas personalizadas sin `api_key` explícita lanzan **`ConfigurationError`** (subclase de `ValueError`). Todos los motores y `WhatsAppChannel` comparten un pipeline de redacción de secretos (texto plano, JSON escapado y URL percent-encoded) y suprimen el encadenamiento crudo `__cause__`/`__context__` en `ProviderError`.
+
+---
+
+## 5. Sesiones, SQLite `:memory:`, `JsonCodecError` y Canales
+
+* **`SQLiteSessionStore(db_path=":memory:")` persistente y lecturas en una sola transacción:** Reutiliza una conexión compartida protegida por `RLock` durante toda la vida de la instancia. `SQLiteSessionStore.get()` lee metadatos y mensajes en una única transacción.
+* **Copia profunda de `metadata` en memoria y deduplicación thread-safe:** `SessionContext` y `SessionStore` hacen copia profunda de `metadata` al crear, actualizar, transferir o revertir turnos, y protegen `record_processed_message()` / `is_message_processed()` con un bloqueo interno.
+* **`JsonCodecError` y fechas ISO-8601:** Objetos `datetime`, `date` y `time` en `metadata` se serializan automáticamente en formato ISO-8601; objetos no serializables a JSON lanzan **`JsonCodecError`**.
+* **Mejoras en `TelegramChannel`:** Soporte de `concurrent_updates`, reintentos acotados ante `telegram.error.RetryAfter` (`max_retry_after_seconds=60.0`) por fragmento pendiente sin duplicar mensajes ya enviados, y `/reset` mediante `Runner.reset_session_async()`.
+* **Mejoras en `WhatsAppChannel`:** Eliminación del parámetro sin uso `dedup_ttl_hours` (configurado en el store), enmascaramiento del teléfono `sender` en la respuesta JSON del webhook (`_mask_phone()`), ID determinista SHA-256 (`gen_<sha256>`) cuando Meta omite `"id"`, validación HTTP `2xx` estricta (`follow_redirects=False`), fallback ante respuestas vacías y `await` completo para cualquier callable awaitable en `on_24h_window_expired`.
+
+---
+
+## 6. Nuevas Excepciones Públicas en `0.4.0`
+
+| Excepción | Clase(s) Base | Cuándo se lanza |
+| :--- | :--- | :--- |
+| `ConfigurationError` | `ChatFlowError`, `ValueError` | Configuración inválida de proveedor, motor, `base_url`, `max_tokens` o parámetros de canales. |
+| `JsonCodecError` | `ChatFlowError` | `metadata` de sesión o payload contiene un objeto no serializable a JSON. |
+| `ToolSchemaError` | `ChatFlowError` | Una función `@tool` o `Tool` usa una anotación adelantada sin resolver o un tipo no convertible a JSON Schema. |
+| `ToolArgumentValidationError` | `ToolExecutionError` | Los argumentos pasados a una herramienta no superan la validación de Pydantic en tiempo de ejecución (`validate_args=True`). |
+| `ReentrantTurnError` | `ChatFlowError`, `RuntimeError` | Se invoca `runner.run()`, `runner.run_async()` o `runner.reset_session*()` sobre el mismo `session_id` desde un turno activo de esa sesión. |
+| `SessionDeletedError` | `ChatFlowError` | Un turno en ejecución intenta confirmar o revertir cambios en una sesión eliminada concurrentemente. |

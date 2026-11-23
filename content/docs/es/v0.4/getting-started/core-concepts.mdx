@@ -2,7 +2,7 @@
 title: 'Conceptos Fundamentales'
 description: 'Comprende cómo se desarrollan los chatflows en chatflow-agent y cómo trabajan juntos Agents, Engines, Tools, Runner, Memory y Handoffs.'
 sourceRevision: '6f2be16'
-sourceHash: 'b48c33fada230cdf08d600497824b6fcc66b615e6991c64ad5180edd17895958'
+sourceHash: "fbc31c0a01395336287b11c91a57e6e6b4255ef61d5798d5ce495984ad3f934d"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -57,8 +57,8 @@ agent = Agent(
 )
 ```
 
-<Callout type="info" title="Validación de Identidad en Enjambres en v0.4.0rc1">
-  En <VersionBadge version="0.4.0rc1" status="prerelease" />, el <code>Runner</code> valida
+<Callout type="info" title="Validación de Identidad en Enjambres en v0.4.0">
+  En <VersionBadge version="0.4.0" status="stable" />, el <code>Runner</code> valida
   estrictamente que todos los agentes dentro de un enjambre posean atributos <code>name</code>{' '}
   distintos, lanzando un <code>ValueError</code> si se detectan nombres duplicados para prevenir
   colisiones en la generación de herramientas.
@@ -103,7 +103,7 @@ response = runner.run(
 Invocación asíncrona, dentro de un bucle de eventos (servidores web, bots, aplicaciones `asyncio`):
 
 ```python
-# [min-version: 0.4.0rc1]
+# [min-version: 0.4.0]
 # [no-exec: requires real openai api key for live response]
 import asyncio
 
@@ -125,8 +125,8 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-<Callout type="info" title="turn_timeout en v0.4.0rc1">
-  En <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>Runner.run_async</code>{' '}
+<Callout type="info" title="turn_timeout en v0.4.0">
+  En <VersionBadge version="0.4.0" status="stable" />, <code>Runner.run_async</code>{' '}
   introduce un parámetro opcional con nombre <code>turn_timeout: float | None = None</code> (por
   ejemplo, <code>turn_timeout=30.0</code>). Si un turno excede el plazo, se cancela y revierte el
   estado de forma atómica.
@@ -140,7 +140,7 @@ Toda la comunicación con modelos en `chatflow-agent` está desacoplada tras la 
 
 - **`OpenAIEngine`**: Compatible con modelos de OpenAI y cualquier API compatible con OpenAI (Groq, DeepSeek, xAI Grok, Ollama, vLLM) mediante `base_url`.
 - **`AnthropicEngine`**: Integración directa por REST con modelos Claude de Anthropic.
-- **`GeminiEngine`**: Integración con Google Gemini. En <VersionBadge version="0.4.0rc1" status="prerelease" />, reescrita completamente con llamadas REST nativas.
+- **`GeminiEngine`**: Integración con Google Gemini. En <VersionBadge version="0.4.0" status="stable" />, reescrita completamente con llamadas REST nativas.
 
 ```python
 from chatflow_agent import Agent, OpenAIEngine

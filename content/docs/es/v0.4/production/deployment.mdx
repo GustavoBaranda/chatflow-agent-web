@@ -2,7 +2,7 @@
 title: "Patrones de Despliegue en Producción"
 description: "Despliega aplicaciones chatflow-agent en producción, servicios ASGI con FastAPI, patrones de concurrencia en SQLite, contenerización con Docker y gestión de procesos."
 sourceRevision: "db864ef"
-sourceHash: "109bf4990e451122afbcdf84d196151a7d815cc8087a9b45df5d079b63d33cc7"
+sourceHash: "d01e18d880766ea197b6b679d0c233612e027e10babd39c2d3ef598c3386958e"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -100,7 +100,7 @@ async def health_check():
 `SQLiteSessionStore` ofrece persistencia sin infraestructura externa ni dependencias de servicios adicionales. Ten en cuenta estos puntos al emplearlo en producción:
 
 1. **Modo WAL (Write-Ahead Logging):** Los almacenes respaldados en archivo activan automáticamente `PRAGMA journal_mode=WAL` y `busy_timeout=10000` en cada conexión; no hay nada que configurar. Los almacenes `":memory:"` utilizan una caché compartida y un busy timeout, sin WAL.
-2. **Descarga a Hilos de Trabajo:** En `v0.4.0rc1`, los almacenes respaldados en archivo ejecutan sus operaciones SQLite en un pequeño grupo de hilos de trabajo propiedad del almacén (4 hilos, creados en el primer uso y finalizados por `close()`), de modo que la E/S de disco no bloquea el bucle de eventos de asyncio. Una llamada a SQLite ya iniciada no puede interrumpirse, por lo que las peticiones que necesitan la base de datos siguen esperando mientras otro escritor la mantiene ocupada.
+2. **Descarga a Hilos de Trabajo:** En `v0.4.0`, los almacenes respaldados en archivo ejecutan sus operaciones SQLite en un pequeño grupo de hilos de trabajo propiedad del almacén (4 hilos, creados en el primer uso y finalizados por `close()`), de modo que la E/S de disco no bloquea el bucle de eventos de asyncio. Una llamada a SQLite ya iniciada no puede interrumpirse, por lo que las peticiones que necesitan la base de datos siguen esperando mientras otro escritor la mantiene ocupada.
 3. **Aislamiento de Procesos:** SQLite no admite escrituras de alta concurrencia seguras entre múltiples procesos independientes del sistema operativo (ej. `gunicorn -w 8`). Ejecuta con un único proceso trabajador con alta concurrencia asíncrona (`uvicorn --workers 1`), o particiona las sesiones según el identificador de usuario.
 
 ## Contenerización con Docker

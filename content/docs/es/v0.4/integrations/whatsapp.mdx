@@ -2,7 +2,7 @@
 title: "WhatsApp Business Cloud API"
 description: "Integración de producción con WhatsApp utilizando Meta Cloud API, webhooks de FastAPI, verificación de firmas HMAC y gestión de ventana de 24 horas."
 sourceRevision: "d2c5d67"
-sourceHash: "b6df9d2ea60f8b1c09371eabaaff97bde64b9fe6c5ed31c6888199ab556e8016"
+sourceHash: "89192ee056746793c141b385f79f18540b95ee87353760d729781817bedd7df8"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -148,14 +148,13 @@ Las peticiones deben incluir un encabezado `Content-Length`; comprueba que ning�
 # Salida registrada en logs:      "1415***671"
 ```
 
-El enmascaramiento solo se aplica a esas líneas de log. El número sin procesar sigue apareciendo en:
+El enmascaramiento se aplica tanto a esas líneas de log como al campo `"sender"` del cuerpo de la respuesta JSON HTTP del webhook. El número sin procesar se sigue utilizando internamente en:
 
-* el cuerpo de la respuesta JSON del webhook (campo `"sender"`);
 * el ID de sesión y los metadatos del turno (`"phone"`) y, por tanto, en el almacén de sesiones;
 * el argumento que se pasa a `on_24h_window_expired`;
-* las respuestas de error de Meta, que se registran tal como se reciben.
+* las peticiones salientes hacia la API Graph de Meta.
 
-Trata los logs, la base de datos de sesiones y cualquier log de acceso HTTP como datos personales.
+Trata la base de datos de sesiones y cualquier log personalizado de tu aplicación como datos personales.
 
 ## Concurrencia, Tiempos Límite y Plazos
 
@@ -172,7 +171,7 @@ Por lo tanto, una respuesta puede tardar hasta `queue_timeout_seconds + llm_time
 
 Meta restringe estrictamente el envío de mensajes libres a un período máximo de **24 horas desde el último mensaje entrante del usuario**. Intentar enviar texto libre fuera de esta ventana provoca que la API de Meta retorne el código de error `131047`.
 
-`WhatsAppChannel` incluye un gancho (*callback hook*) dedicado `on_24h_window_expired`. Se invoca con un único argumento, el número de teléfono del destinatario (sin enmascarar). En v0.4.0rc1 debe ser una función `async def` o una función normal; otros invocables que devuelvan una corrutina (como un objeto con un `async __call__`) no se esperan con await. Las excepciones lanzadas por el gancho se registran en el log y no detienen el canal:
+`WhatsAppChannel` incluye un gancho (*callback hook*) dedicado `on_24h_window_expired`. Se invoca con un único argumento, el número de teléfono del destinatario (sin enmascarar). En `v0.4.0`, cualquier valor de retorno awaitable de `on_24h_window_expired` se espera con `await` (incluyendo funciones `async def`, objetos con `async __call__` y envoltorios `functools.partial`). Las excepciones lanzadas por el gancho se registran en el log y no detienen el canal:
 
 ```python
 async def handle_expired_window(phone_number: str) -> None:
@@ -197,6 +196,6 @@ Los webhooks de Meta frecuentemente reenvían entregas HTTP duplicadas si la lat
 El identificador del mensaje se registra <em>antes</em> de que se ejecute el turno en segundo plano. Si el proceso falla o se reinicia mientras ese turno se ejecuta, el mensaje se pierde: los reintentos de Meta se descartan entonces como duplicados.
 </Callout>
 
-`WhatsAppChannel` también acepta un argumento `dedup_ttl_hours` en v0.4.0rc1, pero se almacena y nunca se utiliza: solo se aplica la configuración del almacén de sesiones.
+El parámetro sin efecto `dedup_ttl_hours` del constructor de `WhatsAppChannel` fue eliminado en `v0.4.0`; configura `dedup_ttl_hours` directamente en `SQLiteSessionStore` o `SessionStore`.
 
-Los identificadores de mensaje se toman de la carga útil. Un mensaje en formato Meta sin `id` recibe un identificador derivado de `hash()` de Python aplicado al mensaje, que cambia entre reinicios del proceso. Una carga genérica (no Meta) sin identificador recibe un identificador aleatorio, por lo que nunca se trata como duplicada.
+Los identificadores de mensaje se toman de la carga útil. En `v0.4.0`, un mensaje en formato Meta sin campo `"id"` recibe un identificador determinista SHA-256 (`gen_<sha256>`) derivado del JSON canónico del mensaje, consistente entre reinicios del proceso. Una carga genérica (no Meta) sin identificador recibe un UUID aleatorio, por lo que nunca se trata como duplicada.

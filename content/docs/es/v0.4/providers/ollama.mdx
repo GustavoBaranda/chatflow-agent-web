@@ -2,7 +2,7 @@
 title: "Modelos Locales con Ollama"
 description: "Ejecuta modelos de pesos abiertos como Google Gemma 2, Llama 3 y Mistral en hardware local sin costos en la nube."
 sourceRevision: "82d8ebf"
-sourceHash: "fbf126632b844d741be3636a8527de87f25e583323a3e9276b6946b994d2fc13"
+sourceHash: "214a6ddcd6ea52a8bf0ffe98827a0192b16ff1f725fd9c5ebd33acb0ae8de8bf"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -32,7 +32,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
   <Step>
     ### Definir un Agente Local
 
-    En v0.4.0rc1, `chatflow-agent` enruta automáticamente nombres de modelo que comiencen con `gemma`, `llama`, `mistral`, `qwen` o `phi` al preajuste del motor Ollama, salvo que el agente defina `provider`, `base_url` o `engine`, o que el `Runner` haya recibido un `engine=` explícito:
+    En v0.4.0, `chatflow-agent` enruta automáticamente nombres de modelo que comiencen con `gemma`, `llama`, `mistral`, `qwen` o `phi` al preajuste del motor Ollama, salvo que el agente defina `provider`, `base_url` o `engine`, o que el `Runner` haya recibido un `engine=` explícito:
 
 ```python
 from chatflow_agent import Agent, Runner

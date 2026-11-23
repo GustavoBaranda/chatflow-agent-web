@@ -2,7 +2,7 @@
 title: "OpenAI y Endpoints Compatibles"
 description: "Configuración, preajustes, pasarelas personalizadas y políticas de seguridad para OpenAI, Groq, DeepSeek y xAI Grok."
 sourceRevision: "82d8ebf"
-sourceHash: "a25e971ba432830099fdbceac769e41bc5d7be392bc6a273dbe457db66491a50"
+sourceHash: "24f7f45eadb2506fa6d6d88a1989d459ec699147bcad2b0999acb162c4ee29fd"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -113,7 +113,7 @@ reasoning_agent = Agent(
 import os
 from chatflow_agent import Agent
 
-# provider="grok" selecciona el preajuste de xAI (api.x.ai); en v0.4.0rc1 basta también con un prefijo de modelo "grok"
+# provider="grok" selecciona el preajuste de xAI (api.x.ai); en v0.4.0 basta también con un prefijo de modelo "grok"
 # Requiere la variable de entorno XAI_API_KEY
 grok_agent = Agent(
     name="GrokAgent",

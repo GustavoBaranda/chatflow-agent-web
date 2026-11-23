@@ -2,7 +2,7 @@
 title: "WhatsApp Business Cloud API"
 description: "Integração do WhatsApp para ambientes de produção com Meta Cloud API, webhooks FastAPI, validação de assinatura HMAC e gerenciamento de janela de 24 horas."
 sourceRevision: "d2c5d67"
-sourceHash: "b6df9d2ea60f8b1c09371eabaaff97bde64b9fe6c5ed31c6888199ab556e8016"
+sourceHash: "89192ee056746793c141b385f79f18540b95ee87353760d729781817bedd7df8"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -148,14 +148,13 @@ O `WhatsAppChannel` mascara números de telefone nas mensagens de log do própri
 # Saída registrada no log:   "1415***671"
 ```
 
-O mascaramento se aplica somente a essas linhas de log. O número original ainda aparece:
+O mascaramento se aplica tanto a essas linhas de log quanto ao campo `"sender"` do corpo da resposta JSON HTTP do webhook. O número original ainda é utilizado internamente:
 
-* no corpo da resposta JSON do webhook (campo `"sender"`);
 * no ID de sessão e nos metadados do turno (`"phone"`) e, portanto, no armazenamento de sessões;
 * no argumento passado para `on_24h_window_expired`;
-* nas respostas de erro da Meta, que são registradas no log tal como recebidas.
+* nas requisições de saída para a Graph API da Meta.
 
-Trate os logs, o banco de dados de sessões e quaisquer logs de acesso HTTP como dados pessoais.
+Trate o banco de dados de sessões e quaisquer logs customizados da aplicação como dados pessoais.
 
 ## Concorrência, Timeouts e Prazos Limite
 
@@ -172,7 +171,7 @@ Uma resposta pode, portanto, levar até `queue_timeout_seconds + llm_timeout_sec
 
 A Meta restringe estritamente o envio de mensagens livres para o intervalo de **24 horas após a última mensagem recebida do usuário**. Tentar enviar texto livre fora dessa janela retorna o código de erro `131047` da API da Meta.
 
-O `WhatsAppChannel` inclui um hook de callback dedicado chamado `on_24h_window_expired`. Ele é chamado com um único argumento, o número de telefone do destinatário (sem máscara). Na v0.4.0rc1, ele deve ser uma função `async def` ou uma função comum; outros invocáveis que retornam uma corrotina (como um objeto com um `async __call__`) não são aguardados. Exceções lançadas pelo hook são registradas no log e não interrompem o canal:
+O `WhatsAppChannel` inclui um hook de callback dedicado chamado `on_24h_window_expired`. Ele é chamado com um único argumento, o número de telefone do destinatário (sem máscara). Na `v0.4.0`, qualquer valor de retorno awaitable de `on_24h_window_expired` é aguardado com `await` (incluindo funções `async def`, objetos com `async __call__` e wrappers `functools.partial`). Exceções lançadas pelo hook são registradas no log e não interrompem o canal:
 
 ```python
 async def handle_expired_window(phone_number: str) -> None:
@@ -197,6 +196,6 @@ Os webhooks da Meta frequentemente reenviam requisições HTTP duplicadas caso a
 O ID da mensagem é registrado <em>antes</em> de o turno em segundo plano ser executado. Se o processo falhar ou reiniciar enquanto esse turno está em execução, a mensagem é perdida: as novas tentativas da Meta para ela são então descartadas como duplicatas.
 </Callout>
 
-O `WhatsAppChannel` também aceita um argumento `dedup_ttl_hours` na v0.4.0rc1, mas ele é armazenado e nunca utilizado: apenas a configuração do armazenamento de sessões se aplica.
+O parâmetro sem efeito `dedup_ttl_hours` do construtor do `WhatsAppChannel` foi removido na `v0.4.0`; configure `dedup_ttl_hours` diretamente no `SQLiteSessionStore` ou `SessionStore`.
 
-Os IDs de mensagem são obtidos da carga útil. Uma mensagem no formato da Meta sem `id` recebe um ID derivado do `hash()` do Python sobre a mensagem, que muda entre reinicializações do processo. Uma carga útil genérica (não Meta) sem ID recebe um ID aleatório, de modo que nunca é tratada como duplicata.
+Os IDs de mensagem são obtidos da carga útil. Na `v0.4.0`, uma mensagem no formato da Meta sem campo `"id"` recebe um ID determinístico SHA-256 (`gen_<sha256>`) derivado do JSON canônico da mensagem, mantendo consistência entre reinicializações do processo. Uma carga útil genérica (não Meta) sem ID recebe um UUID aleatório, de modo que nunca é tratada como duplicata.

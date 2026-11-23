@@ -28,7 +28,7 @@ export function HeroSection() {
       </p>
 
       <Link
-        href="/docs/v0.3/getting-started/core-concepts"
+        href="/docs/v0.4/getting-started/core-concepts"
         className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-primary"
       >
         <span>{t('chatflowConcepts')}</span>

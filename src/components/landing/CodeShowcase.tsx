@@ -215,7 +215,7 @@ export function CodeShowcase() {
       {/* Deep-link to full quickstart guide */}
       <div className="mt-4 mx-auto max-w-4xl flex items-center justify-end px-2">
         <Link
-          href="/docs/v0.3/getting-started/quickstart"
+          href="/docs/v0.4/getting-started/quickstart"
           className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-primary transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-primary"
         >
           <span>{t('viewFullQuickstart')}</span>

@@ -24,10 +24,17 @@
   },
   "versionSelector": {
     "label": "Versión de la Documentación",
+    "ariaLabel": "Cambiar versión de la documentación",
     "switchVersion": "Cambiar versión de la documentación",
     "currentVersion": "Versión actual: {version}",
     "stable": "Estable",
-    "prerelease": "Versión preliminar"
+    "stableBadge": "Latest / Stable",
+    "previousBadge": "Previous Stable",
+    "prereleaseBadge": "RC1",
+    "latestStable": "Última versión estable de producción",
+    "previousStable": "Versión estable anterior",
+    "prerelease": "Versión preliminar",
+    "prereleaseTrack": "Versión candidata preliminar (prerelease)"
   },
   "prereleaseBanner": {
     "title": "Documentación de Versión Preliminar ({version})",
@@ -70,7 +77,7 @@
     "subtitle": "Un framework ligero y asíncrono en Python para agentes de IA conversacional, diseñado con handoffs nativos y conectividad multicanal.",
     "originTitle": "Origen y Propósito",
     "originP1": "chatflow-agent nació para resolver una necesidad concreta en el desarrollo de IA conversacional: conectar modelos LLM con canales de mensajería del mundo real sin sobrecargar el proyecto con orquestadores monolíticos y pesados.",
-    "originP2": "En lugar de imponer arquitecturas distribuidas complejas, chatflow-agent apuesta por la simplicidad de Python, la ejecución con asyncio y la persistencia de sesiones en SQLite. En la versión estable v0.3.4, el rollback restaura el historial ante excepciones ordinarias; no garantiza todo el estado ni las cancelaciones.",
+    "originP2": "En lugar de imponer arquitecturas distribuidas complejas, chatflow-agent apuesta por la simplicidad de Python, la ejecución con asyncio y la persistencia de sesiones en SQLite. En la versión estable v0.4.0, los turnos que fallan, se cancelan o expiran por timeout revierten transaccionalmente el historial, el agente activo y los metadatos (`SQLiteSessionStore` mediante un diario de turno y `SessionStore` mediante instantáneas en memoria), mientras que las herramientas validan los argumentos del modelo en tiempo de ejecución con Pydantic (`validate_args=True`).",
     "principlesTitle": "Principios Fundamentales de Arquitectura",
     "p1Title": "Ligero y Asíncrono",
     "p1Desc": "Construido sobre asyncio estándar de Python, con los turnos de una misma sesión en proceso serializados mediante un lock asíncrono.",
@@ -94,7 +101,7 @@
     "closingCommunityAction": "Unirse a la Comunidad"
   },
   "home": {
-    "badge": "chatflow-agent v0.3.4 • Python >= 3.10",
+    "badge": "chatflow-agent v0.4.0 • Python >= 3.10",
     "heroTitle": "Construí Chatflows y Sistemas Multiagente Contextuales en Python",
     "heroSubtitle": "Construí chatflows en Python con agentes que usan herramientas, delegan tareas mediante handoffs y mantienen el contexto de la conversación entre sesiones.",
     "chatflowConcepts": "Cómo funciona un chatflow en Python",
@@ -119,7 +126,7 @@
     "docCard3Title": "Webhooks y API para Producción",
     "docCard3Desc": "Integrá webhooks con firmas criptográficas HMAC, desplegá con FastAPI y conectá canales en tiempo real.",
     "docCard3Action": "Ver Integración Webhook",
-    "verifiedBadge": "Verificado en chatflow-agent v0.3.4",
+    "verifiedBadge": "Verificado en chatflow-agent v0.4.0",
     "featuresTitle": "Diseñado para Flujos Conversacionales del Mundo Real",
     "featuresSubtitle": "Todo lo necesario para desplegar aplicaciones multiagente confiables sin la sobrecarga de orquestadores monolíticos.",
     "featHandoffsTitle": "Handoffs Nativos entre Agentes",

@@ -34,7 +34,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/docs/v0.3/getting-started/quickstart"
+                  href="/docs/v0.4/getting-started/quickstart"
                   className="inline-block py-0.5 transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
                 >
                   {t('links.quickstart')}
@@ -42,7 +42,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/docs/v0.3/guides/agents"
+                  href="/docs/v0.4/guides/agents"
                   className="inline-block py-0.5 transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
                 >
                   {t('links.guides')}

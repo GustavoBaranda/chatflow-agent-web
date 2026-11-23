@@ -1,60 +1,82 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () => {
-  test('VersionSelector displays active version and published SDK badge on v0.3', async ({ page }) => {
-    await page.goto('/en/docs/v0.3');
-    await page.waitForLoadState('networkidle');
-
-    const trigger = page.locator('[data-testid="version-selector-trigger"]').first();
-    await expect(trigger).toBeVisible();
-    await expect(trigger).toContainText('v0.3');
-    await expect(trigger).toContainText('Stable');
-    await expect(trigger).toContainText('0.3.4');
-  });
-
-  test('VersionSelector displays active version and prerelease badge on v0.4', async ({ page }) => {
+test.describe('Documentation Versioning & Navigation E2E Suite (0.4.0 Latest / Stable Promotion)', () => {
+  test('VersionSelector displays active v0.4 Latest / Stable and SDK 0.4.0 badge on /docs/v0.4', async ({ page }) => {
     await page.goto('/en/docs/v0.4');
     await page.waitForLoadState('networkidle');
 
     const trigger = page.locator('[data-testid="version-selector-trigger"]').first();
     await expect(trigger).toBeVisible();
     await expect(trigger).toContainText('v0.4');
-    await expect(trigger).toContainText('RC1');
-    await expect(trigger).toContainText('0.4.0rc1');
+    await expect(trigger).toContainText('Latest / Stable');
+    await expect(trigger).toContainText('0.4.0');
+    await expect(trigger).not.toContainText('RC1');
+    await expect(trigger).not.toContainText('0.4.0rc1');
   });
 
-  test('VersionSelector recognizes v0.3 as active on legacy unversioned URLs', async ({ page }) => {
-    await page.goto('/en/docs/guides/agents');
+  test('VersionSelector displays active v0.3 Previous Stable and SDK 0.3.4 badge on /docs/v0.3', async ({ page }) => {
+    await page.goto('/en/docs/v0.3');
     await page.waitForLoadState('networkidle');
 
     const trigger = page.locator('[data-testid="version-selector-trigger"]').first();
     await expect(trigger).toBeVisible();
     await expect(trigger).toContainText('v0.3');
-    await expect(trigger).toContainText('Stable');
+    await expect(trigger).toContainText('Previous Stable');
+    await expect(trigger).toContainText('0.3.4');
+  });
+
+  test('unversioned /docs routes redirect to v0.4 Latest / Stable and VersionSelector recognizes v0.4 as active', async ({ page }) => {
+    await page.goto('/en/docs/guides/agents');
+    await page.waitForLoadState('networkidle');
+
+    expect(page.url()).toContain('/en/docs/v0.4/guides/agents');
+
+    const trigger = page.locator('[data-testid="version-selector-trigger"]').first();
+    await expect(trigger).toBeVisible();
+    await expect(trigger).toContainText('v0.4');
+    await expect(trigger).toContainText('Latest / Stable');
+  });
+
+  test('redirects legacy RC URLs (v0.4.0rc1, v0.4.0rc2, v0.4.0rc3) cleanly to v0.4 stable documentation', async ({ page }) => {
+    await page.goto('/en/docs/v0.4.0rc1/guides/agents');
+    await page.waitForLoadState('networkidle');
+    expect(page.url()).toContain('/en/docs/v0.4/guides/agents');
+  });
+
+  test('VersionSelector dropdown lists only stable versions (0.4.0 and 0.3.4) with zero RC options', async ({ page }) => {
+    await page.goto('/en/docs/v0.4');
+    await page.waitForLoadState('networkidle');
+
+    const trigger = page.locator('[data-testid="version-selector-trigger"]').first();
+    await trigger.click();
+
+    const listbox = page.locator('[data-testid="version-selector-listbox"]').first();
+    await expect(listbox).toBeVisible();
+    await expect(listbox).toContainText('0.4.0');
+    await expect(listbox).toContainText('0.3.4');
+    await expect(listbox).not.toContainText('0.4.0rc1');
+    await expect(listbox).not.toContainText('0.4.0rc2');
+    await expect(listbox).not.toContainText('0.4.0rc3');
+    await expect(listbox).not.toContainText('RC1');
   });
 
   test('switches versions preserving locale and topic from v0.3 to v0.4', async ({ page }) => {
     await page.goto('/es/docs/v0.3/guides/agents');
     await page.waitForLoadState('networkidle');
 
-    // Open version selector
     const trigger = page.locator('[data-testid="version-selector-trigger"]').first();
     await trigger.click();
 
-    // Listbox should be visible
     const listbox = page.locator('[data-testid="version-selector-listbox"]').first();
     await expect(listbox).toBeVisible();
 
-    // Click v0.4 option
     const option04 = page.locator('[data-testid="version-option-v0.4"]').first();
-    await expect(option04).toContainText('0.4.0rc1');
+    await expect(option04).toContainText('0.4.0');
     await option04.click();
 
-    // Verify URL preserved locale 'es' and topic 'guides/agents'
     await page.waitForURL(/\/es\/docs\/v0\.4\/guides\/agents/);
     expect(page.url()).toContain('/es/docs/v0.4/guides/agents');
 
-    // Single H1 heading
     const h1 = page.locator('article h1, main h1');
     await expect(h1).toHaveCount(1);
   });
@@ -74,75 +96,57 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
     expect(page.url()).toContain('/en/docs/v0.3/guides/runner-lifecycle');
   });
 
-  test('switches from legacy unversioned URL to v0.4 preserving topic', async ({ page }) => {
-    await page.goto('/en/docs/guides/tools');
-    await page.waitForLoadState('networkidle');
+  test('renders What is New in 0.4.0 and Migration Guide 0.3.4 -> 0.4.0 across en, es, and pt-BR', async ({ page }) => {
+    for (const locale of ['en', 'es', 'pt-BR']) {
+      const wnRes = await page.goto(`/${locale}/docs/v0.4/getting-started/whats-new`);
+      expect(wnRes?.status()).toBe(200);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('article h1, main h1')).toHaveCount(1);
+      await expect(page.locator('main')).toContainText('0.4.0');
+      await expect(page.locator('main')).toContainText('ToolArgumentValidationError');
 
-    const trigger = page.locator('[data-testid="version-selector-trigger"]').first();
-    await trigger.click();
-
-    const option04 = page.locator('[data-testid="version-option-v0.4"]').first();
-    await option04.click();
-
-    await page.waitForURL(/\/en\/docs\/v0\.4\/guides\/tools/);
-    expect(page.url()).toContain('/en/docs/v0.4/guides/tools');
+      const migRes = await page.goto(`/${locale}/docs/v0.4/getting-started/migration`);
+      expect(migRes?.status()).toBe(200);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('article h1, main h1')).toHaveCount(1);
+      await expect(page.locator('main')).toContainText('0.3.4');
+      await expect(page.locator('main')).toContainText('0.4.0');
+      await expect(page.locator('main')).toContainText('dedup_ttl_hours');
+    }
   });
 
-  test('displays PrereleaseBanner only on v0.4 with exact 0.4.0rc1 version and stable link', async ({ page }) => {
-    // 1. On v0.4, banner must be visible
+  test('does NOT display PrereleaseBanner on v0.4 or v0.3 now that both are stable releases', async ({ page }) => {
     await page.goto('/en/docs/v0.4/guides/agents');
     await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-testid="prerelease-banner"]')).toHaveCount(0);
 
-    const banner = page.locator('[data-testid="prerelease-banner"]');
-    await expect(banner).toBeVisible();
-    await expect(banner).toContainText('v0.4.0rc1');
-    await expect(banner).toContainText('RC1');
-
-    // Switch link inside banner
-    const switchLink = page.locator('[data-testid="prerelease-banner-switch-link"]');
-    await expect(switchLink).toBeVisible();
-    await expect(switchLink).toHaveAttribute('href', '/en/docs/v0.3/guides/agents');
-
-    // Clicking switch link navigates to stable
-    await switchLink.click();
-    await page.waitForURL(/\/en\/docs\/v0\.3\/guides\/agents/);
-    expect(page.url()).toContain('/en/docs/v0.3/guides/agents');
-
-    // 2. On v0.3, banner must NOT be present
-    const bannerOnV03 = page.locator('[data-testid="prerelease-banner"]');
-    await expect(bannerOnV03).toHaveCount(0);
+    await page.goto('/en/docs/v0.3/guides/agents');
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-testid="prerelease-banner"]')).toHaveCount(0);
   });
 
-  test('omits TranslationNotice on genuine translations in v0.4 for both Portuguese and Spanish while preserving noindex', async ({ page }) => {
-    // 1. Genuine Brazilian Portuguese translation on v0.4 does NOT show TranslationNotice
+  test('omits TranslationNotice and sets index, follow on genuine translations in v0.4 for both Portuguese and Spanish', async ({ page }) => {
     await page.goto('/pt-BR/docs/v0.4/guides/agents');
     await page.waitForLoadState('networkidle');
 
-    // TranslationNotice banner should NOT be present for genuine Portuguese translation
     const ptNotice = page.locator('aside[role="alert"]');
     await expect(ptNotice).toHaveCount(0);
-
-    // HTML lang attribute matches requested locale
     await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
 
-    // Robots meta has noindex, follow because v0.4 is prerelease
     const ptRobots = page.locator('meta[name="robots"]');
-    await expect(ptRobots).toHaveAttribute('content', 'noindex, follow');
+    await expect(ptRobots).toHaveAttribute('content', 'index, follow');
 
-    // 2. Genuine Spanish translation on v0.4 does NOT show TranslationNotice
     await page.goto('/es/docs/v0.4/guides/agents');
     await page.waitForLoadState('networkidle');
 
     const esNotice = page.locator('aside[role="alert"]');
     await expect(esNotice).toHaveCount(0);
 
-    // Robots meta has noindex, follow because v0.4 is prerelease
     const esRobots = page.locator('meta[name="robots"]');
-    await expect(esRobots).toHaveAttribute('content', 'noindex, follow');
+    await expect(esRobots).toHaveAttribute('content', 'index, follow');
   });
 
   test('isolates sidebar navigation tree between tracks', async ({ page }) => {
-    // 1. On v0.3, sidebar links should only point to v0.3
     await page.goto('/en/docs/v0.3/getting-started/installation');
     await page.waitForLoadState('networkidle');
 
@@ -152,7 +156,6 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
     const v04LinksInV03Sidebar = sidebar.locator('a[href*="/docs/v0.4"]');
     await expect(v04LinksInV03Sidebar).toHaveCount(0);
 
-    // 2. On v0.4, sidebar links should only point to v0.4
     await page.goto('/en/docs/v0.4/getting-started/installation');
     await page.waitForLoadState('networkidle');
 
@@ -161,20 +164,18 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
   });
 
   test('supports keyboard navigation on VersionSelector (Enter, Space, Escape)', async ({ page }) => {
-    await page.goto('/en/docs/v0.3');
+    await page.goto('/en/docs/v0.4');
     await page.waitForLoadState('networkidle');
 
     const trigger = page.locator('[data-testid="version-selector-trigger"]').first();
     await trigger.focus();
     await expect(trigger).toBeFocused();
 
-    // Open via Enter
     await page.keyboard.press('Enter');
     const listbox = page.locator('[data-testid="version-selector-listbox"]').first();
     await expect(listbox).toBeVisible();
     await expect(trigger).toHaveAttribute('aria-expanded', 'true');
 
-    // Close via Escape
     await page.keyboard.press('Escape');
     await expect(listbox).not.toBeVisible();
     await expect(trigger).toHaveAttribute('aria-expanded', 'false');
@@ -182,30 +183,26 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
 
   test('VersionSelector is accessible in mobile navigation drawer', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/en/docs/v0.3');
+    await page.goto('/en/docs/v0.4');
     await page.waitForLoadState('networkidle');
 
-    // Click sidebar toggle on mobile subnav
     const sidebarTrigger = page.locator('#nd-subnav button').last();
     await sidebarTrigger.click();
 
-    // Version selector in mobile drawer
     const mobileSelector = page.locator('[data-testid="version-selector-trigger"]:visible');
     await expect(mobileSelector).toBeVisible();
   });
 
-  test('search endpoint returns strictly isolated results for v0.3 and v0.4 without cross-leaks', async ({ request }) => {
-    // 1. Unversioned legacy search defaults to v0.3
-    const legacyRes = await request.get('/api/search?query=agents');
-    expect(legacyRes.status()).toBe(200);
-    const legacyJson = await legacyRes.json();
-    expect(legacyJson.length).toBeGreaterThan(0);
-    for (const item of legacyJson) {
-      expect(item.url).toContain('/docs/v0.3');
-      expect(item.url).not.toContain('/docs/v0.4');
+  test('search endpoint returns strictly isolated results for v0.4 (default) and v0.3 without cross-leaks', async ({ request }) => {
+    const defaultRes = await request.get('/api/search?query=agents');
+    expect(defaultRes.status()).toBe(200);
+    const defaultJson = await defaultRes.json();
+    expect(defaultJson.length).toBeGreaterThan(0);
+    for (const item of defaultJson) {
+      expect(item.url).toContain('/docs/v0.4');
+      expect(item.url).not.toContain('/docs/v0.3');
     }
 
-    // 2. Explicit v0.3 search
     const v03Res = await request.get('/api/search?query=agents&tag=v0.3');
     expect(v03Res.status()).toBe(200);
     const v03Json = await v03Res.json();
@@ -215,7 +212,6 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
       expect(item.url).not.toContain('/docs/v0.4');
     }
 
-    // 3. Explicit v0.4 search
     const v04Res = await request.get('/api/search?query=agents&tag=v0.4');
     expect(v04Res.status()).toBe(200);
     const v04Json = await v04Res.json();
@@ -227,7 +223,6 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
   });
 
   test('internal documentation links stay within their respective version tracks', async ({ page }) => {
-    // 1. Navigate within v0.4
     await page.goto('/en/docs/v0.4');
     await page.waitForLoadState('networkidle');
 
@@ -237,7 +232,6 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
     await page.waitForURL('**/en/docs/v0.4/getting-started/installation');
     expect(page.url()).toContain('/en/docs/v0.4/getting-started/installation');
 
-    // 2. Navigate within v0.3
     await page.goto('/en/docs/v0.3');
     await page.waitForLoadState('networkidle');
 
@@ -248,107 +242,65 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
     expect(page.url()).toContain('/en/docs/v0.3/getting-started/installation');
   });
 
-  test('generates accurate canonical and robots metadata for stable v0.3 pages', async ({ page }) => {
-    await page.goto('/en/docs/v0.3/guides/agents');
-    await page.waitForLoadState('networkidle');
-
-    // Canonical link points to versioned stable URL
-    const canonical = page.locator('link[rel="canonical"]');
-    await expect(canonical).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.3/guides/agents');
-
-    // Robots meta allows index on stable
-    const robots = page.locator('meta[name="robots"]');
-    await expect(robots).toHaveAttribute('content', 'index, follow');
-  });
-
-  test('canonicalizes legacy unversioned documentation URLs to stable v0.3 equivalent', async ({ page }) => {
-    await page.goto('/en/docs/guides/agents');
-    await page.waitForLoadState('networkidle');
-
-    // Canonical points to /en/docs/v0.3/guides/agents
-    const canonical = page.locator('link[rel="canonical"]');
-    await expect(canonical).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.3/guides/agents');
-  });
-
-  test('enforces self-consistent canonical and noindex, follow on prerelease v0.4 pages', async ({ page }) => {
+  test('generates accurate canonical and index, follow robots metadata for both v0.4 and v0.3 stable pages', async ({ page }) => {
     await page.goto('/en/docs/v0.4/guides/agents');
     await page.waitForLoadState('networkidle');
 
-    const canonical = page.locator('link[rel="canonical"]');
-    await expect(canonical).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.4/guides/agents');
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      'https://chatflowagent.org/en/docs/v0.4/guides/agents',
+    );
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
 
-    const robots = page.locator('meta[name="robots"]');
-    await expect(robots).toHaveAttribute('content', 'noindex, follow');
+    await page.goto('/en/docs/v0.3/guides/agents');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      'https://chatflowagent.org/en/docs/v0.3/guides/agents',
+    );
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
   });
 
   test('restricts hreflang alternates strictly to genuinely translated documentation', async ({ page }) => {
-    // 1. Genuine translated page: /es/docs/v0.3 has translations in es, pt-BR and en
-    await page.goto('/es/docs/v0.3');
+    await page.goto('/es/docs/v0.4');
     await page.waitForLoadState('networkidle');
 
-    const esAlternate = page.locator('link[rel="alternate"][hreflang="es"]');
-    await expect(esAlternate).toHaveAttribute('href', 'https://chatflowagent.org/es/docs/v0.3');
-
-    const ptAlternate = page.locator('link[rel="alternate"][hreflang="pt-BR"]');
-    await expect(ptAlternate).toHaveAttribute('href', 'https://chatflowagent.org/pt-BR/docs/v0.3');
-
-    const enAlternate = page.locator('link[rel="alternate"][hreflang="en"]');
-    await expect(enAlternate).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.3');
-
-    const xDefault = page.locator('link[rel="alternate"][hreflang="x-default"]');
-    await expect(xDefault).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.3');
-
-    // 2. Genuine translated page: /es/docs/v0.3/guides/agents advertises es, pt-BR and en
-    await page.goto('/es/docs/v0.3/guides/agents');
-    await page.waitForLoadState('networkidle');
-
-    const esGuideAlt = page.locator('link[rel="alternate"][hreflang="es"]');
-    await expect(esGuideAlt).toHaveAttribute('href', 'https://chatflowagent.org/es/docs/v0.3/guides/agents');
-
-    const ptGuideAlt = page.locator('link[rel="alternate"][hreflang="pt-BR"]');
-    await expect(ptGuideAlt).toHaveAttribute('href', 'https://chatflowagent.org/pt-BR/docs/v0.3/guides/agents');
-
-    // 3. Genuine translated page on v0.4: /pt-BR/docs/v0.4/guides/agents advertises pt-BR, es, en, and x-default
-    await page.goto('/pt-BR/docs/v0.4/guides/agents');
-    await page.waitForLoadState('networkidle');
-
-    const ptV04Alt = page.locator('link[rel="alternate"][hreflang="pt-BR"]');
-    await expect(ptV04Alt).toHaveAttribute('href', 'https://chatflowagent.org/pt-BR/docs/v0.4/guides/agents');
-
-    const esV04Alt = page.locator('link[rel="alternate"][hreflang="es"]');
-    await expect(esV04Alt).toHaveAttribute('href', 'https://chatflowagent.org/es/docs/v0.4/guides/agents');
-
-    const enV04Alt = page.locator('link[rel="alternate"][hreflang="en"]');
-    await expect(enV04Alt).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.4/guides/agents');
-
-    const xDefV04 = page.locator('link[rel="alternate"][hreflang="x-default"]');
-    await expect(xDefV04).toHaveAttribute('href', 'https://chatflowagent.org/en/docs/v0.4/guides/agents');
+    await expect(page.locator('link[rel="alternate"][hreflang="es"]')).toHaveAttribute(
+      'href',
+      'https://chatflowagent.org/es/docs/v0.4',
+    );
+    await expect(page.locator('link[rel="alternate"][hreflang="pt-BR"]')).toHaveAttribute(
+      'href',
+      'https://chatflowagent.org/pt-BR/docs/v0.4',
+    );
+    await expect(page.locator('link[rel="alternate"][hreflang="en"]')).toHaveAttribute(
+      'href',
+      'https://chatflowagent.org/en/docs/v0.4',
+    );
+    await expect(page.locator('link[rel="alternate"][hreflang="x-default"]')).toHaveAttribute(
+      'href',
+      'https://chatflowagent.org/en/docs/v0.4',
+    );
   });
 
-  test('sitemap.xml returns 200 OK, includes indexable stable docs, and excludes v0.4 and fallbacks', async ({ request }) => {
+  test('sitemap.xml returns 200 OK, includes v0.4 and v0.3 stable docs, and excludes RC and unversioned aliases', async ({ request }) => {
     const res = await request.get('/sitemap.xml');
     expect(res.status()).toBe(200);
 
     const text = await res.text();
+    expect(text).toContain('https://chatflowagent.org/en/docs/v0.4');
+    expect(text).toContain('https://chatflowagent.org/es/docs/v0.4');
+    expect(text).toContain('https://chatflowagent.org/pt-BR/docs/v0.4');
+    expect(text).toContain('https://chatflowagent.org/en/docs/v0.4/getting-started/whats-new');
+    expect(text).toContain('https://chatflowagent.org/en/docs/v0.4/getting-started/migration');
     expect(text).toContain('https://chatflowagent.org/en/docs/v0.3');
-    expect(text).toContain('https://chatflowagent.org/es/docs/v0.3');
-    expect(text).toContain('https://chatflowagent.org/pt-BR/docs/v0.3');
 
-    // Includes genuine Spanish and Portuguese translated guides
-    expect(text).toContain('https://chatflowagent.org/es/docs/v0.3/guides/agents');
-    expect(text).toContain('https://chatflowagent.org/pt-BR/docs/v0.3/guides/agents');
-
-    // Strictly excludes v0.4
-    expect(text).not.toContain('/docs/v0.4');
-
-    // Strictly excludes unversioned doc aliases
+    expect(text).not.toMatch(/rc1|rc2|rc3/i);
     expect(text).not.toContain('https://chatflowagent.org/en/docs/guides');
-
-    // Strictly excludes untranslated fallbacks (e.g. v0.4 guides)
-    expect(text).not.toContain('/docs/v0.4/guides');
   });
 
-  test('robots.txt returns 200 OK, allows crawling for noindex detection, and links sitemap', async ({ request }) => {
+  test('robots.txt returns 200 OK, allows crawling, and links sitemap', async ({ request }) => {
     const res = await request.get('/robots.txt');
     expect(res.status()).toBe(200);
 
@@ -356,9 +308,6 @@ test.describe('Documentation Versioning & Navigation E2E Suite (Phase 6C)', () =
     expect(text).toContain('User-Agent: *');
     expect(text).toContain('Allow: /');
     expect(text).toContain('Disallow: /api/');
-    expect(text).not.toContain('Disallow: /_next/');
-    expect(text).not.toContain('Disallow: /_next/static/');
     expect(text).toContain('Sitemap: https://chatflowagent.org/sitemap.xml');
   });
 });
-

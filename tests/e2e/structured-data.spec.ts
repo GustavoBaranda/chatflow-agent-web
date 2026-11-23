@@ -36,7 +36,7 @@ test.describe('Schema.org Structured Data (JSON-LD) E2E Suite', () => {
     const code = graph.find((e) => e['@type'] === 'SoftwareSourceCode')!;
     expect(code['name']).toBe('chatflow-agent');
     expect(code['codeRepository']).toBe('https://github.com/GustavoBaranda/chatflow-agent');
-    expect(code['version']).toBe('0.3.4');
+    expect(code['version']).toBe('0.4.0');
     expect(code['license']).toBe('https://opensource.org/licenses/MIT');
     expect(code['runtimePlatform']).toBe('Python >=3.10');
 
@@ -112,13 +112,13 @@ test.describe('Schema.org Structured Data (JSON-LD) E2E Suite', () => {
     expect(items[1]).toEqual({
       '@type': 'ListItem',
       position: 2,
-      name: 'Documentation (v0.3)',
-      item: 'https://chatflowagent.org/en/docs/v0.3',
+      name: 'Documentation (v0.4)',
+      item: 'https://chatflowagent.org/en/docs/v0.4',
     });
 
     const article = graph.find((e) => e['@type'] === 'TechArticle')!;
     expect(article['headline']).toContain('Documentation Overview');
-    expect(article['url']).toBe('https://chatflowagent.org/en/docs/v0.3');
+    expect(article['url']).toBe('https://chatflowagent.org/en/docs/v0.4');
   });
 
   test('should omit unlinked categories from BreadcrumbList (/en/docs/v0.3/getting-started/core-concepts)', async ({ page }) => {
@@ -156,15 +156,15 @@ test.describe('Schema.org Structured Data (JSON-LD) E2E Suite', () => {
     expect(items.every(({ item }) => URL.canParse(item))).toBe(true);
   });
 
-  test('should preserve noindex on prerelease v0.4 while emitting structured data (/en/docs/v0.4)', async ({
+  test('should emit index, follow and structured data on Latest / Stable v0.4 (/en/docs/v0.4)', async ({
     page,
   }) => {
     await page.goto('/en/docs/v0.4');
     await page.waitForLoadState('domcontentloaded');
 
-    // 1. Strict robots verification: MUST BE NOINDEX
+    // 1. Strict robots verification: v0.4 is now Latest / Stable (index, follow)
     const robots = page.locator('meta[name="robots"]');
-    await expect(robots).toHaveAttribute('content', 'noindex, follow');
+    await expect(robots).toHaveAttribute('content', 'index, follow');
 
     // 2. Structured data verification
     const jsonLdScript = page.locator('script[type="application/ld+json"]');

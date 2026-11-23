@@ -73,9 +73,9 @@ describe('i18n Configuration & Routing', () => {
   });
 
   it('should include verified SDK capabilities and installation keys in home namespace across all catalogs', () => {
-    expect(enMessages.home.badge).toContain('v0.3.4');
-    expect(esMessages.home.badge).toContain('v0.3.4');
-    expect(ptBRMessages.home.badge).toContain('v0.3.4');
+    expect(enMessages.home.badge).toContain('v0.4.0');
+    expect(esMessages.home.badge).toContain('v0.4.0');
+    expect(ptBRMessages.home.badge).toContain('v0.4.0');
 
     expect(enMessages.home.featHandoffsTitle).toBeTruthy();
     expect(esMessages.home.featHandoffsTitle).toBeTruthy();

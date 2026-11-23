@@ -3,11 +3,11 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { describe, it, expect } from 'vitest';
 
-const DEFAULT_TRACK = process.env.CHATFLOW_DOCS_TRACK || 'v0.3';
+const DEFAULT_TRACK = process.env.CHATFLOW_DOCS_TRACK || 'v0.4';
 const DOCS_DIR = path.resolve(process.cwd(), 'content/docs/en', DEFAULT_TRACK);
 
 // Resolve isolated published release path or fallback
-const DEFAULT_VERSION = process.env.CHATFLOW_SDK_VERSION || '0.3.4';
+const DEFAULT_VERSION = process.env.CHATFLOW_SDK_VERSION || '0.4.0';
 const CACHED_VENV_PATH = path.resolve(process.cwd(), `.cache/sdk-venvs/${DEFAULT_VERSION}`);
 const CACHED_RELEASE_PATH = path.resolve(process.cwd(), `.cache/sdk-releases/${DEFAULT_VERSION}`);
 const SDK_DIR =
@@ -280,13 +280,13 @@ print("Verified: SQLiteSessionStore signature is exact.")
     expect(run.stdout).toContain('Verified: SQLiteSessionStore signature is exact.');
   }, 15000);
 
-  it('verifies pyproject.toml extras match across v0.3.4 and v0.4.0rc1', () => {
+  it('verifies pyproject.toml extras match across v0.3.4 and v0.4.0', () => {
     const checkExtrasScript = `
 import subprocess, os
 
 expected_extras = ["telegram", "whatsapp", "webhook", "all", "dev"]
 
-for tag in ["v0.3.4", "v0.4.0rc1"]:
+for tag in ["v0.3.4", "v0.4.0"]:
     ver = tag.lstrip("v")
     raw = None
     try:

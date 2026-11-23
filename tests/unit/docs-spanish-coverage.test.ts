@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { source, resolveDocPage, getVersionPageTree } from '@/lib/source';
 import { TRACK_AVAILABLE_TOPICS } from '@/config/docs-topics-manifest';
-import { DEFAULT_STABLE_TRACK } from '@/config/docs-versions';
+import { PREVIOUS_STABLE_TRACK } from '@/config/docs-versions';
 import { isGenuineTranslation, resolveDocSeo, SITE_ORIGIN } from '@/config/docs-seo';
 import sitemap from '@/app/sitemap';
 
@@ -21,12 +21,12 @@ describe('Phase 6T.1: Complete Spanish Documentation Coverage Suite (v0.3 Stable
         const { page, isFallback, track } = resolveDocPage(['v0.3', ...cleanSlug], 'es');
 
         expect(page).toBeDefined();
-        expect(track).toBe(DEFAULT_STABLE_TRACK);
+        expect(track).toBe(PREVIOUS_STABLE_TRACK);
         expect(isFallback).toBe(false);
         expect(page?.path).toMatch(/^es\/v0\.3\//);
 
         // Verify genuine translation detection
-        expect(isGenuineTranslation(DEFAULT_STABLE_TRACK, cleanSlug, 'es')).toBe(true);
+        expect(isGenuineTranslation(PREVIOUS_STABLE_TRACK, cleanSlug, 'es')).toBe(true);
       });
 
       it(`defines valid Spanish frontmatter for topic [${topicPath}]`, () => {
@@ -47,7 +47,7 @@ describe('Phase 6T.1: Complete Spanish Documentation Coverage Suite (v0.3 Stable
 
       it(`resolves correct canonical SEO and indexable robots for topic [${topicPath}]`, () => {
         const seo = resolveDocSeo({
-          track: DEFAULT_STABLE_TRACK,
+          track: PREVIOUS_STABLE_TRACK,
           cleanSlug,
           locale: 'es',
           isExplicitTrack: true,

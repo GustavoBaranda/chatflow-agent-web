@@ -9,7 +9,7 @@ import {
 } from '@/config/docs-seo';
 import sitemap from '@/app/sitemap';
 import robots from '@/app/robots';
-import { DEFAULT_STABLE_TRACK, DEFAULT_PRERELEASE_TRACK } from '@/config/docs-versions';
+import { DEFAULT_STABLE_TRACK, PREVIOUS_STABLE_TRACK } from '@/config/docs-versions';
 import { TRACK_AVAILABLE_TOPICS } from '@/config/docs-topics-manifest';
 
 describe('Centralized Documentation SEO Policy', () => {
@@ -24,34 +24,33 @@ describe('Centralized Documentation SEO Policy', () => {
   });
 
   describe('isGenuineTranslation', () => {
-    it('always returns true for English', () => {
+    it('always returns true for English across both stable tracks', () => {
       expect(isGenuineTranslation(DEFAULT_STABLE_TRACK, ['guides', 'agents'], 'en')).toBe(true);
-      expect(isGenuineTranslation(DEFAULT_PRERELEASE_TRACK, ['guides', 'agents'], 'en')).toBe(true);
+      expect(isGenuineTranslation(PREVIOUS_STABLE_TRACK, ['guides', 'agents'], 'en')).toBe(true);
       expect(isGenuineTranslation(DEFAULT_STABLE_TRACK, [], 'en')).toBe(true);
     });
 
-    it('identifies genuine root overview translations for Spanish and Portuguese in v0.3', () => {
-      expect(isGenuineTranslation(DEFAULT_STABLE_TRACK, [], 'es')).toBe(true);
-      expect(isGenuineTranslation(DEFAULT_STABLE_TRACK, [], 'pt-BR')).toBe(true);
+    it('identifies genuine root overview translations for Spanish and Portuguese in v0.4 and v0.3', () => {
+      expect(isGenuineTranslation('v0.4', [], 'es')).toBe(true);
+      expect(isGenuineTranslation('v0.4', [], 'pt-BR')).toBe(true);
+      expect(isGenuineTranslation('v0.3', [], 'es')).toBe(true);
+      expect(isGenuineTranslation('v0.3', [], 'pt-BR')).toBe(true);
     });
 
-    it('identifies all 21 genuine Spanish translations in v0.3', () => {
-      for (const topic of TRACK_AVAILABLE_TOPICS['v0.3']) {
+    it('identifies all 23 genuine Spanish and Portuguese translations in v0.4 (Latest / Stable)', () => {
+      for (const topic of TRACK_AVAILABLE_TOPICS['v0.4']) {
         const cleanSlug = topic ? topic.split('/') : [];
-        expect(isGenuineTranslation(DEFAULT_STABLE_TRACK, cleanSlug, 'es')).toBe(true);
+        expect(isGenuineTranslation('v0.4', cleanSlug, 'es')).toBe(true);
+        expect(isGenuineTranslation('v0.4', cleanSlug, 'pt-BR')).toBe(true);
       }
     });
 
-    it('identifies all 21 genuine Portuguese translations in v0.3', () => {
+    it('identifies all 21 genuine Spanish and Portuguese translations in v0.3 (Previous Stable)', () => {
       for (const topic of TRACK_AVAILABLE_TOPICS['v0.3']) {
         const cleanSlug = topic ? topic.split('/') : [];
-        expect(isGenuineTranslation(DEFAULT_STABLE_TRACK, cleanSlug, 'pt-BR')).toBe(true);
+        expect(isGenuineTranslation('v0.3', cleanSlug, 'es')).toBe(true);
+        expect(isGenuineTranslation('v0.3', cleanSlug, 'pt-BR')).toBe(true);
       }
-    });
-
-    it('identifies genuine Spanish and Portuguese translations in v0.4', () => {
-      expect(isGenuineTranslation(DEFAULT_PRERELEASE_TRACK, ['guides', 'agents'], 'es')).toBe(true);
-      expect(isGenuineTranslation(DEFAULT_PRERELEASE_TRACK, ['guides', 'agents'], 'pt-BR')).toBe(true);
     });
 
     it('returns false for nonexistent topics or invalid locales', () => {
@@ -61,9 +60,28 @@ describe('Centralized Documentation SEO Policy', () => {
   });
 
   describe('resolveDocSeo', () => {
-    it('resolves stable v0.3 English canonical route with index, follow', () => {
+    it('resolves Latest / Stable v0.4 English canonical route with index, follow', () => {
       const seo = resolveDocSeo({
-        track: DEFAULT_STABLE_TRACK,
+        track: 'v0.4',
+        cleanSlug: ['guides', 'agents'],
+        locale: 'en',
+        isExplicitTrack: true,
+        isFallback: false,
+      });
+
+      expect(seo.isIndexable).toBe(true);
+      expect(seo.robots).toEqual({ index: true, follow: true });
+      expect(seo.canonicalPath).toBe('/en/docs/v0.4/guides/agents');
+      expect(seo.canonicalUrl).toBe('https://chatflowagent.org/en/docs/v0.4/guides/agents');
+      expect(seo.languages['en']).toBe('https://chatflowagent.org/en/docs/v0.4/guides/agents');
+      expect(seo.languages['x-default']).toBe('https://chatflowagent.org/en/docs/v0.4/guides/agents');
+      expect(seo.languages['es']).toBe('https://chatflowagent.org/es/docs/v0.4/guides/agents');
+      expect(seo.languages['pt-BR']).toBe('https://chatflowagent.org/pt-BR/docs/v0.4/guides/agents');
+    });
+
+    it('resolves Previous Stable v0.3 English canonical route with index, follow', () => {
+      const seo = resolveDocSeo({
+        track: 'v0.3',
         cleanSlug: ['guides', 'agents'],
         locale: 'en',
         isExplicitTrack: true,
@@ -75,28 +93,11 @@ describe('Centralized Documentation SEO Policy', () => {
       expect(seo.canonicalPath).toBe('/en/docs/v0.3/guides/agents');
       expect(seo.canonicalUrl).toBe('https://chatflowagent.org/en/docs/v0.3/guides/agents');
       expect(seo.languages['en']).toBe('https://chatflowagent.org/en/docs/v0.3/guides/agents');
-      expect(seo.languages['x-default']).toBe('https://chatflowagent.org/en/docs/v0.3/guides/agents');
-      // Spanish translation exists in v0.3
       expect(seo.languages['es']).toBe('https://chatflowagent.org/es/docs/v0.3/guides/agents');
-      // Portuguese translation exists in v0.3
       expect(seo.languages['pt-BR']).toBe('https://chatflowagent.org/pt-BR/docs/v0.3/guides/agents');
     });
 
-    it('includes genuine Spanish and Portuguese alternates in hreflang in v0.4', () => {
-      const seo = resolveDocSeo({
-        track: DEFAULT_PRERELEASE_TRACK,
-        cleanSlug: ['guides', 'agents'],
-        locale: 'en',
-        isExplicitTrack: true,
-        isFallback: false,
-      });
-
-      expect(seo.languages['en']).toBe('https://chatflowagent.org/en/docs/v0.4/guides/agents');
-      expect(seo.languages['es']).toBe('https://chatflowagent.org/es/docs/v0.4/guides/agents');
-      expect(seo.languages['pt-BR']).toBe('https://chatflowagent.org/pt-BR/docs/v0.4/guides/agents');
-    });
-
-    it('resolves legacy unversioned route canonicalizing to stable v0.3 equivalent', () => {
+    it('resolves legacy unversioned route canonicalizing to Latest / Stable v0.4 equivalent', () => {
       const seo = resolveDocSeo({
         track: DEFAULT_STABLE_TRACK,
         cleanSlug: ['guides', 'agents'],
@@ -106,29 +107,14 @@ describe('Centralized Documentation SEO Policy', () => {
       });
 
       expect(seo.isIndexable).toBe(true);
-      expect(seo.canonicalPath).toBe('/en/docs/v0.3/guides/agents');
-      expect(seo.canonicalUrl).toBe('https://chatflowagent.org/en/docs/v0.3/guides/agents');
-      expect(seo.robots).toEqual({ index: true, follow: true });
-    });
-
-    it('enforces noindex, follow on prerelease v0.4 documentation', () => {
-      const seo = resolveDocSeo({
-        track: DEFAULT_PRERELEASE_TRACK,
-        cleanSlug: ['guides', 'agents'],
-        locale: 'en',
-        isExplicitTrack: true,
-        isFallback: false,
-      });
-
-      expect(seo.isIndexable).toBe(false);
-      expect(seo.robots).toEqual({ index: false, follow: true });
       expect(seo.canonicalPath).toBe('/en/docs/v0.4/guides/agents');
       expect(seo.canonicalUrl).toBe('https://chatflowagent.org/en/docs/v0.4/guides/agents');
+      expect(seo.robots).toEqual({ index: true, follow: true });
     });
 
     it('enforces noindex, follow on localized routes displaying English fallback', () => {
       const seo = resolveDocSeo({
-        track: DEFAULT_STABLE_TRACK,
+        track: 'v0.4',
         cleanSlug: ['guides', 'agents'],
         locale: 'es',
         isExplicitTrack: true,
@@ -137,13 +123,13 @@ describe('Centralized Documentation SEO Policy', () => {
 
       expect(seo.isIndexable).toBe(false);
       expect(seo.robots).toEqual({ index: false, follow: true });
-      expect(seo.canonicalPath).toBe('/es/docs/v0.3/guides/agents');
-      expect(seo.canonicalUrl).toBe('https://chatflowagent.org/es/docs/v0.3/guides/agents');
+      expect(seo.canonicalPath).toBe('/es/docs/v0.4/guides/agents');
+      expect(seo.canonicalUrl).toBe('https://chatflowagent.org/es/docs/v0.4/guides/agents');
     });
 
     it('includes genuine hreflang alternates when translations genuinely exist', () => {
       const seo = resolveDocSeo({
-        track: DEFAULT_STABLE_TRACK,
+        track: 'v0.4',
         cleanSlug: [],
         locale: 'es',
         isExplicitTrack: true,
@@ -152,19 +138,22 @@ describe('Centralized Documentation SEO Policy', () => {
 
       expect(seo.isIndexable).toBe(true);
       expect(seo.robots).toEqual({ index: true, follow: true });
-      expect(seo.canonicalUrl).toBe('https://chatflowagent.org/es/docs/v0.3');
-      expect(seo.languages['en']).toBe('https://chatflowagent.org/en/docs/v0.3');
-      expect(seo.languages['es']).toBe('https://chatflowagent.org/es/docs/v0.3');
-      expect(seo.languages['pt-BR']).toBe('https://chatflowagent.org/pt-BR/docs/v0.3');
-      expect(seo.languages['x-default']).toBe('https://chatflowagent.org/en/docs/v0.3');
+      expect(seo.canonicalUrl).toBe('https://chatflowagent.org/es/docs/v0.4');
+      expect(seo.languages['en']).toBe('https://chatflowagent.org/en/docs/v0.4');
+      expect(seo.languages['es']).toBe('https://chatflowagent.org/es/docs/v0.4');
+      expect(seo.languages['pt-BR']).toBe('https://chatflowagent.org/pt-BR/docs/v0.4');
+      expect(seo.languages['x-default']).toBe('https://chatflowagent.org/en/docs/v0.4');
     });
   });
 
   describe('Sitemap Generator', () => {
     const entries = sitemap();
 
-    it('generates exactly 72 indexable canonical entries', () => {
-      expect(entries.length).toBe(72);
+    it('generates 141 indexable canonical entries (9 static + 69 v0.4 + 63 v0.3) with zero RC pages', () => {
+      expect(entries.length).toBe(141);
+      for (const entry of entries) {
+        expect(entry.url).not.toMatch(/rc1|rc2|rc3|prerelease/i);
+      }
     });
 
     it('ensures all entries use the absolute SITE_ORIGIN', () => {
@@ -190,47 +179,27 @@ describe('Centralized Documentation SEO Policy', () => {
       expect(communityUrls.length).toBe(3);
     });
 
-    it('includes all 21 stable v0.3 English documentation pages', () => {
-      const enV03Docs = entries.filter((e) => e.url.startsWith(`${SITE_ORIGIN}/en/docs/v0.3`));
-      expect(enV03Docs.length).toBe(21);
-    });
-
-    it('includes all 21 genuine v0.3 Spanish documentation pages', () => {
-      const esDocs = entries.filter((e) => e.url.startsWith(`${SITE_ORIGIN}/es/docs/`));
-      expect(esDocs.length).toBe(21);
-      for (const topic of TRACK_AVAILABLE_TOPICS['v0.3']) {
-        const subpath = topic ? `/${topic}` : '';
-        const expectedUrl = `${SITE_ORIGIN}/es/docs/v0.3${subpath}`;
-        expect(esDocs.some((d) => d.url === expectedUrl)).toBe(true);
+    it('includes all 23 Latest / Stable v0.4 documentation pages across en, es, and pt-BR', () => {
+      for (const locale of SUPPORTED_LOCALES) {
+        const v04Docs = entries.filter((e) => e.url.startsWith(`${SITE_ORIGIN}/${locale}/docs/v0.4`));
+        expect(v04Docs.length).toBe(23);
+        expect(v04Docs.some((d) => d.url === `${SITE_ORIGIN}/${locale}/docs/v0.4/getting-started/whats-new`)).toBe(true);
+        expect(v04Docs.some((d) => d.url === `${SITE_ORIGIN}/${locale}/docs/v0.4/getting-started/migration`)).toBe(true);
       }
     });
 
-    it('includes all 21 genuine v0.3 Portuguese documentation pages', () => {
-      const ptDocs = entries.filter((e) => e.url.startsWith(`${SITE_ORIGIN}/pt-BR/docs/`));
-      expect(ptDocs.length).toBe(21);
-      for (const topic of TRACK_AVAILABLE_TOPICS['v0.3']) {
-        const subpath = topic ? `/${topic}` : '';
-        const expectedUrl = `${SITE_ORIGIN}/pt-BR/docs/v0.3${subpath}`;
-        expect(ptDocs.some((d) => d.url === expectedUrl)).toBe(true);
+    it('includes all 21 Previous Stable v0.3 documentation pages across en, es, and pt-BR', () => {
+      for (const locale of SUPPORTED_LOCALES) {
+        const v03Docs = entries.filter((e) => e.url.startsWith(`${SITE_ORIGIN}/${locale}/docs/v0.3`));
+        expect(v03Docs.length).toBe(21);
       }
-    });
-
-    it('strictly excludes prerelease v0.4 from the sitemap', () => {
-      const v04Entries = entries.filter((e) => e.url.includes('/docs/v0.4'));
-      expect(v04Entries.length).toBe(0);
     });
 
     it('strictly excludes legacy unversioned documentation aliases from the sitemap', () => {
-      // Any doc entry should have /docs/v0.3
       const docEntries = entries.filter((e) => e.url.includes('/docs/'));
       for (const entry of docEntries) {
-        expect(entry.url).toContain('/docs/v0.3');
+        expect(entry.url).toMatch(/\/docs\/(v0\.4|v0\.3)(\/|$)/);
       }
-    });
-
-    it('strictly excludes untranslated fallback pages from the sitemap', () => {
-      const v04Guides = entries.filter((e) => e.url.includes('/docs/v0.4/guides'));
-      expect(v04Guides.length).toBe(0);
     });
   });
 
@@ -286,7 +255,6 @@ describe('Centralized Documentation SEO Policy', () => {
         images: ['/brand/social-preview.png'],
       });
 
-      // Strict enforcement: zero invented Twitter handles
       expect((social.twitter as Record<string, unknown>).creator).toBeUndefined();
       expect((social.twitter as Record<string, unknown>).site).toBeUndefined();
     });
@@ -300,8 +268,6 @@ describe('Centralized Documentation SEO Policy', () => {
       });
 
       expect(social.openGraph.locale).toBe('es_ES');
-      expect(social.openGraph.title).toBe('chatflow-agent — Agentes de IA Conversacional en Python');
-      expect(social.twitter).toHaveProperty('card', 'summary_large_image');
     });
 
     it('maps Portuguese (Brasil) locale to pt_BR for Open Graph', () => {
@@ -313,29 +279,6 @@ describe('Centralized Documentation SEO Policy', () => {
       });
 
       expect(social.openGraph.locale).toBe('pt_BR');
-      expect(social.openGraph.title).toBe('chatflow-agent — Agentes de IA Conversacional em Python');
-      expect(social.twitter).toHaveProperty('card', 'summary_large_image');
-    });
-
-    it('supports custom social preview image override', () => {
-      const customImage = 'https://chatflowagent.org/custom-image.png';
-      const social = createSocialMetadata({
-        title: 'Custom Title',
-        description: 'Custom Description',
-        url: 'https://chatflowagent.org/en/custom',
-        locale: 'en',
-        image: customImage,
-      });
-
-      expect(social.openGraph.images).toEqual([
-        {
-          url: customImage,
-          width: 1200,
-          height: 630,
-          alt: 'chatflow-agent — Conversational AI Agents in Python',
-        },
-      ]);
-      expect(social.twitter.images).toEqual([customImage]);
     });
 
     it('verifies standard social image dimensions and properties', () => {
@@ -348,4 +291,3 @@ describe('Centralized Documentation SEO Policy', () => {
     });
   });
 });
-

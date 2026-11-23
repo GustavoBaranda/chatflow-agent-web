@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { source, resolveDocPage, getVersionPageTree } from '@/lib/source';
 import { TRACK_AVAILABLE_TOPICS } from '@/config/docs-topics-manifest';
-import { DEFAULT_PRERELEASE_TRACK } from '@/config/docs-versions';
+import { DEFAULT_STABLE_TRACK } from '@/config/docs-versions';
 import { isGenuineTranslation, resolveDocSeo, SITE_ORIGIN } from '@/config/docs-seo';
 import sitemap from '@/app/sitemap';
 
-describe('Phase 6T.3: Complete Spanish Documentation Coverage Suite (v0.4 Prerelease)', () => {
+describe('Complete Spanish Documentation Coverage Suite (v0.4 Latest / Stable)', () => {
   const v04Topics = TRACK_AVAILABLE_TOPICS['v0.4'];
 
-  it('has exactly 21 documented topics in the v0.4 prerelease track inventory', () => {
-    expect(v04Topics.length).toBe(21);
+  it('has all 23 documented topics in the v0.4 Latest / Stable track inventory', () => {
+    expect(v04Topics.length).toBe(23);
   });
 
   describe('Topic Completeness & Genuine Translation Verification', () => {
@@ -21,12 +21,11 @@ describe('Phase 6T.3: Complete Spanish Documentation Coverage Suite (v0.4 Prerel
         const { page, isFallback, track } = resolveDocPage(['v0.4', ...cleanSlug], 'es');
 
         expect(page).toBeDefined();
-        expect(track).toBe(DEFAULT_PRERELEASE_TRACK);
+        expect(track).toBe(DEFAULT_STABLE_TRACK);
         expect(isFallback).toBe(false);
         expect(page?.path).toMatch(/^es\/v0\.4\//);
 
-        // Verify genuine translation detection
-        expect(isGenuineTranslation(DEFAULT_PRERELEASE_TRACK, cleanSlug, 'es')).toBe(true);
+        expect(isGenuineTranslation(DEFAULT_STABLE_TRACK, cleanSlug, 'es')).toBe(true);
       });
 
       it(`defines valid Spanish frontmatter for topic [${topicPath}]`, () => {
@@ -45,9 +44,9 @@ describe('Phase 6T.3: Complete Spanish Documentation Coverage Suite (v0.4 Prerel
         }
       });
 
-      it(`resolves correct canonical SEO and prerelease robots (noindex, follow) for topic [${topicPath}]`, () => {
+      it(`resolves correct canonical SEO and indexable robots (index, follow) for topic [${topicPath}]`, () => {
         const seo = resolveDocSeo({
-          track: DEFAULT_PRERELEASE_TRACK,
+          track: DEFAULT_STABLE_TRACK,
           cleanSlug,
           locale: 'es',
           isExplicitTrack: true,
@@ -57,14 +56,12 @@ describe('Phase 6T.3: Complete Spanish Documentation Coverage Suite (v0.4 Prerel
         const expectedSubpath = cleanSlug.length > 0 ? `/${cleanSlug.join('/')}` : '';
         const expectedUrl = `${SITE_ORIGIN}/es/docs/v0.4${expectedSubpath}`;
 
-        // Prerelease is never indexable
-        expect(seo.isIndexable).toBe(false);
-        expect(seo.robots).toEqual({ index: false, follow: true });
+        expect(seo.isIndexable).toBe(true);
+        expect(seo.robots).toEqual({ index: true, follow: true });
         expect(seo.canonicalUrl).toBe(expectedUrl);
         expect(seo.languages['es']).toBe(expectedUrl);
         expect(seo.languages['en']).toBe(`${SITE_ORIGIN}/en/docs/v0.4${expectedSubpath}`);
         expect(seo.languages['x-default']).toBe(`${SITE_ORIGIN}/en/docs/v0.4${expectedSubpath}`);
-        // pt-BR is now genuinely translated in v0.4 and advertised in hreflang
         expect(seo.languages['pt-BR']).toBe(`${SITE_ORIGIN}/pt-BR/docs/v0.4${expectedSubpath}`);
       });
     }
@@ -75,7 +72,7 @@ describe('Phase 6T.3: Complete Spanish Documentation Coverage Suite (v0.4 Prerel
 
     it('returns a page tree with Spanish localized folder groups', () => {
       expect(esTree).toBeDefined();
-      expect(esTree.children.length).toBe(6); // index + 5 folders
+      expect(esTree.children.length).toBe(6);
 
       const names = esTree.children.map((c) => (typeof c.name === 'string' ? c.name : ''));
       expect(names).toContain('Primeros Pasos');
@@ -103,17 +100,12 @@ describe('Phase 6T.3: Complete Spanish Documentation Coverage Suite (v0.4 Prerel
     });
   });
 
-  describe('Strict Sitemap Exclusion for Prerelease Track v0.4', () => {
+  describe('Sitemap Coverage for Spanish Latest / Stable Track v0.4', () => {
     const entries = sitemap();
 
-    it('strictly excludes all v0.4 documentation pages from the sitemap', () => {
-      const v04Entries = entries.filter((e) => e.url.includes('/docs/v0.4'));
-      expect(v04Entries.length).toBe(0);
-    });
-
-    it('preserves exactly 72 indexable canonical URLs in the sitemap', () => {
-      expect(entries.length).toBe(72);
+    it('includes all 23 Spanish v0.4 documentation pages in the sitemap', () => {
+      const v04Entries = entries.filter((e) => e.url.startsWith(`${SITE_ORIGIN}/es/docs/v0.4`));
+      expect(v04Entries.length).toBe(23);
     });
   });
 });
-

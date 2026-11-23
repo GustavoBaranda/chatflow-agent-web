@@ -8,7 +8,7 @@ const PYTHON_BIN_NAME = process.platform === 'win32' ? 'python.exe' : 'python';
 const resolveSdkPython = (version: string) =>
   path.resolve(ROOT_DIR, '.cache', 'sdk-venvs', version, PYTHON_BIN_DIR, PYTHON_BIN_NAME);
 const PYTHON_34 = resolveSdkPython('0.3.4');
-const PYTHON_40 = resolveSdkPython('0.4.0rc1');
+const PYTHON_40 = resolveSdkPython('0.4.0');
 
 const LOADER_PRELUDE = `
 import sys, os, importlib.util
@@ -36,7 +36,7 @@ function runPythonTest(pyBin: string, testScript: string) {
   return result;
 }
 
-describe('SDK Release Parity Regression Suite (Negative Cases)', { timeout: 15000 }, () => {
+describe('SDK Release Parity Regression Suite (Negative & Positive Cases)', { timeout: 15000 }, () => {
   it('detects protocol error for "async with runner:" on SDK 0.3.4', () => {
     const script = `
 inspector = ReleaseInspector("0.3.4", r"${PYTHON_34}")
@@ -79,24 +79,24 @@ print("VERIFIED: SQLiteSessionStore :memory: detected on 0.3.4")
     expect(res.stdout).toContain('VERIFIED: SQLiteSessionStore :memory: detected on 0.3.4');
   });
 
-  it('detects ImportError when importing ReentrantTurnError on SDK 0.3.4', () => {
+  it('detects ImportError when importing v0.4.0 exceptions on SDK 0.3.4', () => {
     const script = `
 inspector = ReleaseInspector("0.3.4", r"${PYTHON_34}")
-code = "from chatflow_agent import ReentrantTurnError"
+code = "from chatflow_agent import ReentrantTurnError, ToolArgumentValidationError"
 meta = parse_snippet_metadata(code)
 ok, err = validate_code_ast(code, "test.mdx", 1, meta, inspector)
 assert not ok, "Expected failure on 0.3.4!"
 assert "ImportError" in err and "ReentrantTurnError" in err, f"Unexpected error: {err}"
-print("VERIFIED: ReentrantTurnError detected on 0.3.4")
+print("VERIFIED: v0.4.0 exceptions detected on 0.3.4")
 `;
     const res = runPythonTest(PYTHON_34, script);
     expect(res.status).toBe(0);
-    expect(res.stdout).toContain('VERIFIED: ReentrantTurnError detected on 0.3.4');
+    expect(res.stdout).toContain('VERIFIED: v0.4.0 exceptions detected on 0.3.4');
   });
 
   it('detects SignatureError when passing invalid keyword to Runner constructor', () => {
     const script = `
-for v, py in [("0.3.4", r"${PYTHON_34}"), ("0.4.0rc1", r"${PYTHON_40}")]:
+for v, py in [("0.3.4", r"${PYTHON_34}"), ("0.4.0", r"${PYTHON_40}")]:
     inspector = ReleaseInspector(v, py)
     code = "from chatflow_agent import Runner; runner = Runner(invalid_param=123)"
     meta = parse_snippet_metadata(code)
@@ -133,11 +133,11 @@ print("VERIFIED: turn_timeout on run_async detected as invalid in 0.3.4")
     expect(res.stdout).toContain('VERIFIED: turn_timeout on run_async detected as invalid in 0.3.4');
   });
 
-  it('permits turn_timeout and async with runner on 0.4.0rc1 when min-version is annotated', () => {
+  it('permits turn_timeout, async with runner, and v0.4.0 exceptions on 0.4.0 when min-version is annotated', () => {
     const script = `
-inspector = ReleaseInspector("0.4.0rc1", r"${PYTHON_40}")
-code = """# [min-version: 0.4.0rc1]
-from chatflow_agent import Agent, Runner
+inspector = ReleaseInspector("0.4.0", r"${PYTHON_40}")
+code = """# [min-version: 0.4.0]
+from chatflow_agent import Agent, ConfigurationError, JsonCodecError, Runner, ToolArgumentValidationError
 
 agent = Agent(name="Bot", instructions="Test", model="gpt-4o")
 runner = Runner(starting_agent=agent)
@@ -148,11 +148,11 @@ async def test():
 """
 meta = parse_snippet_metadata(code)
 ok, err = validate_code_ast(code, "test.mdx", 1, meta, inspector)
-assert ok, f"Expected success on 0.4.0rc1, got: {err}"
-print("VERIFIED: RC1 features pass on 0.4.0rc1 with proper annotation")
+assert ok, f"Expected success on 0.4.0, got: {err}"
+print("VERIFIED: 0.4.0 features pass on 0.4.0 with proper annotation")
 `;
     const res = runPythonTest(PYTHON_40, script);
     expect(res.status).toBe(0);
-    expect(res.stdout).toContain('VERIFIED: RC1 features pass on 0.4.0rc1 with proper annotation');
+    expect(res.stdout).toContain('VERIFIED: 0.4.0 features pass on 0.4.0 with proper annotation');
   });
 });

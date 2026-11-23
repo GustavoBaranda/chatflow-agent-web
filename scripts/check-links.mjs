@@ -49,8 +49,8 @@ function buildPageIndex(files) {
     index.add(`/${locale}/docs/${track}${cleanSlug ? `/${cleanSlug}` : ''}`);
     index.add(`/docs/${track}${cleanSlug ? `/${cleanSlug}` : ''}`);
 
-    // If stable v0.3, also register unversioned alias paths
-    if (track === 'v0.3') {
+    // If default stable v0.4, also register unversioned alias paths
+    if (track === 'v0.4') {
       index.add(`/${locale}/docs${cleanSlug ? `/${cleanSlug}` : ''}`);
       index.add(`/docs${cleanSlug ? `/${cleanSlug}` : ''}`);
     }

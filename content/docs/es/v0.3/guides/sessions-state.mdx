@@ -1,8 +1,8 @@
 ---
 title: "Sesiones y Estado de Conversación"
 description: "Guía completa sobre memoria de sesión, poda de turnos con ventana deslizante, persistencia en memoria y SQLite, y deduplicación de mensajes en chatflow-agent."
-sourceRevision: "0ffb562"
-sourceHash: "8beb3706c3e0c137611a410bd5391761528b25a379aa776b77bc60b8baab499c"
+sourceRevision: "fe6b247"
+sourceHash: "e471d9372579a7bf6756a391573c642db56e90d869cc19f488ea489459aa6fe3"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -175,7 +175,7 @@ La gestión de sesiones introduce optimizaciones para alta concurrencia en versi
 * `SessionStore` en memoria y persistencia en disco con `SQLiteSessionStore`.
 * TTL de deduplicación de mensajes de 8 días (`DEFAULT_DEDUP_TTL_HOURS = 192`).
 
-### Mejoras en v0.4.0 (`v0.4.0`)
+### Mejoras en `v0.4.0`
 * <VersionBadge version="0.4.0" status="stable" /> **Pool Dedicado para E/S Bloqueante:** En `SQLiteSessionStore`, las operaciones de lectura y escritura se delegan a un pool privado de 4 hilos trabajadores (`_BLOCKING_IO_WORKERS = 4`) vía `_run_blocking`. Esto previene que la latencia del disco bloquee el bucle de eventos asíncrono.
 * <VersionBadge version="0.4.0" status="stable" /> **`SessionDeletedError`:** Si una tarea activa intenta interactuar con una sesión eliminada mediante `store.delete(session_id)`, el framework lanza un `SessionDeletedError`.
 * <VersionBadge version="0.4.0" status="stable" /> **Validación Estricta:** Pasar `max_turns <= 0` o `default_max_turns <= 0` produce un `ValueError` inmediato.

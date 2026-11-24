@@ -1,8 +1,8 @@
 ---
 title: "Herramientas y Llamadas a Funciones"
 description: "Guía arquitectónica completa sobre llamadas a funciones, esquemas de tipos de parámetros, despacho síncrono/asíncrono y aislamiento de errores en chatflow-agent."
-sourceRevision: "0ffb562"
-sourceHash: "c92f9e7e3676db794a389c1579b08b6b716bf7bbf210799689c1bd0cb8a873ca"
+sourceRevision: "fe6b247"
+sourceHash: "7fb36d9291279a7d7c813e642d57197bd2e50a08b5ea29b54a457510c13c998c"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -132,7 +132,7 @@ La generación de esquemas y la ejecución de herramientas han evolucionado de f
 * Mapeo de tipos de un solo nivel para primitivos y colecciones sin parametrizar `list`/`dict`.
 * Funciones síncronas delegadas a hilos secundarios vía `asyncio.to_thread` durante `execute_async()`.
 
-### Mejoras en v0.4.0 (`v0.4.0`)
+### Mejoras en `v0.4.0`
 * <VersionBadge version="0.4.0" status="stable" /> **Tipado Profundo en Colecciones:** Introspecciona esquemas de elementos para `list[T]`, `Sequence[T]`, `set[T]` y tuplas homogéneas `tuple[T, ...]`:
 
 ```python

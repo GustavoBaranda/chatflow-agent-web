@@ -1,8 +1,8 @@
 ---
 title: Visión General de la Documentación
 description: Documentación técnica oficial para chatflow-agent v0.4.0 (Última Estable) — el framework asíncrono y ligero en Python para flujos conversacionales multi-agente.
-sourceRevision: "5d2d319"
-sourceHash: "84754d5b517becb25cf08b6fc4c6c673c6aa045c1f22348d857dbb127dcf02a1"
+sourceRevision: "fe6b247"
+sourceHash: "58a231bbe3dadf8938357e42f0b28fbe0b45f94392a0c38d8376bc6839a87b13"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -27,11 +27,12 @@ Estás consultando la documentación oficial de **`chatflow-agent` `v0.4.0` (`Ú
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         Canales de Entrega                              │
-│     CLIChannel   │   TelegramChannel   │   WhatsAppChannel   │  FastAPI │
-└─────────┬───────────────────┬─────────────────────┬───────────────┬─────┘
-          │                   │                     │               │
-          ▼                   ▼                     ▼               ▼
+│             Canales de Entrega e Integraciones Personalizadas           │
+│      CLIChannel    │    TelegramChannel    │    WhatsAppChannel         │
+│      (o invoca Runner directamente desde tu app FastAPI / ASGI)         │
+└─────────┬───────────────────┬─────────────────────┬─────────────────────┘
+          │                   │                     │
+          ▼                   ▼                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                      Runner (Orquestador de Turnos)                     │
 │  • Bloqueo Async por Sesión        • Bucle Acotado de Tools (def: 10)   │
@@ -59,7 +60,7 @@ Estás consultando la documentación oficial de **`chatflow-agent` `v0.4.0` (`Ú
 1. **Cero Magia Oculta:** Cada transición de agente, invocación de herramienta y transacción de base de datos es explícita e inspeccionable. Los handoffs se sintetizan como herramientas deterministas (`transfer_to_<agent_name>`).
 2. **Concurrencia Async-First:** Construido nativamente sobre `asyncio` y `httpx.AsyncClient`. `Runner` utiliza bloqueos `asyncio.Lock` por sesión para evitar condiciones de carrera, detecta turnos reentrantes en la misma sesión (`ReentrantTurnError`) y soporta `async with runner:` para limpieza automática del motor.
 3. **Validación de Argumentos en Tiempo de Ejecución:** Las herramientas decoradas con `@tool` o `@agent.tool` validan y coaccionan los argumentos suministrados por el modelo frente a las anotaciones de tipo en Python usando Pydantic antes de ejecutar la función (`validate_args=True` por defecto), lanzando `ToolArgumentValidationError` ante entradas inválidas.
-4. **Integridad Transaccional de Estado:** `SQLiteSessionStore` funciona en modo `WAL` (Write-Ahead Logging) con el mismo esquema `user_version = 1` que `v0.3.4` y un journal de reversión en memoria. Si una excepción no controlada, cancelación o `turn_timeout` aborta un turno, el historial, `active_agent` y `metadata` se restauran al estado previo al turno. Pasar `db_path=":memory:"` mantiene una conexión compartida persistente durante toda la vida de la instancia.
+4. **Integridad Transaccional de Estado:** Las bases `SQLiteSessionStore` respaldadas por archivos funcionan en modo `WAL` (Write-Ahead Logging) con el mismo esquema `user_version = 1` que `v0.3.4` y un journal de reversión en memoria. Si una excepción no controlada, cancelación o `turn_timeout` aborta un turno, el historial, `active_agent` y `metadata` se restauran al estado previo al turno. Pasar `db_path=":memory:"` mantiene una conexión compartida persistente durante toda la vida de la instancia.
 5. **Libertad Multi-Proveedor:** Alterna sin fricción entre OpenAI (`gpt-4o`), Google Gemini (`gemini-2.5-flash`), Anthropic Claude (`claude-3-5-sonnet-latest`), DeepSeek, Groq, xAI Grok y modelos locales Ollama — o combina varios proveedores en un mismo enjambre.
 
 ## Instalación Rápida

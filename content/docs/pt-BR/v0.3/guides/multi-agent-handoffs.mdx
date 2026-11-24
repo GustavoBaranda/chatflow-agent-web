@@ -1,8 +1,8 @@
 ---
 title: "Handoffs Multiagente"
 description: "Orquestrando enxames autônomos, delegação ponto a ponto, ferramentas sintéticas de transferência e prevenção de ciclos no chatflow-agent."
-sourceRevision: "0ffb562"
-sourceHash: "8c82df8a6c137068046039ff3a6174cad84cd1dd271542907faa9720b979dc89"
+sourceRevision: "fe6b247"
+sourceHash: "f263138a2ce5f8724fcb0b9c5853a527c77d4e07c0fcc545e960b7eb1377acd4"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -168,7 +168,7 @@ A geração e sanitização de handoffs receberam melhorias significativas de co
 * Histórico de sessão compartilhado mantém contexto conversacional completo entre transferências.
 * `Handoff.context_updates` existe como campo, mas o runner da v0.3.4 o ignora quando ocorre um handoff.
 
-### Melhorias na v0.4.0 (`v0.4.0`)
+### Melhorias na `v0.4.0`
 * <VersionBadge version="0.4.0" status="stable" /> **Transliteração Unicode NFKD:** Normaliza automaticamente caracteres com acentuação para ASCII simples (ex.: `AtenciónAlCliente` torna-se `transfer_to_atencionalcliente`).
 * <VersionBadge version="0.4.0" status="stable" /> **Fallbacks Determinísticos com Hash:** Nomes de agentes em alfabetos não latinos (ex.: japonês, árabe, cirílico) ou emojis utilizam um prefixo determinístico de hash SHA-256 (`transfer_to_u<hash>`) para garantir identificadores válidos.
 * <VersionBadge version="0.4.0" status="stable" /> **Desambiguação em Colisões:** Se dois agentes gerarem nomes sanitizados idênticos, sufixos numéricos (`_2`, `_3`) são adicionados automaticamente para evitar sobrescritas.

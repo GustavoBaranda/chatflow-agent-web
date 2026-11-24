@@ -1,8 +1,8 @@
 ---
 title: Migração de 0.3.4 para 0.4.0
 description: Guia passo a passo para atualizar chatflow-agent de v0.3.4 para v0.4.0, alinhado às 4 mudanças incompatíveis oficiais, comportamento verificado do SDK e verificações.
-sourceRevision: "5d2d319"
-sourceHash: "bb09db75ca4e73948ff1e38a54d570f9ef436019bcf02e012b86a8706aba932d"
+sourceRevision: "7471e08"
+sourceHash: "a61ccef9fbd1273252432cc96677d8a9cd0c003e046120ac18dc07a50f667c10"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -318,7 +318,39 @@ except ToolSchemaError:
 ```
 
 ### Validações Adicionais e Mudanças de Comportamento
-* **Validação de Provedor e URL (`ConfigurationError`):** Herda de `ChatFlowError` e `ValueError`, mantendo compatibilidade com `except ValueError:`.
+* **Resolução de Provedores e Endpoints Compatíveis com OpenAI (`ConfigurationError`):** `ConfigurationError` herda de `ChatFlowError` e `ValueError`, mantendo compatibilidade com `except ValueError:`. `Agent(provider=...)` valida estritamente contra a lista integrada de provedores (`anthropic`, `claude`, `deepseek`, `gemini`, `gemma`, `google`, `grok`, `groq`, `ollama`, `openai`, `xai`) mesmo quando `base_url` é informado: passar um nome não listado como `Agent(provider="mistral", base_url=..., api_key=...)` lança `ConfigurationError`. Para usar um provedor compatível com OpenAI customizado, instancie `OpenAIEngine(provider="mistral", base_url=..., api_key=...)` explicitamente e associe-o via `Agent(..., engine=engine)` (ou omita `provider` e passe `base_url` + `api_key` diretamente ao `Agent`).
+
+```python
+# [min-version: 0.4.0]
+# [executable]
+from chatflow_agent import Agent, ConfigurationError, OpenAIEngine
+from chatflow_agent.core.engines import resolve_engine
+
+try:
+    Agent(
+        name="MistralViaProvider",
+        instructions="Be concise.",
+        provider="mistral",
+        base_url="https://api.mistral.ai/v1",
+        api_key="test-key",
+    )
+    raise AssertionError("Expected ConfigurationError")
+except ConfigurationError:
+    pass
+
+mistral_engine = OpenAIEngine(
+    provider="mistral",
+    base_url="https://api.mistral.ai/v1",
+    api_key="test-key",
+)
+good_agent = Agent(
+    name="MistralAgent",
+    instructions="Be concise.",
+    model="mistral-large-latest",
+    engine=mistral_engine,
+)
+assert resolve_engine(good_agent) is mistral_engine
+```
 * **Serialização de `metadata` (`JsonCodecError`):** `datetime`, `date` e `time` serializam automaticamente como ISO-8601; valores não serializáveis em `metadata` de sessão (ou estruturas circulares passadas ao codec JSON estrito) lançam `JsonCodecError`. Retornos de ferramentas continuam sendo convertidos para string na codificação de envio.
 * **Validações de Construtores Verificadas:** `Agent(name=...)` rejeita nomes vazios ou em branco (`ValueError`); `SessionContext(max_turns=...)` e `SQLiteSessionStore(default_max_turns=...)` rejeitam booleanos (`True`/`False`) e `<= 0` (`ValueError`); `Runner.run_async(..., turn_timeout=...)` rejeita booleanos e valores não positivos ou não finitos (`ValueError`); `WhatsAppChannel`, `TelegramChannel` e `AnthropicEngine` validam limites de configuração com `ConfigurationError`.
 * **Encaminhamento de Histórico `Role.SYSTEM`:** Na `0.3.4`, mensagens `Role.SYSTEM` em `session.history` eram preservadas no recorte de janela mas não encaminhadas aos provedores; na `0.4.0`, os motores as encaminham junto às instruções do agente.
@@ -370,6 +402,6 @@ async def run_once() -> None:
 | `TypeError: WhatsAppChannel.__init__() got an unexpected keyword argument 'dedup_ttl_hours'` | `dedup_ttl_hours` foi passado para `WhatsAppChannel(...)` | Passe `dedup_ttl_hours=...` para `SQLiteSessionStore(...)` ou `SessionStore(...)`. |
 | `ToolSchemaError` em parâmetro de união | Uma ferramenta usa uma união com membro sem mapeamento (ex.: `CustomClass \| None` ou `int \| datetime`) | Substitua o membro por primitivos ou coleções suportadas (`str`, `int`, `float`, `bool`, `list`, `tuple`, `set`, `frozenset`, `dict`) ou use um `str` ISO-8601. |
 | `ToolArgumentValidationError` ao chamar ferramenta | Argumentos inválidos para as anotações de tipo | Amplie a anotação (ex.: `int \| str`) ou passe `@tool(validate_args=False)`. |
-| `ConfigurationError` em provedor ou canal | Nome de `provider` não suportado sem `base_url` personalizado, ou limites inválidos no canal | Use um provedor suportado (`openai`, `gemini`, `google`, `gemma`, `anthropic`, `claude`, `deepseek`, `groq`, `grok`, `xai`, `ollama`) ou informe `base_url` e `api_key`. |
+| `ConfigurationError` em provedor ou canal | `Agent(provider=...)` recebeu um provedor não listado (mesmo com `base_url`), uma `base_url` remota omitiu `api_key` ou um canal recebeu limites inválidos | Use um provedor integrado (`anthropic`, `claude`, `deepseek`, `gemini`, `gemma`, `google`, `grok`, `groq`, `ollama`, `openai`, `xai`), ou para endpoints compatíveis com OpenAI customizados passe `engine=OpenAIEngine(provider="...", base_url="...", api_key="...")` ao `Agent`. |
 | `ReentrantTurnError` durante um turno ativo | Código iniciado por um turno ativo chamou `runner.run()`, `runner.run_async()` ou `runner.reset_session*()` para o mesmo `session_id` | Use `runner.spawn_turn(session_id, user_message)` para enfileirar um turno independente. |
 | `JsonCodecError` ao persistir sessão | `metadata` contém um objeto não serializável em JSON | Converta os valores para tipos JSON (`dict`, `list`, `str`, `int`, `float`, `bool`, `None`) ou `datetime`/`date`/`time`. |

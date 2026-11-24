@@ -1,8 +1,8 @@
 ---
 title: "Novidades na 0.4.0"
 description: Visão geral completa dos novos recursos, validação de argumentos de ferramentas, motor REST direto do Gemini, reversões transacionais e proteções de concorrência no chatflow-agent v0.4.0.
-sourceRevision: "5d2d319"
-sourceHash: "af33048043320f225380dd8fcaef80cd48b0db04ee11ca9b8a4f7bbb325afe0b"
+sourceRevision: "fe6b247"
+sourceHash: "06800278ea0c31b662d36884c9a6c679edadbd53feda18bce072b6188dd06251"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -116,7 +116,7 @@ except ToolArgumentValidationError as exc:
 
 * **`CLIChannel`:** O comando interativo `/reset` limpa a sessão chamando diretamente `session.clear_history()` sem reiniciar o terminal (**não** utiliza `Runner.reset_session_async()` nem adquire o lock de sessão do `Runner`).
 * **`TelegramChannel`:** `concurrent_updates`, retentativas limitadas para `telegram.error.RetryAfter` (`max_retry_after_seconds=60.0` — se `retry_after` exceder o limite, registra erro e aborta imediatamente sem aguardar nem duplicar blocos já enviados) e `/reset` via `Runner.reset_session_async()`.
-* **`WhatsAppChannel`:** Remoção de `dedup_ttl_hours` (mudança incompatível), parâmetros *keyword-only* (`max_body_size`, `enable_docs`, `queue_timeout_seconds=120.0`), `llm_timeout_seconds` alterado de `30.0` para `120.0` (`float | None`) com avisos estruturados de timeout, `outbound_max_delay=30.0`, mascaramento de `sender`, ID determinístico `gen_<sha256>`, validação estrita `2xx` e proteções `ConfigurationError`.
+* **`WhatsAppChannel`:** Remoção de `dedup_ttl_hours` (mudança incompatível), parâmetros *keyword-only* (`max_body_size`, `enable_docs`, `queue_timeout_seconds=120.0`), `llm_timeout_seconds` alterado de `30.0` para `120.0` (`float | None`) com avisos estruturados de timeout, validação na construção com `ConfigurationError` para os parâmetros de saída existentes (incluindo `outbound_max_delay`, que mantém o padrão `30.0` da `v0.3.4`), mascaramento de `sender`, ID determinístico `gen_<sha256>` e validação estrita `2xx`.
 
 ---
 

@@ -1,8 +1,8 @@
 ---
 title: "Novedades en 0.4.0"
 description: Resumen completo de nuevas funciones, validación de argumentos de herramientas, motor REST directo de Gemini, reversiones transaccionales y guardas de concurrencia en chatflow-agent v0.4.0.
-sourceRevision: "5d2d319"
-sourceHash: "af33048043320f225380dd8fcaef80cd48b0db04ee11ca9b8a4f7bbb325afe0b"
+sourceRevision: "fe6b247"
+sourceHash: "06800278ea0c31b662d36884c9a6c679edadbd53feda18bce072b6188dd06251"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -116,7 +116,7 @@ except ToolArgumentValidationError as exc:
 
 * **`CLIChannel`:** El comando interactivo `/reset` limpia la sesión llamando directamente a `session.clear_history()` sin reiniciar la terminal (**no** utiliza `Runner.reset_session_async()` ni adquiere el bloqueo de sesión del `Runner`).
 * **`TelegramChannel`:** `concurrent_updates`, reintentos acotados para `telegram.error.RetryAfter` (`max_retry_after_seconds=60.0` — si `retry_after` supera el límite, registra un error y aborta inmediatamente sin esperar ni duplicar bloques ya enviados) y `/reset` mediante `Runner.reset_session_async()`.
-* **`WhatsAppChannel`:** Eliminación de `dedup_ttl_hours` (cambio incompatible), parámetros *keyword-only* (`max_body_size`, `enable_docs`, `queue_timeout_seconds=120.0`), `llm_timeout_seconds` cambiado de `30.0` a `120.0` (`float | None`) con advertencias estructuradas de timeout, `outbound_max_delay=30.0`, enmascaramiento de `sender`, ID determinista `gen_<sha256>`, validación estricta `2xx` y guardas `ConfigurationError`.
+* **`WhatsAppChannel`:** Eliminación de `dedup_ttl_hours` (cambio incompatible), parámetros *keyword-only* (`max_body_size`, `enable_docs`, `queue_timeout_seconds=120.0`), `llm_timeout_seconds` cambiado de `30.0` a `120.0` (`float | None`) con advertencias estructuradas de timeout, validación en construcción con `ConfigurationError` sobre los parámetros salientes existentes (incluido `outbound_max_delay`, que mantiene su valor predeterminado `30.0` de `v0.3.4`), enmascaramiento de `sender`, ID determinista `gen_<sha256>` y validación estricta `2xx`.
 
 ---
 

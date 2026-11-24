@@ -1,7 +1,7 @@
 ---
 title: "Visión General de Proveedores de LLM"
 description: "Arquitectura de motores, resolución dinámica de proveedores, políticas de seguridad y ejecución multimodelo en chatflow-agent."
-sourceRevision: "37f2a36"
+sourceRevision: "9f730ce"
 sourceHash: "81fe42bfd660f703b843ab618759f739c98ab08004492dc31dcff70574d47e1b"
 ---
 
@@ -162,7 +162,7 @@ Comprender las diferencias arquitectónicas entre versiones facilita la configur
 | **Preajustes de Proveedores** | OpenAI, Grok/xAI, Ollama/Gemma, DeepSeek y Groq. | Conserva los preajustes y mejora la resolución por prefijo de modelo. |
 | **Protección de Credenciales** | `_resolve_api_key` limita claves de entorno a endpoints oficiales exactos y exige credenciales explícitas para URLs remotas personalizadas. | Conserva el aislamiento *fail-closed*. |
 
-<Callout type="info" title="Nota de v0.4.0: Pool de Conexiones en v0.4.0">
+<Callout type="info" title="Pool de Conexiones en v0.4.0">
 En la versión estable `v0.3.4`, los turnos se ejecutan directamente mediante `await runner.run_async(...)`. En `v0.4.0`, engloba la ejecución del runner dentro de `async with runner:` para habilitar conexiones HTTP reutilizables entre turnos:
 
 ```python

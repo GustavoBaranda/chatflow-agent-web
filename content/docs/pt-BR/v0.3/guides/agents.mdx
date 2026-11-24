@@ -1,8 +1,8 @@
 ---
 title: "Agentes e Instruções Dinâmicas"
 description: "Aprofunde-se na abstração do Agent, callables de instrução dinâmica em tempo de execução, vinculação de ferramentas e parâmetros de configuração no chatflow-agent."
-sourceRevision: "0ffb562"
-sourceHash: "f41fc166a36b792e67286c2c41cc00967c7ade523220c806b26d72cee5999fb5"
+sourceRevision: "fe6b247"
+sourceHash: "4442abc1449ccfccaac616926414069ed7ad528f5035d92c5a44a5713f1ddfe2"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -172,7 +172,7 @@ O `chatflow-agent` mantém consistência mecânica enquanto introduz validaçõe
 * <VersionBadge version="0.3.4" status="stable" /> O construtor não valida `name`; a única verificação é que `add_handoff()` rejeita um handoff para o próprio agente.
 * Ferramentas sintéticas de handoff são nomeadas no formato `transfer_to_<sanitized_name>`.
 
-### Melhorias na v0.4.0 (`v0.4.0`)
+### Melhorias na `v0.4.0`
 * <VersionBadge version="0.4.0" status="stable" /> **Validação de Nome Não Vazio:** O construtor rejeita explicitamente nomes vazios ou compostos apenas por espaços em branco:
 
 ```python

@@ -1,8 +1,8 @@
 ---
 title: "Runner e Ciclo de Vida da Execução"
 description: "Guia detalhado sobre o loop conversacional de múltiplos turnos, resolução de motores, fluxo de ferramentas, timeouts e reversão transacional no chatflow-agent."
-sourceRevision: "f8f8bac"
-sourceHash: "860c0af092f505d82e8b2d057fa0765c9cb09213cd1663fbc026dd373dc34a81"
+sourceRevision: "fe6b247"
+sourceHash: "77c5771fd1106cfd83ca5348364106b6b484368be9d7fdc9671e95e88e34c917"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -100,7 +100,7 @@ Na v0.4.0, cada chamada a `runner.run_async()` segue uma sequência determiníst
    ├── D. Se o Modelo Solicitar Ferramentas:
    │      ├── Adiciona Message(role=Role.MODEL, tool_calls=[...])
    │      ├── Executa ferramentas / avalia handoffs sintéticos
-   │      ├── Se Handoff: troca agente ativo e valida max_handoffs_per_turn
+   │      ├── Se Handoff: valida max_handoffs_per_turn e então troca agente ativo
    │      └── Adiciona Message(role=Role.TOOL, tool_results=[...])
    │      └── Continua o loop para avaliação do próximo agente
    └── E. Se Texto Final for Gerado:

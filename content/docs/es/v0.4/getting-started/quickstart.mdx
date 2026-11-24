@@ -1,8 +1,8 @@
 ---
 title: Inicio Rápido
 description: Construye y ejecuta tu primer agente conversacional de IA con herramientas y memoria persistente en menos de 5 minutos.
-sourceRevision: "5d2d319"
-sourceHash: "bca121bf829ca54c70421d1ef8d86196cf3f3e8b2017880976a4fa4b3ec59787"
+sourceRevision: "fe6b247"
+sourceHash: "34613f4f5e1a2d94a0fa85d3085f158676d2d5feef6545be4c9868b38db13102"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -75,7 +75,7 @@ if __name__ == "__main__" and False:  # Configura tu API key para ejecutar un tu
 ```
 
 <Callout type="info" title="Inspección de Herramientas Ejecutadas">
-Cada `AgentResponse` retornado por `runner.run()` o `await runner.run_async()` incluye `response.tool_calls_executed` (un `list[str]` con los nombres de las herramientas invocadas en el turno), `response.active_agent_name` y `response.handoff` (un registro `AgentHandoff` si el control fue transferido a otro agente).
+Cada `AgentResponse` retornado por `runner.run()` o `await runner.run_async()` incluye `response.tool_calls_executed` (un `list[str]` con los nombres de las herramientas invocadas en el turno), `response.active_agent_name` y `response.handoff` (`Handoff | None`, poblado si el control fue transferido a otro agente).
 </Callout>
 
 ## 3. Ejecución Asíncrona y Memoria Persistente en SQLite

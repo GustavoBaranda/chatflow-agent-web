@@ -1,8 +1,8 @@
 ---
 title: "Runner e Ciclo de Execução"
 description: "Guia detalhado sobre o loop conversacional de múltiplos turnos, resolução de motores, fluxo de execução de ferramentas, limites de tempo e reversão transacional no chatflow-agent."
-sourceRevision: "0ffb562"
-sourceHash: "85edd02a7484dc471b55134f0bbf45ac2a8527dddd635ed810e112ec466f93b0"
+sourceRevision: "fe6b247"
+sourceHash: "ef03a7a9fe81d230f3881c5522250e1fd5668ee02cbcb65e57e6369b1a539a8f"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -208,7 +208,7 @@ async def handle_requests():
 ```
 
 <Callout type="info" title="Melhorias na v0.4.0">
-Pool de conexões assíncronas via <code>async with runner:</code> (para requisições ao Gemini), proteção contra reentrância com <code>ReentrantTurnError</code>, serialização por sessão para stores SQLite, reversão completa do estado inclusive em cancelamentos e rastreamento de cancelamento de threads foram introduzidos na versão v0.4.0 <strong>v0.4.0</strong>. Na versão estável v0.3.4, execute turnos diretamente na instância compartilhada do runner.
+Pool de conexões assíncronas via <code>async with runner:</code> (para requisições ao Gemini), proteção contra reentrância com <code>ReentrantTurnError</code>, serialização por sessão para stores SQLite, reversão completa do estado inclusive em cancelamentos e rastreamento de cancelamento de threads foram introduzidos na versão <strong>v0.4.0</strong>. Na versão estável v0.3.4, execute turnos diretamente na instância compartilhada do runner.
 </Callout>
 
 ---

@@ -1,8 +1,8 @@
 ---
 title: Conceitos Fundamentais
 description: Mergulho profundo nas cinco abstrações fundamentais do chatflow-agent — Agents, Runners, Engines, Tools e Sessions.
-sourceRevision: "5d2d319"
-sourceHash: "1af5f3876ce08b1b4ec43917d252d30006a95f7048db8a7938b630ee1db06be9"
+sourceRevision: "fe6b247"
+sourceHash: "066968bc595565cfc0ed5df647c2d592932cfe65184974b406d8e74f712730d8"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -48,7 +48,7 @@ assert "Current server time:" in agent.get_instructions()
 
 O `Runner` (`chatflow_agent.core.runner.Runner`) coordena a execução entre sessões, agentes, motores e ferramentas:
 
-1. **Descoberta do Registro de Agentes:** Na inicialização, o `Runner` realiza uma busca em largura (BFS) a partir de `starting_agent` percorrendo `.handoffs` e registrando cada `Agent` alcançável. Se duas instâncias distintas de `Agent` compartilharem o mesmo `.name`, o `Runner` lança `ValueError` imediatamente.
+1. **Descoberta do Registro de Agentes:** Na inicialização, o `Runner` percorre todas as instâncias de `Agent` alcançáveis a partir de `starting_agent` pelas arestas `.handoffs`, registrando cada `Agent` alcançável. Se duas instâncias distintas de `Agent` compartilharem o mesmo `.name`, o `Runner` lança `ValueError` imediatamente.
 2. **Bloqueio de Concorrência por Sessão:** Chamadas a `run_async()` para o mesmo `session_id` adquirem um `asyncio.Lock` dedicado para impedir corrupção do histórico. Na `v0.4.0`, se uma ferramenta ou task em segundo plano iniciada dentro de um turno tentar chamar `run()` ou `run_async()` para o **mesmo** `session_id`, o `Runner` lança `ReentrantTurnError` imediatamente em vez de entrar em deadlock.
 3. **Redefinição Segura de Sessão (`reset_session_async`):** `await runner.reset_session_async(session_id) -> bool` e `runner.reset_session(session_id) -> bool` coordenam a limpeza do histórico com o lock de turno, a barreira de trabalho síncrono e a guarda de reentrância, retornando `True` se uma sessão existente foi limpa e `False` caso contrário.
 4. **Loop de Execução Limitado:** Dentro de um turno, o `Runner` aplica `max_tool_iterations` (padrão `10`) e `max_handoffs_per_turn` (padrão `5`) para evitar loops infinitos.
@@ -79,7 +79,7 @@ Um `Tool` (`chatflow_agent.core.tools.Tool`) encapsula uma função Python sínc
 
 * Inspeciona anotações de tipo Python (`str`, `int`, `float`, `bool`, `list[T]`, `Sequence[T]`, `set[T]`, `frozenset[T]`, `tuple[T, ...]`, `dict`, `Optional[T]` / `T | None`, uniões de tipos suportados e `Annotated[T, ...]`) para compilar schemas de function-calling. Lança `ToolSchemaError` na definição se uma anotação de união contiver um membro sem mapeamento (ex.: `CustomClass | None`), enquanto tipos não-união não suportados preservam o fallback compatível `STRING` / `string`.
 * Valida e coage argumentos fornecidos pelo modelo em tempo de execução antes de chamar a função (`validate_args=True` por padrão), lançando `ToolArgumentValidationError` (subclasse de `ToolExecutionError`) em entradas inválidas.
-* Despacha funções síncronas e aguarda corrotinas (`inspect.iscoroutinefunction`).
+* Aguarda corrotinas diretamente (`inspect.iscoroutinefunction`) e executa funções síncronas `def` em uma thread trabalhadora via `_run_sync_tool` durante `execute_async()` para que código bloqueante não trave o event loop (threads síncronas não podem ser interrompidas à força se um turno for cancelado ou expirar; turnos posteriores da mesma sessão aguardam a conclusão do trabalho síncrono residual).
 * Se uma ferramenta lançar uma exceção em tempo de execução, o `Runner` a captura, registra um `trace_id` no log e retorna um `ToolResult` sanitizado (`is_error=True`) ao LLM sem expor stack traces aos usuários finais.
 
 ## 5. `BaseSessionStore` e `SessionContext` — Estado e Memória
@@ -87,10 +87,29 @@ Um `Tool` (`chatflow_agent.core.tools.Tool`) encapsula uma função Python sínc
 O estado conversacional é encapsulado em `SessionContext`:
 
 * **`session_id`** (`str`): Chave única de conversa (ex.: telefone do WhatsApp, chat ID do Telegram ou UUID).
-* **`history`** (`list[Message]`): Sequência ordenada de mensagens `USER`, `ASSISTANT`, `TOOL` e `SYSTEM`, limitada por janela deslizante (`max_turns`, padrão `50` turnos de usuário) que preserva pares de chamadas de ferramentas e uma âncora `[System Note]`.
+* **`history`** (`list[Message]`): Sequência ordenada de mensagens `USER`, `ASSISTANT`, `TOOL` e `SYSTEM`, limitada por janela deslizante (`max_turns`, padrão `40` turnos de usuário completos). Durante o recorte (`_prune_history()`), todas as mensagens `Role.SYSTEM` são preservadas no início de `history` enquanto turnos antigos não-sistema são descartados para que a janela retida comece em uma mensagem `Role.USER` e nunca separe pares `tool_call` / `tool_result`.
 * **`active_agent`** (`Agent`): Agente atendendo a sessão atualmente; atualizado e persistido após cada handoff.
 * **`metadata`** (`dict[str, Any]`): Dicionário JSON-serializável persistido junto à sessão (com isolamento por cópia profunda em `SessionStore`, serialização ISO-8601 para `datetime`/`date`/`time` e `JsonCodecError` para objetos não serializáveis).
 
+```python
+# [min-version: 0.4.0]
+# [executable]
+from chatflow_agent import Agent
+from chatflow_agent.core.memory import SessionContext
+from chatflow_agent.types import Message, Role
+
+agent = Agent(name="Helper", instructions="Be concise.")
+ctx = SessionContext(session_id="demo", initial_agent=agent, max_turns=2)
+ctx.add_message(Message(role=Role.SYSTEM, content="Account tier: enterprise"))
+for i in range(3):
+    ctx.add_message(Message(role=Role.USER, content=f"Question {i}"))
+    ctx.add_message(Message(role=Role.MODEL, content=f"Answer {i}"))
+
+# Role.SYSTEM é preservado no início; apenas os 2 turnos completos mais recentes permanecem
+assert ctx.history[0].role == Role.SYSTEM
+assert [m.content for m in ctx.history if m.role == Role.USER] == ["Question 1", "Question 2"]
+```
+
 Escolha entre:
-* **`SessionStore`**: Armazenamento rápido em memória com isolamento por cópia profunda de metadados e deduplicação thread-safe.
-* **`SQLiteSessionStore`**: Armazenamento durável em SQLite com journaling `WAL`, suporte persistente a `:memory:`, leituras em transação única, reversão transacional de turnos e deduplicação de webhooks de 192 horas (`8 dias`).
+* **`SessionStore`**: Armazenamento rápido em memória (`default_max_turns=40`) com isolamento por cópia profunda de metadados e deduplicação thread-safe.
+* **`SQLiteSessionStore`**: Armazenamento durável em SQLite (`default_max_turns=40`) com journaling `WAL` em bancos baseados em arquivo, suporte persistente a `:memory:`, leituras em transação única, reversão transacional de turnos e deduplicação de webhooks de 192 horas (`8 dias`).

@@ -1,8 +1,8 @@
 ---
 title: "Agentes e Instrucciones Dinámicas"
 description: "Profundización en la abstracción Agent, callables de instrucciones dinámicas en tiempo de ejecución, vinculación de herramientas y parámetros de configuración en chatflow-agent."
-sourceRevision: "0ffb562"
-sourceHash: "f41fc166a36b792e67286c2c41cc00967c7ade523220c806b26d72cee5999fb5"
+sourceRevision: "fe6b247"
+sourceHash: "4442abc1449ccfccaac616926414069ed7ad528f5035d92c5a44a5713f1ddfe2"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -172,7 +172,7 @@ assert any(t.name == "query_active_users" for t in agent.tools)
 * <VersionBadge version="0.3.4" status="stable" /> El constructor no valida `name`; la única comprobación es que `add_handoff()` rechaza una transferencia hacia el propio agente.
 * Las herramientas de transferencia sintetizadas tienen el formato `transfer_to_<sanitized_name>`.
 
-### Mejoras en v0.4.0 (`v0.4.0`)
+### Mejoras en `v0.4.0`
 * <VersionBadge version="0.4.0" status="stable" /> **Validación de Nombres No Vacíos:** El constructor rechaza explícitamente nombres vacíos o que solo contengan espacios en blanco:
 
 ```python

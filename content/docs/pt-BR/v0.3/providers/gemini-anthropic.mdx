@@ -1,7 +1,7 @@
 ---
 title: "Google Gemini e Anthropic Claude"
 description: "Google Gemini por meio do google-genai e Anthropic Claude por meio da Messages API no chatflow-agent v0.3.4."
-sourceRevision: "3c5ab27"
+sourceRevision: "321461a"
 sourceHash: "309aa135e34450033786eee149a8e15e8438844d67270ef5090981707bbf4c74"
 ---
 
@@ -63,7 +63,7 @@ assistant = Agent(
 A implementação do Gemini passou por uma evolução arquitetural fundamental entre as versões:
 
 * **Na versão `v0.3.4` (Estável):** O motor usa o SDK oficial `google-genai` do Google (`from google import genai`), que é instalado automaticamente como dependência principal. Não há pool de conexões.
-* **Na versão `v0.4.0` (v0.4.0):** O motor foi reescrito utilizando `httpx` assíncrono nativo contra `https://generativelanguage.googleapis.com/v1beta`. Isso remove a dependência `google-genai` e, dentro de um escopo `async with runner:`, permite que as requisições ao Gemini compartilhem um único cliente HTTP com pool de conexões.
+* **Na versão `v0.4.0`:** O motor foi reescrito utilizando `httpx` assíncrono nativo contra `https://generativelanguage.googleapis.com/v1beta`. Isso remove a dependência `google-genai` e, dentro de um escopo `async with runner:`, permite que as requisições ao Gemini compartilhem um único cliente HTTP com pool de conexões.
 
 Na v0.3.4, execute os turnos diretamente em um runner compartilhado:
 

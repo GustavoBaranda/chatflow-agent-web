@@ -1,8 +1,8 @@
 ---
 title: "Observabilidad y Depuración"
 description: "Registro estructurado en producción, telemetría, IDs de correlación, trazado de herramientas e inspección en sistemas chatflow-agent."
-sourceRevision: "0ca4592"
-sourceHash: "8c6848ae8c57e48134df0598aa1a92be6f13eb896bf81342e8766a0f252b6d44"
+sourceRevision: "321461a"
+sourceHash: "fd5778c751de69677c189184be1342251492506b92c09880bafa8ddf8a42b58d"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -32,8 +32,8 @@ chatflow_agent
 
 El SDK no emite métricas ni trazas, y los loggers de los motores no registran cargas útiles de las peticiones, latencias ni recuentos de tokens. Añade esa instrumentación en tu aplicación si la necesitas.
 
-<Callout type="info" title="Loggers adicionales en prerelease">
-<VersionBadge version="0.4.0rc1" status="prerelease" /> agrega `chatflow_agent.tools` y `chatflow_agent.memory`. La versión estable v0.3.4 no los emite.
+<Callout type="info" title="Loggers adicionales en v0.4.0">
+<VersionBadge version="0.4.0" status="stable" /> agrega `chatflow_agent.tools` y `chatflow_agent.memory`. La versión estable v0.3.4 no los emite.
 </Callout>
 
 ## Configuración de Registros Estructurados

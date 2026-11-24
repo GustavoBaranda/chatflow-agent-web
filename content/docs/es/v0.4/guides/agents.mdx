@@ -1,8 +1,8 @@
 ---
 title: "Agentes e Instrucciones Dinámicas"
 description: "Profundiza en la abstracción de Agent, funciones invocables para instrucciones dinámicas en tiempo de ejecución, vinculación de herramientas y parámetros de configuración en chatflow-agent."
-sourceRevision: "f8f8bac"
-sourceHash: "2f2bf00b518f2c11972a9436e148b73eb7b506a6b6330e513f1bcad23de752c8"
+sourceRevision: "90324d3"
+sourceHash: "7039de3a2852ca726a724e1606d19f5638638157814a9dfdbb55597d36de261d"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -163,7 +163,7 @@ assert any(t.name == "query_active_users" for t in agent.tools)
 
 ---
 
-## Diferencias de Versión y Funciones Preliminares
+## Diferencias de Versión (v0.3.4 vs v0.4.0)
 
 `chatflow-agent` ofrece una mecánica consistente de agentes a la vez que introduce validaciones más estrictas y normalización de caracteres en versiones más recientes:
 
@@ -171,22 +171,22 @@ assert any(t.name == "query_active_users" for t in agent.tools)
 * <VersionBadge version="0.3.4" status="stable" /> El constructor no valida `name`; solo se rechaza una transferencia al propio agente.
 * Las herramientas sintéticas de transferencia se formatean como `transfer_to_<sanitized_name>`.
 
-### Mejoras de la Versión Preliminar (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Validación de Nombres No Vacíos:** El constructor rechaza explícitamente nombres vacíos o formados únicamente por espacios:
+### Mejoras de la Última Versión Estable (`v0.4.0`)
+* <VersionBadge version="0.4.0" status="stable" /> **Validación de Nombres No Vacíos:** El constructor rechaza explícitamente nombres vacíos o formados únicamente por espacios:
 
 ```python
 from chatflow_agent import Agent
 
-# En v0.4.0rc1: lanza ValueError("Agent name must be a non-empty string.")
+# En v0.4.0: lanza ValueError("Agent name must be a non-empty string.")
 try:
     Agent(name="   ", instructions="test")
 except ValueError as err:
     print("Caught expected validation error:", err)
 ```
 
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Transliteración Unicode NFKD:** Nombres de agentes con acentos o caracteres especiales (ej. `AtenciónAlCliente`) se transliteran limpiamente a identificadores ASCII válidos (`transfer_to_atencionalcliente`).
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Desambiguación de Colisiones:** Si múltiples agentes objetivo producen nombres de herramientas sintéticas equivalentes, se anexan automáticamente sufijos numéricos (`_2`, `_3`).
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Límite de Longitud en Nombres de Herramientas:** Los nombres de herramientas sintéticas se acotan estrictamente a un máximo de 60 caracteres para cumplir con los límites de las APIs de todos los proveedores.
+* <VersionBadge version="0.4.0" status="stable" /> **Transliteración Unicode NFKD:** Nombres de agentes con acentos o caracteres especiales (ej. `AtenciónAlCliente`) se transliteran limpiamente a identificadores ASCII válidos (`transfer_to_atencionalcliente`).
+* <VersionBadge version="0.4.0" status="stable" /> **Desambiguación de Colisiones:** Si múltiples agentes objetivo producen nombres de herramientas sintéticas equivalentes, se anexan automáticamente sufijos numéricos (`_2`, `_3`).
+* <VersionBadge version="0.4.0" status="stable" /> **Límite de Longitud en Nombres de Herramientas:** Los nombres de herramientas sintéticas se acotan estrictamente a un máximo de 60 caracteres para cumplir con los límites de las APIs de todos los proveedores.
 
 ---
 
@@ -216,7 +216,7 @@ agent.current_user = "user_123"  # ¡Se filtrará entre sesiones concurrentes!
 # )
 ```
 
-En v0.4.0rc1, los `metadata` pasados a `run()` / `run_async()` se fusionan con los metadatos de la sesión en cada turno y se persisten junto con ella.
+En v0.4.0, los `metadata` pasados a `run()` / `run_async()` se fusionan con los metadatos de la sesión en cada turno y se persisten junto con ella.
 
 ### 3. Registro de Auto-Transferencias (Self-Handoff)
 Un agente no puede registrar una transferencia hacia sí mismo. Hacerlo genera un error inmediato:

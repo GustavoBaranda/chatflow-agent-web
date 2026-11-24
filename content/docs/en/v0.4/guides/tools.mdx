@@ -115,36 +115,51 @@ Calling <code>tool.execute()</code> synchronously on an <code>async def</code> t
 
 ---
 
-## Version Differences & Prerelease Features
+## Runtime Argument Validation & Version Evolution (`v0.4.0`)
 
-Tool schema generation and execution have evolved significantly between releases:
+Tool schema generation and runtime execution include major safety upgrades in **`v0.4.0`**:
 
-### Stable Release (`v0.3.4`)
+### Previous Stable Baseline (`v0.3.4`)
 * <VersionBadge version="0.3.4" status="stable" /> Canonical Gemini declaration format (`to_gemini_declaration()`).
 * Single-level type mapping for primitive types and unparameterized `list`/`dict`.
-* Sync functions offloaded via `asyncio.to_thread` during `execute_async()`.
+* Sync functions offloaded via `asyncio.to_thread` during `execute_async()`, without runtime argument validation.
 
-### Prerelease Enhancements (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Deep Collection Typing:** Introspects item schemas for `list[T]`, `Sequence[T]`, `set[T]`, and homogeneous tuples `tuple[T, ...]`:
+### Latest Stable Enhancements (`v0.4.0`)
+* <VersionBadge version="0.4.0" status="stable" /> **Runtime Pydantic Argument Validation (`validate_args=True` by default):**
+  Every tool validates and coerces model-supplied or caller-supplied arguments against its Python type hints before calling the function. Invalid arguments raise **`ToolArgumentValidationError`** (a subclass of `ToolExecutionError`):
+  * Unquoted integers and finite floats coerce cleanly to `str` targets, while booleans, lists, dicts, and `None` are rejected for `str`.
+  * String booleans (`"true"`, `"false"`) coerce to `bool`; numeric `int` and `float` parameters reject booleans (`True`/`False`) and non-finite `NaN`/`inf` (`allow_inf_nan=False`).
+  * In union types containing `str` (such as `str | int`), non-coercing branches are tried before string coercion so integer inputs like `5` remain `int`.
+  * Parameters with leading underscores (`_id`), `model_config`, or plain functions taking `self` or `cls` are validated without colliding with Pydantic internals.
+  * Opt out per tool or per agent registration by passing `validate_args=False` on `@tool(validate_args=False)`, `@agent.tool(validate_args=False)`, `agent.add_tool(fn, validate_args=False)`, or `Tool(fn, validate_args=False)`.
 
 ```python
-from chatflow_agent import tool
+# [min-version: 0.4.0]
+# [executable]
+from chatflow_agent import ToolArgumentValidationError, tool
 
 @tool
 def sum_metrics(values: list[float]) -> float:
     """Sum a list of numeric measurements."""
     return sum(values)
 
-# Generates: {"type": "ARRAY", "items": {"type": "NUMBER"}}
+assert sum_metrics.execute(values=[1.5, 2.5, 3.0]) == 7.0
+
+try:
+    sum_metrics.execute(values=["not-a-float"])
+except ToolArgumentValidationError as exc:
+    assert "values" in str(exc)
 ```
 
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Union & Optional Support:**
-  * `Optional[T]` or `T | None` generates `{ "type": "...", "nullable": True }`.
+* <VersionBadge version="0.4.0" status="stable" /> **Collection, Union & Optional Typing:**
+  * Introspects item schemas for `list[T]`, `Sequence[T]`, `set[T]`, `frozenset[T]`, homogeneous tuples `tuple[T, ...]`, bare `tuple`, `dict`, and `typing.Annotated[T, ...]`.
+  * `Optional[T]` or `T | None` (where `T` is a supported type) generates `{ "type": "...", "nullable": True }` for Gemini and standard JSON Schema nullable unions for OpenAI/Anthropic.
   * `int | float` broadens deterministically to `"NUMBER"` regardless of declaration order.
-  * Multi-type unions generate an `anyOf` schema list.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`to_openai_parameters()`:** Generates JSON Schema formatted parameters (lowercased type names, `type: "null"`, and no `nullable` keyword) for OpenAI and Anthropic engines.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`ToolSchemaError`:** Raised when the tool is created if a union annotation contains a member with no schema mapping (for example `int | datetime`). Other unknown annotations, and unannotated parameters, still fall back to `"STRING"`.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Varargs Exclusion:** `*args` and `**kwargs` are automatically omitted from parameter schemas.
+  * Non-union unsupported annotations (such as custom classes, `BaseModel`, `TypedDict`, `dataclass`, `Enum`, or `Literal`) retain the backward-compatible `"STRING"` / `"string"` schema fallback and `Any` runtime validation rather than deep schema introspection.
+* <VersionBadge version="0.4.0" status="stable" /> **`to_openai_parameters()`:** Public helper returning a deep copy of the JSON Schema formatted parameters (`{"type": "object", "properties": ..., "required": ...}`) for OpenAI and Anthropic engines.
+* <VersionBadge version="0.4.0" status="stable" /> **Fail-Fast `ToolSchemaError` on Unmappable Unions:** Raised immediately when the tool is created if a union annotation contains a member with no concrete schema mapping (for example `CustomClass | None`, `BaseModel | None`, or `int | datetime`). Non-union unknown annotations and unannotated parameters continue to fall back to `"STRING"` / `"string"`.
+* <VersionBadge version="0.4.0" status="stable" /> **Static `@overload` Typing & `Tool.clone()`:** `@tool` and `@agent.tool` provide `@overload` signatures returning `Tool`, and `Tool.clone(validate_args=...)` creates an isolated shallow copy when shared across agents.
+* <VersionBadge version="0.4.0" status="stable" /> **Varargs Exclusion:** `*args` and `**kwargs` are automatically omitted from parameter schemas.
 
 ---
 

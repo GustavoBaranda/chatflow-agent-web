@@ -1,8 +1,8 @@
 ---
 title: "Webhooks e Canais Customizados"
 description: "Construa integrações customizadas de webhook e adaptadores de canais usando BaseChannel, FastAPI e despacho assíncrono."
-sourceRevision: "a362b6e"
-sourceHash: "05bf90d83094740284a53201c70733c1a8dc24128dcee320edddbe1ac4a713ec"
+sourceRevision: "90324d3"
+sourceHash: "7ad6b01221ad4b77c9ba8d3ca1fa1a48c9323c790579961c47e32dd420830de1"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -13,7 +13,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 Embora o `chatflow-agent` forneça canais pré-construídos para Telegram e WhatsApp, sistemas modernos frequentemente demandam conectar enxames multiagente a microsserviços internos, APIs de eventos do Slack, bots do Discord ou webhooks de CRM (Zendesk, Intercom).
 
-O `chatflow-agent` não inclui um canal de webhook genérico. O extra opcional `webhook` apenas instala `fastapi>=0.110.0` e `uvicorn>=0.29.0`; você mesmo escreve o endpoint, seja como uma subclasse de `BaseChannel` (como abaixo) ou chamando `runner.run_async()` a partir de uma rota existente. O repositório do SDK inclui uma aplicação de referência completa em [`examples/webhook_api_service.py`](https://github.com/GustavoBaranda/chatflow-agent/blob/v0.4.0rc1/examples/webhook_api_service.py).
+O `chatflow-agent` não inclui um canal de webhook genérico. O extra opcional `webhook` apenas instala `fastapi>=0.110.0` e `uvicorn>=0.29.0`; você mesmo escreve o endpoint, seja como uma subclasse de `BaseChannel` (como abaixo) ou chamando `runner.run_async()` a partir de uma rota existente. O repositório do SDK inclui uma aplicação de referência completa em [`examples/webhook_api_service.py`](https://github.com/GustavoBaranda/chatflow-agent/blob/v0.4.0/examples/webhook_api_service.py).
 
 ## A Arquitetura do BaseChannel
 
@@ -58,7 +58,7 @@ class MyChannel(BaseChannel):
 ```
 
 * `attach(runner: Runner) -> BaseChannel`: Vincula uma instância do Runner multiagente ao canal.
-* `dispatch_async(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Encaminha a mensagem ao runner vinculado de forma assíncrona (`runner.run_async`). Na v0.4.0rc1, os turnos de uma mesma sessão são serializados tanto para `SessionStore` quanto para `SQLiteSessionStore` (por store e por event loop).
+* `dispatch_async(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Encaminha a mensagem ao runner vinculado de forma assíncrona (`runner.run_async`). Na v0.4.0, os turnos de uma mesma sessão são serializados tanto para `SessionStore` quanto para `SQLiteSessionStore` (por store e por event loop).
 * `dispatch(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Contraparte síncrona para ambientes de execução síncronos.
 
 `split_message(text: str, max_len: int = 4096) -> list[str]` não é um método de `BaseChannel`, e sim um utilitário em nível de módulo para dividir respostas longas: `from chatflow_agent.channels import split_message`.

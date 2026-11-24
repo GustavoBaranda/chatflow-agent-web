@@ -121,6 +121,15 @@
   * **About & Institutional Pages:** Emphasize project origin, creator background, maintainer leadership, and community collaboration.
   * Never artificially repeat the creator's name in titles or meta descriptions of technical documentation pages.
 
+### 3.3 Editorial & Public Communication Standards
+* **Match Tone to Page Purpose:** Communicate value clearly first and deepen technically where appropriate:
+  * **Home & Features:** Clear, benefit-oriented language describing concrete capabilities without exaggerated claims.
+  * **About (Institutional):** Human, clear, and timeless prose focused on project purpose, modularity, developer control, and open-source collaboration—never embed release-specific numbers, internal class names, or constructor flags in Origin & Purpose.
+  * **Community:** Welcoming, natural, and participation-oriented; only reference documentation sections and guides that actually exist.
+  * **Technical Docs, What's New & Migration:** Precise, verifiable implementation details, signatures, and breaking changes.
+* **No Unbacked Promotional Claims:** Avoid superlatives or unverified promises (e.g., "everything you need", "bloat", "seamless", "low overhead", "in under a minute", or absolute concurrency/production guarantees without caveats).
+* **Natural Localization:** Translate idiomatically across `en`, `es`, and `pt-BR` rather than literally; preserve Argentine *voseo* on public Spanish UI pages, avoid literal backticks in rendered UI prose, and never hardcode English labels in React components.
+
 ---
 
 ## 4. Python SDK Accuracy Protocol

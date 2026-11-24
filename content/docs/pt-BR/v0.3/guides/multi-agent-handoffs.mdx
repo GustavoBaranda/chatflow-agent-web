@@ -1,8 +1,8 @@
 ---
 title: "Handoffs Multiagente"
 description: "Orquestrando enxames autônomos, delegação ponto a ponto, ferramentas sintéticas de transferência e prevenção de ciclos no chatflow-agent."
-sourceRevision: "0ffb562"
-sourceHash: "a48d585989b7285a1841e4fa223556aceba347c3dc83df7eb64710ba3f0e6fb6"
+sourceRevision: "fe6b247"
+sourceHash: "f263138a2ce5f8724fcb0b9c5853a527c77d4e07c0fcc545e960b7eb1377acd4"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -140,7 +140,7 @@ Quando `runner.run_async()` processa um turno:
 Transferências descontroladas entre agentes poderiam gerar loops infinitos caso os prompts sejam ambíguos. O `chatflow-agent` protege sua execução com salvaguardas nativas:
 
 * **`max_handoffs_per_turn` (Padrão: 5):**
-  O número máximo de transferências de agentes contabilizadas dentro de um único turno de mensagem do usuário. Na v0.3.4 a verificação ocorre depois da transferência: a transferência que excede o limite ainda é aplicada (o agente ativo muda), em seguida é adicionado um resultado de erro, `"Maximum agent transfers exceeded for a single turn."`, e as chamadas de ferramentas restantes dessa mensagem do modelo não recebem resultado. A versão <VersionBadge version="0.4.0rc1" status="prerelease" /> verifica o limite antes de trocar de agente e adiciona um resultado "Tool skipped" para cada chamada restante.
+  O número máximo de transferências de agentes contabilizadas dentro de um único turno de mensagem do usuário. Na v0.3.4 a verificação ocorre depois da transferência: a transferência que excede o limite ainda é aplicada (o agente ativo muda), em seguida é adicionado um resultado de erro, `"Maximum agent transfers exceeded for a single turn."`, e as chamadas de ferramentas restantes dessa mensagem do modelo não recebem resultado. A versão <VersionBadge version="0.4.0" status="stable" /> verifica o limite antes de trocar de agente e adiciona um resultado "Tool skipped" para cada chamada restante.
 * **`max_tool_iterations` (Padrão: 10):**
   O número máximo de rodadas de modelo/ferramentas por turno. Uma rodada é uma geração do modelo mais todas as chamadas de ferramentas que ela solicitou, portanto uma rodada pode executar várias ferramentas. Quando o limite é atingido, o turno termina com uma resposta de fallback "Execution iteration limit reached".
 
@@ -159,7 +159,7 @@ runner = Runner(
 
 ---
 
-## Diferenças de Versão e Recursos de Pré-lançamento
+## Diferenças de Versão e Recursos da v0.4.0
 
 A geração e sanitização de handoffs receberam melhorias significativas de confiabilidade em versões mais recentes:
 
@@ -168,12 +168,12 @@ A geração e sanitização de handoffs receberam melhorias significativas de co
 * Histórico de sessão compartilhado mantém contexto conversacional completo entre transferências.
 * `Handoff.context_updates` existe como campo, mas o runner da v0.3.4 o ignora quando ocorre um handoff.
 
-### Melhorias de Pré-lançamento (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Transliteração Unicode NFKD:** Normaliza automaticamente caracteres com acentuação para ASCII simples (ex.: `AtenciónAlCliente` torna-se `transfer_to_atencionalcliente`).
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Fallbacks Determinísticos com Hash:** Nomes de agentes em alfabetos não latinos (ex.: japonês, árabe, cirílico) ou emojis utilizam um prefixo determinístico de hash SHA-256 (`transfer_to_u<hash>`) para garantir identificadores válidos.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Desambiguação em Colisões:** Se dois agentes gerarem nomes sanitizados idênticos, sufixos numéricos (`_2`, `_3`) são adicionados automaticamente para evitar sobrescritas.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Limite de Caracteres:** Identificadores de ferramentas de handoff são limitados a 60 caracteres para conformidade com provedores.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Encaminhamento de Atualizações de Contexto:** O método `session.set_active_agent(agent, context_updates)` armazena `Handoff.context_updates` nos metadados da sessão quando ocorre o handoff. As ferramentas embutidas `transfer_to_*` nunca preenchem `context_updates`; somente uma ferramenta personalizada que retorne seu próprio `Handoff` pode fazê-lo.
+### Melhorias na `v0.4.0`
+* <VersionBadge version="0.4.0" status="stable" /> **Transliteração Unicode NFKD:** Normaliza automaticamente caracteres com acentuação para ASCII simples (ex.: `AtenciónAlCliente` torna-se `transfer_to_atencionalcliente`).
+* <VersionBadge version="0.4.0" status="stable" /> **Fallbacks Determinísticos com Hash:** Nomes de agentes em alfabetos não latinos (ex.: japonês, árabe, cirílico) ou emojis utilizam um prefixo determinístico de hash SHA-256 (`transfer_to_u<hash>`) para garantir identificadores válidos.
+* <VersionBadge version="0.4.0" status="stable" /> **Desambiguação em Colisões:** Se dois agentes gerarem nomes sanitizados idênticos, sufixos numéricos (`_2`, `_3`) são adicionados automaticamente para evitar sobrescritas.
+* <VersionBadge version="0.4.0" status="stable" /> **Limite de Caracteres:** Identificadores de ferramentas de handoff são limitados a 60 caracteres para conformidade com provedores.
+* <VersionBadge version="0.4.0" status="stable" /> **Encaminhamento de Atualizações de Contexto:** O método `session.set_active_agent(agent, context_updates)` armazena `Handoff.context_updates` nos metadados da sessão quando ocorre o handoff. As ferramentas embutidas `transfer_to_*` nunca preenchem `context_updates`; somente uma ferramenta personalizada que retorne seu próprio `Handoff` pode fazê-lo.
 
 ---
 

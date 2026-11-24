@@ -5,24 +5,24 @@
  * release statuses, route prefixes, and resolution utilities.
  */
 
-export type DocVersionTrack = 'v0.3' | 'v0.4';
+export type DocVersionTrack = 'v0.4' | 'v0.3';
 
 export type DocReleaseStatus = 'stable' | 'prerelease' | 'legacy';
 
 export interface DocVersionConfig {
-  /** Identifier used in URLs and file trees (e.g., 'v0.3') */
+  /** Identifier used in URLs and file trees (e.g., 'v0.4') */
   track: DocVersionTrack;
   /** Exact published release of chatflow-agent on PyPI */
   sdkVersion: string;
-  /** Release classification: 'stable' for production or 'prerelease' */
+  /** Release classification: 'stable' for latest production, 'legacy' for previous stable */
   status: DocReleaseStatus;
   /** Human-readable display label */
   label: string;
-  /** Compact badge label (e.g., 'Stable', 'RC1') */
+  /** Compact badge label (e.g., 'Latest / Stable', 'Previous Stable') */
   badgeLabel: string;
   /** Whether this track is the default active stable track */
   isDefault: boolean;
-  /** Route prefix under /[locale]/docs/ (e.g., 'v0.3') */
+  /** Route prefix under /[locale]/docs/ (e.g., 'v0.4') */
   routePrefix: string;
   /** Installation command for this track */
   installCommand: string;
@@ -32,37 +32,38 @@ export interface DocVersionConfig {
   description: string;
 }
 
-export const DEFAULT_STABLE_TRACK: DocVersionTrack = 'v0.3';
+export const DEFAULT_STABLE_TRACK: DocVersionTrack = 'v0.4';
+export const PREVIOUS_STABLE_TRACK: DocVersionTrack = 'v0.3';
 export const DEFAULT_PRERELEASE_TRACK: DocVersionTrack = 'v0.4';
 
 export const DOC_VERSIONS: Record<DocVersionTrack, DocVersionConfig> = {
+  'v0.4': {
+    track: 'v0.4',
+    sdkVersion: '0.4.0',
+    status: 'stable',
+    label: 'v0.4.0 — Latest / Stable',
+    badgeLabel: 'Latest / Stable',
+    isDefault: true,
+    routePrefix: 'v0.4',
+    installCommand: 'pip install chatflow-agent==0.4.0',
+    supportedLocales: ['en', 'es', 'pt-BR'] as const,
+    description: 'Latest stable production release targeting published SDK v0.4.0.',
+  },
   'v0.3': {
     track: 'v0.3',
     sdkVersion: '0.3.4',
-    status: 'stable',
-    label: 'v0.3.x (Stable)',
-    badgeLabel: 'Stable',
-    isDefault: true,
+    status: 'legacy',
+    label: 'v0.3.4 — Previous Stable',
+    badgeLabel: 'Previous Stable',
+    isDefault: false,
     routePrefix: 'v0.3',
     installCommand: 'pip install chatflow-agent==0.3.4',
     supportedLocales: ['en', 'es', 'pt-BR'] as const,
-    description: 'Current production-ready release targeting published SDK v0.3.4 and compatible patches 0.3.0–0.3.4.',
-  },
-  'v0.4': {
-    track: 'v0.4',
-    sdkVersion: '0.4.0rc1',
-    status: 'prerelease',
-    label: 'v0.4.0rc1 (Prerelease)',
-    badgeLabel: 'RC1',
-    isDefault: false,
-    routePrefix: 'v0.4',
-    installCommand: 'pip install --pre chatflow-agent==0.4.0rc1',
-    supportedLocales: ['en', 'es', 'pt-BR'] as const,
-    description: 'Prerelease preview documentation targeting published SDK v0.4.0rc1 with async runner context and memory store.',
+    description: 'Previous stable release targeting published SDK v0.3.4 and compatible patches 0.3.0–0.3.4.',
   },
 } as const;
 
-export const ALL_DOC_TRACKS: readonly DocVersionTrack[] = ['v0.3', 'v0.4'] as const;
+export const ALL_DOC_TRACKS: readonly DocVersionTrack[] = ['v0.4', 'v0.3'] as const;
 
 import { TRACK_AVAILABLE_TOPICS } from './docs-topics-manifest';
 export { TRACK_AVAILABLE_TOPICS };

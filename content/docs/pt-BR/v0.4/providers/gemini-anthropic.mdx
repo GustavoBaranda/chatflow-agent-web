@@ -1,8 +1,8 @@
 ---
 title: "Google Gemini e Anthropic Claude"
 description: "Integração de modelos de fronteira de alto desempenho com Google Gemini REST v1beta e Anthropic Claude Messages API."
-sourceRevision: "82d8ebf"
-sourceHash: "9eb8468fcc81dccbdb8dd2176d913db697901d5f1004fc9f5f1783c132baa0f8"
+sourceRevision: "90324d3"
+sourceHash: "114e401860712898ffab50f923f5b4a157f1ad8c2943edb7e80fb38f8d094a7a"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -55,17 +55,17 @@ assistant = Agent(
 ### Pool de Conexões e Arquitetura Zero-SDK
 
 <div className="flex gap-2 my-3">
-  <VersionBadge version="0.4.0rc1" status="prerelease" />
+  <VersionBadge version="0.4.0" status="stable" />
   <VersionBadge version="0.3.4" status="stable" />
 </div>
 
 A implementação do Gemini passou por uma reformulação arquitetural significativa entre as versões:
 
 * **Na `v0.3.4` (Estável):** O motor importava o SDK oficial `google-genai` do Google (`from google import genai`), exigindo a instalação da biblioteca de cliente externa.
-* **Na `v0.4.0rc1` (Pré-lançamento):** O motor foi totalmente reescrito usando `httpx` assíncrono nativo contra `https://generativelanguage.googleapis.com/v1beta`. Isso elimina dependências pesadas e viabiliza o **pool de conexões** entre os turnos dos agentes:
+* **Na `v0.4.0` (Última Estável):** O motor foi totalmente reescrito usando `httpx` assíncrono nativo contra `https://generativelanguage.googleapis.com/v1beta`. Isso elimina dependências pesadas e viabiliza o **pool de conexões** entre os turnos dos agentes:
 
 ```python
-# [min-version: 0.4.0rc1]
+# [min-version: 0.4.0]
 # [no-exec: requires real gemini api key]
 import asyncio
 from chatflow_agent import Agent, Runner
@@ -139,7 +139,7 @@ O `AnthropicEngine` repete automaticamente requisições em caso de restrições
 * **Intervalo Base:** 1.0 segundo.
 * **Intervalo Máximo:** 10.0 segundos.
 
-Esses valores são fixos na v0.4.0rc1; não são parâmetros do construtor. Quando uma resposta repetida inclui um cabeçalho `Retry-After` numérico, esse valor substitui o intervalo exponencial, mas a espera continua limitada a 10 segundos, de modo que um intervalo solicitado mais longo não é totalmente respeitado.
+Esses valores são fixos na v0.4.0; não são parâmetros do construtor. Quando uma resposta repetida inclui um cabeçalho `Retry-After` numérico, esse valor substitui o intervalo exponencial, mas a espera continua limitada a 10 segundos, de modo que um intervalo solicitado mais longo não é totalmente respeitado.
 
 ---
 

@@ -13,7 +13,7 @@
  */
 
 import { SITE_ORIGIN } from '@/config/docs-seo';
-import { type DocVersionTrack, DEFAULT_STABLE_TRACK } from '@/config/docs-versions';
+import { type DocVersionTrack } from '@/config/docs-versions';
 
 export const AUTHOR_ID = `${SITE_ORIGIN}/#author`;
 export const SOURCE_CODE_ID = `${SITE_ORIGIN}/#software-source-code`;
@@ -24,7 +24,7 @@ export const GITHUB_REPO_URL = 'https://github.com/GustavoBaranda/chatflow-agent
 export const CREATOR_GITHUB_URL = 'https://github.com/GustavoBaranda';
 export const PYPI_PACKAGE_URL = 'https://pypi.org/project/chatflow-agent/';
 export const LICENSE_URL = 'https://opensource.org/licenses/MIT';
-export const STABLE_SDK_VERSION = '0.3.4';
+export const STABLE_SDK_VERSION = '0.4.0';
 
 export const SECTION_NAMES: Record<string, Record<string, string>> = {
   'getting-started': {
@@ -302,7 +302,7 @@ export function getDocStructuredData({
 }: DocStructuredDataOptions): Record<string, unknown> {
   const homeLabel = NAV_LABELS.home[locale] ?? 'Home';
   const docsLabel = NAV_LABELS.docs[locale] ?? 'Documentation';
-  const trackBadge = track === DEFAULT_STABLE_TRACK ? 'v0.3' : 'v0.4';
+  const trackBadge = track;
 
   const breadcrumbs: Array<{ name: string; url?: string }> = [
     { name: homeLabel, url: `${SITE_ORIGIN}/${locale}` },

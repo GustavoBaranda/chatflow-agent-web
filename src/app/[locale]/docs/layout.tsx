@@ -12,13 +12,13 @@ export default async function Layout({
   const { locale } = await params;
   const v03Tree = getVersionPageTree('v0.3', locale);
   const v04Tree = getVersionPageTree('v0.4', locale);
-  const v03UnversionedTree = createUnversionedPageTree(v03Tree, 'v0.3');
+  const v04UnversionedTree = createUnversionedPageTree(v04Tree, 'v0.4');
 
   return (
     <DocsLayoutClient
       v03Tree={v03Tree}
       v04Tree={v04Tree}
-      v03UnversionedTree={v03UnversionedTree}
+      v03UnversionedTree={v04UnversionedTree}
     >
       {children}
     </DocsLayoutClient>

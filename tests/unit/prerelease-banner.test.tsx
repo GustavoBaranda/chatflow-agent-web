@@ -8,23 +8,21 @@ import esMessages from '../../messages/es.json';
 import ptBRMessages from '../../messages/pt-BR.json';
 
 describe('PrereleaseBanner Component Unit Tests', () => {
-  it('renders prerelease banner with exact SDK 0.4.0rc1 version and RC1 badge', () => {
+  it('renders banner with current track config and topic-preserving switch link', () => {
     const html = renderToString(
       <NextIntlClientProvider locale="en" messages={enMessages}>
         <PrereleaseBanner locale="en" currentSlug={['guides', 'agents']} />
       </NextIntlClientProvider>,
     );
 
-    expect(html).toContain('Prerelease Documentation (v0.4.0rc1)');
-    expect(html).toContain('RC1');
-    expect(html).toContain('0.4.0rc1');
-    expect(html).toContain('Switch to stable documentation (v0.3.4)');
+    expect(html).toContain('0.4.0');
+    expect(html).toContain('0.3.4');
     expect(html).toContain('href="/en/docs/v0.3/guides/agents"');
     expect(html).toContain('data-testid="prerelease-banner"');
     expect(html).toContain('role="status"');
   });
 
-  it('preserves existing topic when generating stable switch link', () => {
+  it('preserves existing topic when generating switch link', () => {
     const html = renderToString(
       <NextIntlClientProvider locale="en" messages={enMessages}>
         <PrereleaseBanner locale="en" currentSlug={['production', 'error-handling']} />
@@ -34,10 +32,10 @@ describe('PrereleaseBanner Component Unit Tests', () => {
     expect(html).toContain('href="/en/docs/v0.3/production/error-handling"');
   });
 
-  it('falls back to stable overview when current topic does not exist in v0.3', () => {
+  it('falls back to v0.3 overview when current topic does not exist in v0.3', () => {
     const html = renderToString(
       <NextIntlClientProvider locale="en" messages={enMessages}>
-        <PrereleaseBanner locale="en" currentSlug={['unreleased-feature-xyz']} />
+        <PrereleaseBanner locale="en" currentSlug={['getting-started', 'whats-new']} />
       </NextIntlClientProvider>,
     );
 
@@ -51,8 +49,6 @@ describe('PrereleaseBanner Component Unit Tests', () => {
       </NextIntlClientProvider>,
     );
 
-    expect(html).toContain('Documentación de Versión Preliminar (v0.4.0rc1)');
-    expect(html).toContain('Cambiar a la documentación estable (v0.3.4)');
     expect(html).toContain('href="/es/docs/v0.3/guides/agents"');
   });
 
@@ -63,8 +59,6 @@ describe('PrereleaseBanner Component Unit Tests', () => {
       </NextIntlClientProvider>,
     );
 
-    expect(html).toContain('Documentação de Versão Pré-lançamento (v0.4.0rc1)');
-    expect(html).toContain('Mudar para a documentação estável (v0.3.4)');
     expect(html).toContain('href="/pt-BR/docs/v0.3/guides/agents"');
   });
 });

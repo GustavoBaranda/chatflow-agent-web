@@ -31,7 +31,7 @@ CACHE_DIR = os.path.join(ROOT_DIR, ".cache")
 VENVS_DIR = os.path.join(CACHE_DIR, "sdk-venvs")
 WHEELS_DIR = os.path.join(CACHE_DIR, "sdk-wheels")
 
-SEMVER_ORDER = ["0.3.0", "0.3.1", "0.3.2", "0.3.3", "0.3.4", "0.4.0rc1"]
+SEMVER_ORDER = ["0.3.0", "0.3.1", "0.3.2", "0.3.3", "0.3.4", "0.4.0rc1", "0.4.0"]
 
 
 def semver_gte(v1: str, v2: str) -> bool:
@@ -273,7 +273,14 @@ def validate_code_ast(
         elif isinstance(node, ast.ImportFrom):
             if node.module == "chatflow_agent":
                 for alias in node.names:
-                    if alias.name in ("ReentrantTurnError", "SessionDeletedError", "ToolSchemaError"):
+                    if alias.name in (
+                        "ReentrantTurnError",
+                        "SessionDeletedError",
+                        "ToolSchemaError",
+                        "ToolArgumentValidationError",
+                        "ConfigurationError",
+                        "JsonCodecError",
+                    ):
                         uses_rc1_exceptions = True
             elif node.module == "chatflow_agent.channels":
                 for alias in node.names:
@@ -284,13 +291,13 @@ def validate_code_ast(
     if uses_async_with:
         if not meta["min_version"]:
             errors.append(
-                f"MetadataError: Snippet uses 'async with runner:' which requires SDK >= 0.4.0rc1, "
-                f"but missing '# [min-version: 0.4.0rc1]' (file {file_rel}:{line_no})"
+                f"MetadataError: Snippet uses 'async with runner:' which requires SDK >= 0.4.0, "
+                f"but missing '# [min-version: 0.4.0]' (file {file_rel}:{line_no})"
             )
         elif not semver_gte(meta["min_version"], "0.4.0rc1"):
             errors.append(
                 f"MetadataError: Snippet specifies min-version {meta['min_version']} but uses 'async with runner:' "
-                f"which requires SDK >= 0.4.0rc1 (file {file_rel}:{line_no})"
+                f"which requires SDK >= 0.4.0 (file {file_rel}:{line_no})"
             )
         if not inspector.supports_async_with_runner:
             errors.append(
@@ -301,20 +308,20 @@ def validate_code_ast(
     if uses_sqlite_memory:
         if not meta["min_version"]:
             errors.append(
-                f"MetadataError: Snippet uses SQLiteSessionStore(db_path=':memory:') which requires SDK >= 0.4.0rc1 "
-                f"for persistent memory, but missing '# [min-version: 0.4.0rc1]' (file {file_rel}:{line_no})"
+                f"MetadataError: Snippet uses SQLiteSessionStore(db_path=':memory:') which requires SDK >= 0.4.0 "
+                f"for persistent memory, but missing '# [min-version: 0.4.0]' (file {file_rel}:{line_no})"
             )
         if not semver_gte(target_version, "0.4.0rc1"):
             errors.append(
                 f"CompatibilityError: SQLiteSessionStore with ':memory:' is unsupported in SDK {target_version} "
-                f"(ephemeral in-memory connections lose state across turns; requires SDK >= 0.4.0rc1) "
+                f"(ephemeral in-memory connections lose state across turns; requires SDK >= 0.4.0) "
                 f"(file {file_rel}:{line_no})"
             )
 
     if uses_rc1_exceptions:
         if not meta["min_version"]:
             errors.append(
-                f"MetadataError: Snippet imports RC1 exceptions from chatflow_agent without '# [min-version: 0.4.0rc1]' "
+                f"MetadataError: Snippet imports v0.4.0 exceptions from chatflow_agent without '# [min-version: 0.4.0]' "
                 f"(file {file_rel}:{line_no})"
             )
 
@@ -520,12 +527,12 @@ def run_validation(target_version: str, track: str | None = None) -> dict[str, A
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate SDK documentation parity")
-    parser.add_argument("--version", choices=["0.3.4", "0.4.0rc1"], help="Target SDK version")
+    parser.add_argument("--version", choices=["0.3.4", "0.4.0"], help="Target SDK version")
     parser.add_argument("--track", choices=["v0.3", "v0.4", "all", "auto"], default="auto", help="Documentation track (default: auto)")
     parser.add_argument("--all", action="store_true", help="Validate all versions")
     args = parser.parse_args()
 
-    versions = ["0.3.4", "0.4.0rc1"] if args.all or not args.version else [args.version]
+    versions = ["0.3.4", "0.4.0"] if args.all or not args.version else [args.version]
 
     exit_code = 0
     print("=" * 75)

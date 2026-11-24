@@ -1,8 +1,8 @@
 ---
 title: "WhatsApp Business Cloud API"
 description: "Integración de WhatsApp para producción usando Meta Cloud API, webhooks de FastAPI, verificación de firmas HMAC y gestión de ventana de 24 horas."
-sourceRevision: "d2c5d67"
-sourceHash: "1d314afc31b395941a4e18b4c607b48345a8b2e443795f33ee0797d421db39cc"
+sourceRevision: "9f730ce"
+sourceHash: "9d48804773af6a898a2ca7b40fac60eb4903d050363542e5042eaa301d7ba306"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -18,7 +18,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 Instala `chatflow-agent` con el extra `whatsapp` (`fastapi>=0.110.0`, `uvicorn>=0.29.0`):
 
 ```bash
-pip install "chatflow-agent[whatsapp]"
+pip install "chatflow-agent[whatsapp]==0.3.4"
 ```
 
 ## Arquitectura y Flujo de Mensajes
@@ -165,7 +165,7 @@ La versión estable v0.3.4 expone el siguiente plazo para la evaluación del mod
 | :--- | :--- | :--- |
 | `llm_timeout_seconds` | `30.0` | Plazo que aplica `WhatsAppChannel` mientras espera el turno del runner. |
 
-`queue_timeout_seconds` y el valor predeterminado de `120.0` segundos son funciones de la prerelease v0.4.0rc1. `max_concurrent_tasks` no es un parámetro del constructor ni en v0.3.4 ni en v0.4.0rc1. En v0.3.4, los turnos de una misma sesión esperan el lock sin un plazo de cola. Un timeout cancela la espera y devuelve el `fallback_message`, pero v0.3.4 no garantiza rollback ante cancelación.
+`queue_timeout_seconds` y el valor predeterminado de `120.0` segundos son funciones de la v0.4.0. `max_concurrent_tasks` no es un parámetro del constructor ni en v0.3.4 ni en v0.4.0. En v0.3.4, los turnos de una misma sesión esperan el lock sin un plazo de cola. Un timeout cancela la espera y devuelve el `fallback_message`, pero v0.3.4 no garantiza rollback ante cancelación.
 
 ## Control de la Ventana de Atención al Cliente de 24 Horas
 

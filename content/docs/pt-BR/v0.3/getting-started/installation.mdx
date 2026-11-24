@@ -1,8 +1,8 @@
 ---
 title: "Instalação"
 description: "Instale o chatflow-agent e configure extras opcionais de canais para Telegram, WhatsApp e desenvolvimento."
-sourceRevision: "8be3a1c"
-sourceHash: "529ca17e0898efc3adc9a509277c2d83b36731442b62871ff480a260bc71d30a"
+sourceRevision: "9f730ce"
+sourceHash: "bd54204145909c6626bf4ac5ba9c9d9b12e7769f8cc8503a6e2ddf1d61f00296"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -28,40 +28,40 @@ python --version
 
 ## Instalando o Pacote Principal
 
-O `chatflow-agent` mantém suas dependências principais enxutas: na v0.3.4 elas são `google-genai` (usada pelo `GeminiEngine`), `pydantic` e `httpx`. Escolha entre a versão estável ou a versão candidata de pré-lançamento:
+O `chatflow-agent` mantém suas dependências principais enxutas: na `v0.3.4` elas são `google-genai` (usada pelo `GeminiEngine`), `pydantic` e `httpx`. Para fixar a versão estável anterior `v0.3.4` (ou instalar a versão estável mais recente `v0.4.0`):
 
 <Tabs items={['pip', 'uv', 'poetry']}>
   <Tab value="pip">
 ```bash
-# Instalar a versão estável atual (v0.3.4 - recomendada para produção)
-pip install chatflow-agent
+# Instalar a versão v0.3.4
+pip install "chatflow-agent==0.3.4"
 
-# Ou instalar a versão candidata de pré-lançamento (v0.4.0rc1, a única versão 0.4 publicada)
-pip install "chatflow-agent==0.4.0rc1"
+# Ou instalar a versão estável mais recente (v0.4.0 - recomendada para novos projetos)
+pip install chatflow-agent
 ```
   </Tab>
   <Tab value="uv">
 ```bash
-# Instalar a versão estável atual com uv
-uv add chatflow-agent
+# Instalar a versão v0.3.4 com uv
+uv add "chatflow-agent==0.3.4"
 
-# Ou instalar a versão candidata de pré-lançamento
-uv add "chatflow-agent==0.4.0rc1"
+# Ou instalar a versão estável mais recente (v0.4.0)
+uv add chatflow-agent
 ```
   </Tab>
   <Tab value="poetry">
 ```bash
-# Instalar a versão estável atual com poetry
-poetry add chatflow-agent
+# Instalar a versão v0.3.4 com poetry
+poetry add "chatflow-agent==0.3.4"
 
-# Ou instalar a versão candidata de pré-lançamento
-poetry add chatflow-agent@0.4.0rc1
+# Ou instalar a versão estável mais recente (v0.4.0)
+poetry add chatflow-agent
 ```
   </Tab>
 </Tabs>
 
 <Callout type="info" title="Dependências Principais">
-Na versão **v0.3.4**, as dependências principais são `google-genai>=0.1.1`, `pydantic>=2.6.0` e `httpx>=0.27.0`; `google-genai` é instalada automaticamente. No pré-lançamento **v0.4.0rc1**, `google-genai` deixa de ser uma dependência: os motores Gemini, Anthropic e compatíveis com OpenAI comunicam-se todos via REST com `httpx`. A persistência com SQLite utiliza a biblioteca padrão `sqlite3` do Python, sem necessidade de drivers adicionais de terceiros.
+Na versão **v0.3.4**, as dependências principais são `google-genai>=0.1.1`, `pydantic>=2.6.0` e `httpx>=0.27.0`; `google-genai` é instalada automaticamente. A partir da **v0.4.0** (Última Estável), `google-genai` deixa de ser uma dependência: os motores Gemini, Anthropic e compatíveis com OpenAI comunicam-se todos via REST com `httpx`. A persistência com SQLite utiliza a biblioteca padrão `sqlite3` do Python, sem necessidade de drivers adicionais de terceiros.
 </Callout>
 
 ---
@@ -72,11 +72,11 @@ O `chatflow-agent` define dependências opcionais no `pyproject.toml` para mante
 
 | Nome do Extra | Descrição | Principais Dependências Adicionadas | Comando |
 | :--- | :--- | :--- | :--- |
-| `[telegram]` | Integração com Bot do Telegram via long polling (`TelegramChannel`) | `python-telegram-bot>=21.0` | `pip install "chatflow-agent[telegram]"` |
-| `[whatsapp]` | Servidor de webhooks da API Meta WhatsApp Cloud (`WhatsAppChannel`) | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[whatsapp]"` |
-| `[webhook]` | Instala FastAPI e Uvicorn para construir seu próprio endpoint HTTP. Não há um canal genérico de webhook embutido; consulte o [guia de Webhooks Personalizados](/pt-BR/docs/v0.3/integrations/webhook) | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[webhook]"` |
-| `[all]` | Instala todas as dependências de canais simultaneamente | `telegram`, `whatsapp`, `webhook` | `pip install "chatflow-agent[all]"` |
-| `[dev]` | Ferramentas para execução de testes unitários e de integração | `pytest>=8.0.0`, `pytest-asyncio`, `ruff`, `mypy` | `pip install "chatflow-agent[dev]"` |
+| `[telegram]` | Integração com Bot do Telegram via long polling (`TelegramChannel`) | `python-telegram-bot>=21.0` | `pip install "chatflow-agent[telegram]==0.3.4"` |
+| `[whatsapp]` | Servidor de webhooks da API Meta WhatsApp Cloud (`WhatsAppChannel`) | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[whatsapp]==0.3.4"` |
+| `[webhook]` | Instala FastAPI e Uvicorn para construir seu próprio endpoint HTTP. Não há um canal genérico de webhook embutido; consulte o [guia de Webhooks Personalizados](/pt-BR/docs/v0.3/integrations/webhook) | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `pip install "chatflow-agent[webhook]==0.3.4"` |
+| `[all]` | Instala todas as dependências de canais simultaneamente | `telegram`, `whatsapp`, `webhook` | `pip install "chatflow-agent[all]==0.3.4"` |
+| `[dev]` | Ferramentas para execução de testes unitários e de integração | `pytest>=8.0.0`, `pytest-asyncio`, `ruff`, `mypy` | `pip install "chatflow-agent[dev]==0.3.4"` |
 
 ---
 
@@ -92,7 +92,6 @@ Saída esperada:
 ```text
 0.3.4
 ```
-*(ou `0.4.0rc1` caso tenha instalado com a flag de pré-lançamento)*.
 
 ---
 

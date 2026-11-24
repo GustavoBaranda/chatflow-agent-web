@@ -1,8 +1,11 @@
 {
   "title": "Primeros Pasos",
+  "defaultOpen": true,
   "pages": [
     "installation",
     "quickstart",
-    "core-concepts"
+    "core-concepts",
+    "whats-new",
+    "migration"
   ]
 }

@@ -11,7 +11,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 While `chatflow-agent` provides pre-built channels for Telegram and WhatsApp, modern systems frequently require connecting multi-agent swarms to internal microservices, Slack Events APIs, Discord bots, or CRM webhooks (Zendesk, Intercom). 
 
-`chatflow-agent` does not ship a generic webhook channel. The optional `webhook` extra only installs `fastapi>=0.110.0` and `uvicorn>=0.29.0`; you write the endpoint yourself, either as a `BaseChannel` subclass (as below) or by calling `runner.run_async()` from an existing route. The SDK repository includes a complete reference application in [`examples/webhook_api_service.py`](https://github.com/GustavoBaranda/chatflow-agent/blob/v0.4.0rc1/examples/webhook_api_service.py).
+`chatflow-agent` does not ship a generic webhook channel. The optional `webhook` extra only installs `fastapi>=0.100.0` and `uvicorn>=0.23.0`; you write the endpoint yourself, either as a `BaseChannel` subclass (as below) or by calling `runner.run_async()` from an existing route. The SDK repository includes a complete reference application in [`examples/webhook_api_service.py`](https://github.com/GustavoBaranda/chatflow-agent/blob/v0.4.0/examples/webhook_api_service.py).
 
 ## The BaseChannel Architecture
 
@@ -56,7 +56,7 @@ class MyChannel(BaseChannel):
 ```
 
 * `attach(runner: Runner) -> BaseChannel`: Binds a multi-agent Runner instance to the channel.
-* `dispatch_async(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Forwards the message to the attached runner asynchronously (`runner.run_async`). In v0.4.0rc1, same-session turns are serialized for both `SessionStore` and `SQLiteSessionStore` (per store and event loop).
+* `dispatch_async(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Forwards the message to the attached runner asynchronously (`runner.run_async`). In `v0.4.0`, same-session turns are serialized for both `SessionStore` and `SQLiteSessionStore` (per store and event loop).
 * `dispatch(session_id: str, message: str, metadata: dict | None = None) -> AgentResponse`: Synchronous counterpart for synchronous runtimes.
 
 `split_message(text: str, max_len: int = 4096) -> list[str]` is not a `BaseChannel` method but a module-level helper for chunking long outbound responses: `from chatflow_agent.channels import split_message`.

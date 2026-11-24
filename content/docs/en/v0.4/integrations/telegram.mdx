@@ -75,8 +75,10 @@ The `TelegramChannel` constructor accepts the following options:
 | :--- | :--- | :--- | :--- |
 | `token` | `str` | *Required* | Telegram Bot API token issued by @BotFather. |
 | `start_message` | `str` | `"Hello! I am your AI..."` | Greeting message sent when a user triggers `/start`. |
-| `fallback_message` | `str` | `"Disculpa, ocurrió un..."` | User-facing message sent when model execution fails. |
+| `fallback_message` | `str` | `"Disculpa, ocurrió un..."` | User-facing message sent when model execution fails before any chunk is delivered. |
 | `allowed_updates` | `list[str] \| None` | `None` | Restrict update types (e.g. `["message"]`). Defaults to all. |
+| `concurrent_updates` | `bool \| int \| BaseUpdateProcessor` | `False` | Keyword-only (`v0.4.0`). Enables concurrent update processing across different chats (validated with `ConfigurationError`). |
+| `max_retry_after_seconds` | `float` | `60.0` | Keyword-only (`v0.4.0`). Maximum flood-control `RetryAfter` wait time (in seconds) per outbound chunk retry (validated with `ConfigurationError`). |
 
 ## Built-In Commands & Group Chat Security
 
@@ -86,7 +88,7 @@ The `TelegramChannel` constructor accepts the following options:
 Responds with `start_message` to onboard new users.
 
 ### `/reset` Command
-Clears the session history in `runner.session_store` for the active chat ID, allowing users to restart their conversation cleanly.
+Delegates to `await runner.reset_session_async(session_id)` (`v0.4.0`), clearing the session history under the session turn lock, waiting for any escaping synchronous thread work, and offloading file-backed SQLite writes via the store's dedicated 4-worker `ThreadPoolExecutor` (`_run_blocking`).
 
 <Callout type="warn" title="Group and Supergroup Chat Security">
 In group and supergroup chats, allowing any participant to clear the conversation could disrupt other users. `TelegramChannel` enforces role verification:
@@ -120,13 +122,18 @@ chunks = split_message(long_text, max_len=4096)
 
 The channel delivers chunks sequentially. `split_message` prefers paragraph, line, sentence, and then word boundaries; when a chunk contains no separator (for example a very long URL), it falls back to a hard cut at `max_len`. Lengths are counted in Python characters, and `max_len` must be positive.
 
+In `v0.4.0`, if Telegram raises `telegram.error.RetryAfter` while sending a chunk, `TelegramChannel` compares the requested `retry_after` delay against `max_retry_after_seconds` (default `60.0`):
+* If `retry_after <= max_retry_after_seconds`, it sleeps for `retry_after` seconds and retries **only the unsent chunk** (up to 3 retries) without duplicating already-delivered chunks.
+* If `retry_after > max_retry_after_seconds`, it logs an error and **aborts sending the reply immediately** without sleeping.
+* If a failure occurs after at least one chunk was already sent, the channel does not send a contradictory `fallback_message`.
+
 ## Typing Indicators & User Experience
 
 When a message arrives, `TelegramChannel` sends a single `ChatAction.TYPING` indicator before dispatching the turn (errors from that call are ignored). It is not repeated while the turn runs, so for long turns Telegram's typing status may disappear before the reply arrives.
 
 ## Event Loop Handling
 
-`run()` starts long polling and blocks: it drives the event loop itself through python-telegram-bot's `run_polling()`. In v0.4.0rc1 it also opens the attached runner's `async with runner:` scope for the application's lifetime (entered in `post_init`, closed in `post_shutdown`), so turns reuse pooled Gemini connections. Passing `close_loop=False` keeps the event loop open after `run()` returns:
+`run()` starts long polling and blocks: it drives the event loop itself through python-telegram-bot's `run_polling()`. In `v0.4.0` it also opens the attached runner's `async with runner:` scope for the application's lifetime (entered in `post_init`, closed in `post_shutdown`), so turns reuse pooled Gemini connections. Passing `close_loop=False` keeps the event loop open after `run()` returns:
 
 ```python
 telegram.run(drop_pending_updates=True, close_loop=False)

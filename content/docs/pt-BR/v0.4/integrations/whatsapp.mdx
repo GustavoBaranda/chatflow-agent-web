@@ -1,8 +1,8 @@
 ---
 title: "WhatsApp Business Cloud API"
 description: "Integração do WhatsApp para ambientes de produção com Meta Cloud API, webhooks FastAPI, validação de assinatura HMAC e gerenciamento de janela de 24 horas."
-sourceRevision: "d2c5d67"
-sourceHash: "b6df9d2ea60f8b1c09371eabaaff97bde64b9fe6c5ed31c6888199ab556e8016"
+sourceRevision: "885e064"
+sourceHash: "1b413b63aeb073bf0d783d57f11c838bc596507101080a94001eb5f79afa5516"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -148,31 +148,35 @@ O `WhatsAppChannel` mascara números de telefone nas mensagens de log do própri
 # Saída registrada no log:   "1415***671"
 ```
 
-O mascaramento se aplica somente a essas linhas de log. O número original ainda aparece:
+O mascaramento se aplica tanto a essas linhas de log quanto ao campo `"sender"` do corpo da resposta JSON HTTP do webhook. O número original ainda é utilizado internamente:
 
-* no corpo da resposta JSON do webhook (campo `"sender"`);
 * no ID de sessão e nos metadados do turno (`"phone"`) e, portanto, no armazenamento de sessões;
 * no argumento passado para `on_24h_window_expired`;
-* nas respostas de erro da Meta, que são registradas no log tal como recebidas.
+* nas requisições de saída para a Graph API da Meta.
 
-Trate os logs, o banco de dados de sessões e quaisquer logs de acesso HTTP como dados pessoais.
+Trate o banco de dados de sessões e quaisquer logs customizados da aplicação como dados pessoais.
 
-## Concorrência, Timeouts e Prazos Limite
+## Concorrência, Timeouts, Retentativas de Saída e Prazos Limite
 
-A confirmação do webhook é imediata; em seguida, o turno é executado em segundo plano com dois limites distintos:
+A confirmação do webhook é imediata; em seguida, o turno é executado em segundo plano com limites configuráveis validados na construção com `ConfigurationError`:
 
 | Parâmetro | Padrão | Finalidade |
 | :--- | :--- | :--- |
-| `queue_timeout_seconds` | `120.0` | Espera máxima atrás de turnos anteriores da mesma sessão (número de telefone). Deve ser um número positivo e finito. Se expirar, o usuário recebe a `fallback_message` e o turno nunca é executado, portanto não é adicionado ao histórico. |
-| `llm_timeout_seconds` | `120.0` | Limite para o próprio turno (chamadas ao modelo, ferramentas, transferências), contado a partir do momento em que o turno detém a sessão. Ao expirar, o turno é cancelado e revertido, e a `fallback_message` é enviada. `None` ou `inf` não define limite. |
+| `queue_timeout_seconds` | `120.0` | Keyword-only (`v0.4.0`). Espera máxima atrás de turnos anteriores da mesma sessão (número de telefone). Deve ser um número positivo e finito (booleanos rejeitados). Se expirar, o usuário recebe a `fallback_message` e o turno nunca é executado. |
+| `llm_timeout_seconds` | `120.0` | Limite (`float \| None`, alterado de `30.0` na `v0.3.4`) para o próprio turno (chamadas ao modelo, ferramentas, transferências), contado a partir do momento em que o turno detém a sessão. Ao expirar, o turno é cancelado e revertido, e a `fallback_message` é enviada. `None` ou `inf` não define limite. |
+| `max_outbound_retries` | `3` | Máximo de retentativas (`0..10`) para erros transitórios na entrega via Meta API (`429`, `5xx`, erros de rede). |
+| `outbound_base_delay` | `1.0` | Atraso base do backoff exponencial em segundos (`>= 0`). |
+| `outbound_max_delay` | `30.0` | Teto máximo do backoff exponencial em segundos (`>= 0`). |
+| `max_body_size` | `1_048_576` | Keyword-only (`v0.4.0`). Tamanho máximo em bytes do payload recebido (`> 0`). |
+| `enable_docs` | `False` | Keyword-only (`v0.4.0`). Controla a exposição das rotas FastAPI `/docs`, `/redoc` e `/openapi.json`. |
 
-Uma resposta pode, portanto, levar até `queue_timeout_seconds + llm_timeout_seconds`. Não existe nenhuma configuração que limite quantos turnos de webhook são executados simultaneamente.
+Na `v0.4.0`, a entrega de saída exige validação HTTP `2xx` estrita com `follow_redirects=False` (rejeitando redirecionamentos `3xx` sem retentativa), interrompe os blocos restantes imediatamente se um bloco anterior falhar e envia `fallback_message` se o agente retornar resposta vazia. Na construção, também registra um aviso se `access_token` ou `phone_number_id` estiverem vazios.
 
 ## Rastreamento da Janela de Atendimento de 24 Horas
 
 A Meta restringe estritamente o envio de mensagens livres para o intervalo de **24 horas após a última mensagem recebida do usuário**. Tentar enviar texto livre fora dessa janela retorna o código de erro `131047` da API da Meta.
 
-O `WhatsAppChannel` inclui um hook de callback dedicado chamado `on_24h_window_expired`. Ele é chamado com um único argumento, o número de telefone do destinatário (sem máscara). Na v0.4.0rc1, ele deve ser uma função `async def` ou uma função comum; outros invocáveis que retornam uma corrotina (como um objeto com um `async __call__`) não são aguardados. Exceções lançadas pelo hook são registradas no log e não interrompem o canal:
+O `WhatsAppChannel` inclui um hook de callback dedicado chamado `on_24h_window_expired`. Ele é chamado com um único argumento, o número de telefone do destinatário (sem máscara). Na `v0.4.0`, qualquer valor de retorno awaitable de `on_24h_window_expired` é aguardado com `await` (incluindo funções `async def`, objetos com `async __call__` e wrappers `functools.partial`). Exceções lançadas pelo hook são registradas no log e não interrompem o canal:
 
 ```python
 async def handle_expired_window(phone_number: str) -> None:
@@ -197,6 +201,6 @@ Os webhooks da Meta frequentemente reenviam requisições HTTP duplicadas caso a
 O ID da mensagem é registrado <em>antes</em> de o turno em segundo plano ser executado. Se o processo falhar ou reiniciar enquanto esse turno está em execução, a mensagem é perdida: as novas tentativas da Meta para ela são então descartadas como duplicatas.
 </Callout>
 
-O `WhatsAppChannel` também aceita um argumento `dedup_ttl_hours` na v0.4.0rc1, mas ele é armazenado e nunca utilizado: apenas a configuração do armazenamento de sessões se aplica.
+O parâmetro sem efeito `dedup_ttl_hours` do construtor do `WhatsAppChannel` foi removido na `v0.4.0`; configure `dedup_ttl_hours` diretamente no `SQLiteSessionStore` ou `SessionStore`.
 
-Os IDs de mensagem são obtidos da carga útil. Uma mensagem no formato da Meta sem `id` recebe um ID derivado do `hash()` do Python sobre a mensagem, que muda entre reinicializações do processo. Uma carga útil genérica (não Meta) sem ID recebe um ID aleatório, de modo que nunca é tratada como duplicata.
+Os IDs de mensagem são obtidos da carga útil. Na `v0.4.0`, uma mensagem no formato da Meta sem campo `"id"` recebe um ID determinístico SHA-256 (`gen_<sha256>`) derivado do JSON canônico da mensagem, mantendo consistência entre reinicializações do processo. Uma carga útil genérica (não Meta) sem ID recebe um UUID aleatório, de modo que nunca é tratada como duplicata.

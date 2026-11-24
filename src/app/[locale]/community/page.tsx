@@ -198,7 +198,7 @@ export default async function CommunityPage({
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
                 <Link
-                  href="/docs/v0.3/getting-started/quickstart"
+                  href="/docs/v0.4/getting-started/quickstart"
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary w-full sm:w-auto"
                 >
                   <span>{t('featuredDocsQuickstart')}</span>

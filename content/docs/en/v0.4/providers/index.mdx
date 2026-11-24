@@ -74,7 +74,7 @@ The engine returns an `EngineTurnResult` containing:
 When multi-agent handoffs occur between different model families (for instance, handing off from Anthropic Claude to OpenAI GPT-4o), historical messages retain tool call IDs issued by the previous model. Because different providers impose conflicting ID validation constraints (for example, OpenAI rejects tool call IDs exceeding 40 characters), `chatflow-agent` uses deterministic replacement:
 
 ```python
-# [min-version: 0.4.0rc1]
+# [min-version: 0.4.0]
 # [executable]
 from chatflow_agent.core.engines.base import replacement_tool_call_id
 
@@ -112,11 +112,11 @@ flowchart TD
 ### Resolution Order Details
 
 1. **Explicit Engine:** `agent.engine` takes precedence if directly assigned on the agent instance.
-2. **Explicit Provider:** `agent.provider` matches recognized strings (`"gemini"`, `"google"`, `"anthropic"`, `"claude"`, `"openai"`, `"grok"`, `"xai"`, `"ollama"`, `"gemma"`, `"deepseek"`, `"groq"`).
-3. **Custom Base URL:** `agent.base_url` without a provider. Official endpoints map to their provider; other URLs use `OpenAIEngine(provider="openai")` and require an explicit key unless local. Setting only `agent.api_key` does not select an engine.
+2. **Explicit Provider:** `agent.provider` matches recognized strings (`"gemini"`, `"google"`, `"anthropic"`, `"claude"`, `"openai"`, `"grok"`, `"xai"`, `"ollama"`, `"gemma"`, `"deepseek"`, `"groq"`). Unrecognized provider strings fail fast with `ConfigurationError` (a `ValueError` subclass).
+3. **Custom Base URL:** `agent.base_url` without a provider. Official endpoints map to their provider; other URLs use `OpenAIEngine(provider="openai")` and require an explicit key unless local. Combining `provider="gemini"` or `"google"` with a custom `base_url` raises `ConfigurationError`.
 4. **Caller Override:** `default_engine` supplied with `prefer_default_engine=True`. `Runner` does this when you pass `Runner(engine=...)` explicitly, so an explicit engine wins over model-name prefixes.
 5. **Model Name Prefix Heuristics:** Matches recognizable prefixes (`claude-`, `gpt-`, `o1`, `o3`, `grok`, `deepseek-`, `gemma`, `llama`, `mistral`, `qwen`, `phi`). This prevents a Claude model from accidentally falling back to a Gemini default.
-6. **Default Runner Engine:** The implicit `GeminiEngine` built by `Runner` when no engine was passed (e.g., from `Runner(starting_agent=..., api_key=...)`), used for Gemini and unrecognized models.
+6. **Default Runner Engine:** The implicit `GeminiEngine` built by `Runner` when no engine was passed (e.g., from `Runner(starting_agent=..., api_key=...)`), used for Gemini and unrecognized models. If `agent.api_key` is set on the agent, `resolve_engine()` clones the default `GeminiEngine` with that agent's `api_key`.
 7. **Ultimate Fallback:** Standard `GeminiEngine(api_key=...)`.
 
 ## Security Rules and Credential Isolation
@@ -124,7 +124,7 @@ flowchart TD
 A common vulnerability in multi-provider frameworks is credential leakage: sending cloud API keys (such as `OPENAI_API_KEY`) to untrusted proxy endpoints or third-party gateways. `chatflow-agent` enforces strict credential isolation:
 
 <Callout type="warn" title="Credential Isolation Policy">
-Environment keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`) are **strictly transmitted only to their official provider HTTPS endpoints**. Passing a custom `base_url` without providing an explicit `api_key` raises a `ValueError` rather than leaking global cloud credentials.
+Environment keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`) are **strictly transmitted only to their official provider HTTPS endpoints**. Passing a custom `base_url` without providing an explicit `api_key` raises `ConfigurationError` (a `ValueError` subclass) rather than leaking global cloud credentials.
 </Callout>
 
 ```python
@@ -147,23 +147,23 @@ local_engine = OpenAIEngine(
 )
 ```
 
-## Version Evolution: v0.3.4 vs v0.4.0rc1
+## Version Evolution: `v0.3.4` vs `v0.4.0`
 
 Understanding architectural differences between releases helps choose the right configuration:
 
-| Architectural Area | Baseline `v0.3.4` (Stable) | Prerelease `v0.4.0rc1` |
+| Architectural Area | Previous Stable `v0.3.4` | Latest Stable `v0.4.0` |
 | :--- | :--- | :--- |
 | **Gemini Engine Runtime** | Powered by the Google `google-genai` SDK (`from google import genai`). | **Zero-SDK Lock-in**: Re-engineered with native asynchronous `httpx` directly against `https://generativelanguage.googleapis.com/v1beta`. |
-| **Connection Pooling** | Separate connection handles per request. | **Runner Lifespan Client Pool** for `GeminiEngine`: inside `async with runner:`, Gemini requests share one pooled `httpx` client. OpenAI-compatible and Anthropic engines still use a client per request attempt. |
-| **Provider Presets** | OpenAI, Grok/xAI, Ollama/Gemma, DeepSeek, and Groq. | Same presets; the `deepseek-` model prefix is now recognized. |
-| **Credential Guard** | `_resolve_api_key` restricts environment keys to exact official endpoints and requires explicit credentials for custom remote URLs. | Same guard; `GeminiEngine` additionally never follows redirects and redacts its key from errors. |
-| **Engine Resolution** | A `Runner`'s default engine wins before model-name prefixes, so non-Gemini models need `provider=` or `engine=`. | Model-name prefixes win over the implicit default engine; an explicit `Runner(engine=...)` still wins over prefixes. |
+| **Connection Pooling** | Separate connection handles per request. | **Runner Lifespan Client Pool** for `GeminiEngine`: inside `async with runner:`, Gemini requests share one pooled `httpx` client. |
+| **Provider Presets & Validation** | OpenAI, Grok/xAI, Ollama/Gemma, DeepSeek, and Groq. | Same presets plus `deepseek-` model prefix recognition and fail-fast `ConfigurationError` on unrecognized providers. |
+| **Credential & Log Redaction** | `_resolve_api_key` restricts environment keys to exact official endpoints and requires explicit credentials for custom remote URLs. | Shared credential-redaction pipeline across all engines (plain, JSON-escaped, percent-encoded), header control-character validation, `follow_redirects=False` on Gemini, and sanitized `ProviderError` without raw exception chaining. |
+| **Engine Resolution** | A `Runner`'s default engine wins before model-name prefixes, so non-Gemini models need `provider=` or `engine=`. | Model-name prefixes win over the implicit default engine; `Agent(api_key=...)` is honored on default Gemini fallback; an explicit `Runner(engine=...)` still wins over prefixes. |
 
-<Callout type="info" title="Runner Connection Pooling in v0.4.0rc1">
-In `v0.4.0rc1`, wrap runner executions inside `async with runner:` so that Gemini requests reuse one pooled HTTP client across turns. `Runner.run()`, `TelegramChannel.run()`, and the `WhatsAppChannel` app open this scope automatically:
+<Callout type="info" title="Runner Connection Pooling in v0.4.0">
+In `v0.4.0`, wrap runner executions inside `async with runner:` so that Gemini requests reuse one pooled HTTP client across turns. `Runner.run()`, `TelegramChannel.run()`, and the `WhatsAppChannel` app open this scope automatically:
 
 ```python
-# [min-version: 0.4.0rc1]
+# [min-version: 0.4.0]
 # [no-exec: requires real provider engine for turn execution]
 import asyncio
 from chatflow_agent import Agent, Runner
@@ -186,13 +186,13 @@ asyncio.run(main())
 Explore detailed setup guides for each provider:
 
 <Cards>
-  <Card title="OpenAI & Compatible Endpoints" href="/en/docs/providers/openai">
+  <Card title="OpenAI & Compatible Endpoints" href="/en/docs/v0.4/providers/openai">
     Configure GPT-4o, Groq, DeepSeek, and custom proxy gateways.
   </Card>
-  <Card title="Google Gemini & Anthropic Claude" href="/en/docs/providers/gemini-anthropic">
+  <Card title="Google Gemini & Anthropic Claude" href="/en/docs/v0.4/providers/gemini-anthropic">
     Direct REST Gemini v1beta and Anthropic Messages API integrations.
   </Card>
-  <Card title="Local Models with Ollama" href="/en/docs/providers/ollama">
+  <Card title="Local Models with Ollama" href="/en/docs/v0.4/providers/ollama">
     Run Gemma 2, Llama 3, and Mistral on local hardware with zero cloud fees.
   </Card>
 </Cards>

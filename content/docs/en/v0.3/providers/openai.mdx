@@ -169,9 +169,9 @@ open_engine = OpenAIEngine(
 )
 ```
 
-## Tool Call ID Constraints & Normalization (Prerelease)
+## Tool Call ID Constraints & Normalization (v0.4.0)
 
-<VersionBadge version="0.4.0rc1" status="prerelease" /> adds deterministic normalization for OpenAI `tool_call_id` values longer than 40 characters. Stable v0.3.4 does not provide this cross-provider normalization guarantee:
+<VersionBadge version="0.4.0" status="stable" /> adds deterministic normalization for OpenAI `tool_call_id` values longer than 40 characters. Stable v0.3.4 does not provide this cross-provider normalization guarantee:
 
 1. **Truncation and Hashing:** If an existing historical message contains a tool call ID exceeding 40 characters, `OpenAIEngine` safely replaces it using a deterministic SHA-256 derived identifier (`call_` + 24 hex characters).
 2. **Schema Type Normalization:** The engine automatically normalizes JSON schema parameter types (`_lowercase_schema_types`) while preserving custom property schemas, ensuring tool compatibility across different OpenAI model versions.

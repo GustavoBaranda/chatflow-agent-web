@@ -1,8 +1,8 @@
 ---
 title: "Observabilidade e Depuração"
 description: "Logging para produção, telemetria, IDs de correlação, rastreamento de ferramentas e estratégias de inspeção em sistemas com chatflow-agent."
-sourceRevision: "db864ef"
-sourceHash: "bbf39225e8b189c10c3e8d727c1a9582ccd6a0cc7cb0a9fd0bb96d51a0d62117"
+sourceRevision: "90324d3"
+sourceHash: "13c143be3c6b3debc9c9e0acb68d53103f2970620a48213ce6e109c72838d3b8"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -13,7 +13,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 Operar enxames multiagente em produção requer visibilidade completa. Quando um agente transfere uma conversa, invoca APIs externas ou aciona fallbacks, os operadores precisam de logs estruturados e IDs de correlação para diagnosticar latências, investigar anomalias e auditar decisões.
 
-O `chatflow-agent` v0.4.0rc1 usa loggers da biblioteca padrão do Python para o runner, as ferramentas, os armazenamentos de sessão, os motores de provedores e as integrações de canais. As aplicações podem anexar seu próprio formatador estruturado.
+O `chatflow-agent` v0.4.0 usa loggers da biblioteca padrão do Python para o runner, as ferramentas, os armazenamentos de sessão, os motores de provedores e as integrações de canais. As aplicações podem anexar seu próprio formatador estruturado.
 
 ## Hierarquia de Loggers
 

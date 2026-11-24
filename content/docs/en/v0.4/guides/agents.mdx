@@ -161,30 +161,33 @@ assert any(t.name == "query_active_users" for t in agent.tools)
 
 ---
 
-## Version Differences & Prerelease Features
+## Version Evolution (`v0.3.4` → `v0.4.0`)
 
-`chatflow-agent` provides consistent agent mechanics while introducing robust validation and character normalization in newer releases:
+`chatflow-agent` `0.4.0` preserves the core `Agent` blueprint API while adding strict validation, runtime tool-argument checking, and identifier normalization:
 
-### Stable Release (`v0.3.4`)
+### Previous Stable Baseline (`v0.3.4`)
 * <VersionBadge version="0.3.4" status="stable" /> The constructor does not validate `name`; only a handoff to the agent itself is rejected.
 * Synthetic handoff tools are formatted as `transfer_to_<sanitized_name>`.
 
-### Prerelease Enhancements (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Non-Empty Name Validation:** The constructor explicitly rejects empty or whitespace-only names:
+### Latest Stable Enhancements (`v0.4.0`)
+* <VersionBadge version="0.4.0" status="stable" /> **Non-Empty Name Validation:** The constructor explicitly rejects empty or whitespace-only names:
 
 ```python
 from chatflow_agent import Agent
 
-# In v0.4.0rc1: raises ValueError("Agent name must be a non-empty string.")
+# In v0.4.0: raises ValueError("Agent name must be a non-empty string.")
 try:
     Agent(name="   ", instructions="test")
 except ValueError as err:
     print("Caught expected validation error:", err)
 ```
 
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **NFKD Unicode Transliteration:** Agent names with accents (e.g., `AtenciónAlCliente`) are transliterated cleanly to valid ASCII identifiers (`transfer_to_atencionalcliente`).
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Collision Disambiguation:** If multiple handoff targets produce equivalent sanitized tool names, numeric suffixes (`_2`, `_3`) are automatically appended.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Tool Name Length Capping:** Synthetic tool names are strictly capped at 60 characters to comply with all upstream provider API limits.
+* <VersionBadge version="0.4.0" status="stable" /> **Static `@overload` Typing & Isolated Tool Cloning:** `@agent.tool` provides `@overload` static return types (`Tool`) for both bare (`@agent.tool`) and parameterized (`@agent.tool(...)`) forms. In addition, `agent.add_tool(tool_fn, validate_args=...)` accepts a per-agent `validate_args: bool | None = None` override; if a shared `Tool` instance is registered with a different `validate_args` flag than its own, `add_tool()` clones the tool (`Tool.clone()`) so other agents sharing that tool are never mutated.
+* <VersionBadge version="0.4.0" status="stable" /> **Agent `api_key` Honored on Default Gemini Fallback:** When an `Agent(api_key=...)` uses a Gemini model without an explicit `engine`, `provider`, or `base_url`, `Runner.resolve_engine()` clones the default `GeminiEngine` with the agent's `api_key`.
+* <VersionBadge version="0.4.0" status="stable" /> **Strict Provider & Endpoint Validation (`ConfigurationError`):** Passing an unsupported `provider` name or combining `provider="gemini"` / `"google"` with a custom `base_url` raises `ConfigurationError` (a `ValueError` subclass).
+* <VersionBadge version="0.4.0" status="stable" /> **NFKD Unicode Transliteration:** Agent names with accents (e.g., `AtenciónAlCliente`) are transliterated cleanly to valid ASCII identifiers (`transfer_to_atencionalcliente`).
+* <VersionBadge version="0.4.0" status="stable" /> **Collision Disambiguation:** If multiple handoff targets produce equivalent sanitized tool names, numeric suffixes (`_2`, `_3`) are automatically appended.
+* <VersionBadge version="0.4.0" status="stable" /> **Tool Name Length Capping:** Synthetic tool names are strictly capped at 60 characters to comply with all upstream provider API limits.
 
 ---
 
@@ -214,7 +217,7 @@ agent.current_user = "user_123"  # Will leak across concurrent sessions!
 # )
 ```
 
-In v0.4.0rc1, `metadata` passed to `run()` / `run_async()` is merged into the session's metadata on every turn and persisted with it.
+In v0.4.0, `metadata` passed to `run()` / `run_async()` is merged into the session's metadata on every turn and persisted with it.
 
 ### 3. Self-Handoff Registration
 An agent cannot register a handoff to itself. Doing so raises an immediate error:

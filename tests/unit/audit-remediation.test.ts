@@ -411,7 +411,8 @@ describe('PR #48 Audit Remediation — Full SDK Parity, i18n Fixtures, STABLE-ON
     for (const locale of LOCALES) {
       const p = path.join(DOCS_DIR, locale, 'v0.4', 'getting-started', 'core-concepts.mdx');
       const text = fs.readFileSync(p, 'utf8');
-      expect(text, `${locale} core-concepts must document max_turns 40`).toContain('40');
+      expect(text, `${locale} core-concepts must document max_turns default 40`).toMatch(/`max_turns`[^.\n]*`40`/);
+      expect(text, `${locale} core-concepts must document default_max_turns=40`).toContain('default_max_turns=40');
       expect(text, `${locale} core-concepts must reference _run_sync_tool`).toContain('_run_sync_tool');
       expect(text, `${locale} core-concepts must not claim [System Note] anchor`).not.toContain('[System Note]');
       expect(text, `${locale} core-concepts must not claim breadth-first/BFS`).not.toMatch(/breadth-first|\bBFS\b/i);

@@ -208,7 +208,7 @@ async def handle_requests():
 ```
 
 <Callout type="info" title="Mejoras en v0.4.0">
-La gestión de conexiones HTTP compartidas mediante <code>async with runner:</code> (para peticiones a Gemini), la prevención de turnos reentrantes con <code>ReentrantTurnError</code>, la serialización por sesión para almacenes SQLite, la reversión completa del estado incluida la cancelación y el seguimiento de cancelación en hilos trabajadores se introducen en la versión de v0.4.0 <strong>v0.4.0</strong>. En la versión estable v0.3.4, ejecuta los turnos directamente sobre la instancia compartida del runner.
+La gestión de conexiones HTTP compartidas mediante <code>async with runner:</code> (para peticiones a Gemini), la prevención de turnos reentrantes con <code>ReentrantTurnError</code>, la serialización por sesión para almacenes SQLite, la reversión completa del estado incluida la cancelación y el seguimiento de cancelación en hilos trabajadores se introducen en <strong>v0.4.0</strong>. En la versión estable v0.3.4, ejecuta los turnos directamente sobre la instancia compartida del runner.
 </Callout>
 
 ---

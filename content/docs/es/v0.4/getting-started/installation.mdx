@@ -1,8 +1,8 @@
 ---
 title: "Instalación"
 description: "Instala chatflow-agent v0.4.0 desde PyPI, configura extras opcionales de canales y credenciales de proveedores LLM."
-sourceRevision: "fe6b247"
-sourceHash: "6166521aa44423cfe5c7e462e138ed120c0d8bf8ec23e01b30709e092e1be974"
+sourceRevision: "f77ac95"
+sourceHash: "8687926be034ca3e99b09f415e68bea6a6b228195f789bb48a76e9fb8a8f6859"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -130,7 +130,7 @@ Si intentas instanciar `TelegramChannel` o `WhatsAppChannel` sin instalar su ext
 
 `chatflow-agent` resuelve automáticamente las credenciales desde variables de entorno estándar cuando no se pasa `api_key` explícitamente al constructor de un `Agent` o motor. Cada proveedor lee únicamente su propia variable y solo cuando la petición se dirige a su endpoint oficial (`OPENAI_API_KEY` nunca se envía a otro proveedor ni a un host remoto personalizado):
 
-| Proveedor | Variable de Entorno | Modelo Preset por Defecto | Clase de Motor |
+| Proveedor | Variable de Entorno | Modelo de Ejemplo | Clase de Motor |
 | :--- | :--- | :--- | :--- |
 | **Google Gemini** | `GEMINI_API_KEY` *(usa `GOOGLE_API_KEY` como respaldo si no está definida; opcional `GOOGLE_GEMINI_BASE_URL` para proxies)* | `gemini-2.5-flash` | `GeminiEngine` |
 | **OpenAI** | `OPENAI_API_KEY` | `gpt-4o-mini` | `OpenAIEngine` |

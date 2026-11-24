@@ -10,7 +10,7 @@ export function CommunityTeaser() {
       <div className="mx-auto max-w-4xl rounded-2xl border border-border bg-gradient-to-b from-card to-card/50 p-8 sm:p-10 shadow-xs text-center">
         <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3.5 py-1 text-xs font-semibold text-muted-foreground">
           <Heart className="h-3.5 w-3.5 text-rose-500 fill-rose-500" aria-hidden="true" />
-          <span>Open Source</span>
+          <span>{t('communityTeaserBadge')}</span>
         </div>
 
         <h2 id="community-teaser-title" className="mt-4 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">

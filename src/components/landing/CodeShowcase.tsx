@@ -201,11 +201,11 @@ export function CodeShowcase() {
           <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
             <span className="inline-flex items-center gap-1.5 shrink-0">
               <Zap className="h-3.5 w-3.5 text-amber-400" />
-              <span>Native asyncio</span>
+              <span>{t('highlightAsync')}</span>
             </span>
             <span className="inline-flex items-center gap-1.5 shrink-0">
               <Database className="h-3.5 w-3.5 text-blue-400" />
-              <span>SQLite State & Rollback</span>
+              <span>{t('highlightSqlite')}</span>
             </span>
           </div>
           <span className="font-mono text-slate-500 shrink-0">Python &gt;= 3.10</span>

@@ -2,7 +2,7 @@
 title: "Integración con Bots de Telegram"
 description: "Despliega asistentes de IA multi-agente en Telegram con python-telegram-bot, memoria de sesión, división de mensajes y controles de administración para grupos."
 sourceRevision: "a362b6e"
-sourceHash: "77930f3e8ec1a78d3b827902715a4c82211bd076ca68010517e88978aeb4c11c"
+sourceHash: "407f8991385bee035a3daf7bdb33d7d8ba170842e59fa52e2863d6e124314d27"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -79,6 +79,8 @@ El constructor de `TelegramChannel` acepta las siguientes opciones:
 | `start_message` | `str` | `"Hello! I am your AI..."` | Mensaje de bienvenida enviado cuando un usuario ejecuta `/start`. |
 | `fallback_message` | `str` | `"Disculpa, ocurrió un..."` | Mensaje de cara al usuario enviado si falla la ejecución del modelo. |
 | `allowed_updates` | `list[str] \| None` | `None` | Restringe tipos de actualizaciones (ej. `["message"]`). Por defecto todas. |
+| `concurrent_updates` | `bool \| int \| BaseUpdateProcessor` | `False` | Keyword-only (`v0.4.0`). Habilita el procesamiento concurrente entre distintos chats (validado con `ConfigurationError`). |
+| `max_retry_after_seconds` | `float` | `60.0` | Keyword-only (`v0.4.0`). Tiempo máximo de espera (en segundos) ante `RetryAfter` por bloque saliente (validado con `ConfigurationError`). |
 
 ## Comandos Integrados y Seguridad en Grupos
 
@@ -88,7 +90,7 @@ El constructor de `TelegramChannel` acepta las siguientes opciones:
 Responde con `start_message` para incorporar a nuevos usuarios.
 
 ### Comando `/reset`
-Borra el historial de la sesión en `runner.session_store` para el chat ID activo, permitiendo a los usuarios reiniciar su conversación de forma limpia.
+Delega en `await runner.reset_session_async(session_id)` (`v0.4.0`), limpiando el historial bajo el bloqueo de turno de la sesión, esperando cualquier trabajo síncrono pendiente y descargando escrituras SQLite en archivo al `ThreadPoolExecutor` dedicado de 4 workers (`_run_blocking`).
 
 <Callout type="warn" title="Seguridad en Chats Grupales y Supergrupos">
 En chats grupales y supergrupos, permitir que cualquier participante borre la conversación podría afectar a otros miembros. `TelegramChannel` impone verificación de roles:
@@ -121,6 +123,11 @@ chunks = split_message(long_text, max_len=4096)
 ```
 
 El canal entrega los fragmentos secuencialmente. `split_message` prioriza los límites de párrafo, de línea, de oración y, después, de palabra; cuando un fragmento no contiene ningún separador (por ejemplo, una URL muy larga), recurre a un corte forzado en `max_len`. Las longitudes se cuentan en caracteres de Python, y `max_len` debe ser positivo.
+
+En `v0.4.0`, si Telegram lanza `telegram.error.RetryAfter` al enviar un fragmento, `TelegramChannel` compara `retry_after` contra `max_retry_after_seconds` (por defecto `60.0`):
+* Si `retry_after <= max_retry_after_seconds`, espera `retry_after` segundos y reintenta **solo el fragmento no enviado** (hasta 3 reintentos) sin duplicar los ya entregados.
+* Si `retry_after > max_retry_after_seconds`, registra un error y **aborta el envío inmediatamente** sin esperar.
+* Si ocurre un fallo después de haber entregado al menos un fragmento, no envía un `fallback_message` contradictorio.
 
 ## Indicadores de Escritura y Experiencia de Usuario
 

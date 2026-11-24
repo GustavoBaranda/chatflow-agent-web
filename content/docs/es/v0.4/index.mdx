@@ -1,74 +1,66 @@
 ---
-title: "Visión General de la Documentación"
-description: "Documentación técnica oficial de chatflow-agent v0.4.0 (Latest / Stable) — el framework ligero y asíncrono en Python para flujos conversacionales multiagente."
-sourceRevision: "feba63b"
-sourceHash: "2c9f1df1ff9a75ca888b9d7ce997813626f6ecb05d6e4c96477d9e9547c1cc52"
+title: Visión General de la Documentación
+description: Documentación técnica oficial para chatflow-agent v0.4.0 (Última Estable) — el framework asíncrono y ligero en Python para flujos conversacionales multi-agente.
+sourceRevision: "5d2d319"
+sourceHash: "84754d5b517becb25cf08b6fc4c6c673c6aa045c1f22348d857dbb127dcf02a1"
 ---
 
-import { VersionBadge } from '@/components/docs/VersionBadge';
-import { Card, Cards } from 'fumadocs-ui/components/card';
 import { Callout } from 'fumadocs-ui/components/callout';
+import { Card, Cards } from 'fumadocs-ui/components/card';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { VersionBadge } from '@/components/docs/VersionBadge';
 
 <div className="mb-4 flex flex-wrap items-center gap-2">
   <VersionBadge version="0.4.0" status="stable" />
   <span className="text-xs text-slate-500 dark:text-slate-400">Python &gt;= 3.10 • Licencia MIT • Autor: Gustavo Baranda</span>
 </div>
 
-**`chatflow-agent`** es un framework de código abierto, ligero y asíncrono en Python diseñado para orquestar agentes conversacionales de IA, invocación de herramientas con validación en tiempo de ejecución, handoffs multiagente y canales de mensajería sin la sobrecarga de frameworks monolíticos.
+**`chatflow-agent`** es un framework Python open-source, ligero y asíncrono diseñado para orquestar agentes conversacionales de IA, llamadas a funciones validadas en tiempo de ejecución, transferencias (*handoffs*) multi-agente y pipelines de mensajería multicanal sin la sobrecarga de frameworks monolíticos.
 
 <Callout type="info" title="chatflow-agent v0.4.0 — Última Versión Estable">
-Estás visualizando la documentación oficial de **`chatflow-agent` `v0.4.0` (`Latest / Stable`)**. Entre las principales capacidades de `v0.4.0` se incluyen la validación en tiempo de ejecución de argumentos de herramientas mediante Pydantic por defecto (`validate_args=True` y `ToolArgumentValidationError`), transporte REST directo con `httpx` para Gemini (eliminando la dependencia `google-genai`), reversión transaccional completa de turnos (historial, agente activo y metadatos de sesión ante excepciones, cancelaciones y timeouts), prevención de interbloqueos por reentrada (`ReentrantTurnError` y `Runner.spawn_turn()`), reinicio seguro de sesión (`Runner.reset_session_async()`), SQLite persistente en memoria (`db_path=":memory:"`) y validación estricta con `ConfigurationError`. ¿Actualizas desde `v0.3.4`? Consulta [Novedades de 0.4.0](/es/docs/v0.4/getting-started/whats-new) y la [Guía de Migración (0.3.4 → 0.4.0)](/es/docs/v0.4/getting-started/migration).
+Estás consultando la documentación oficial de **`chatflow-agent` `v0.4.0` (`Última Estable`)**. Entre las capacidades clave de `v0.4.0` se incluyen validación Pydantic de argumentos de herramientas activada por defecto (`validate_args=True` y `ToolArgumentValidationError`), transporte REST directo de Gemini vía `httpx` (eliminando la dependencia `google-genai`), reversión transaccional completa de turnos (historial, agente activo y metadatos ante excepciones, cancelaciones y timeouts), prevención de deadlocks por reentrancia (`ReentrantTurnError` y `Runner.spawn_turn()`), `Runner.reset_session_async() -> bool`, SQLite persistente en memoria (`db_path=":memory:"`) y validación estricta `ConfigurationError`. ¿Actualizás desde `v0.3.4`? Consultá [Novedades en 0.4.0](/es/docs/v0.4/getting-started/whats-new) y la [Guía de Migración (0.3.4 → 0.4.0)](/es/docs/v0.4/getting-started/migration).
 </Callout>
 
----
+## Arquitectura del Sistema de un Vistazo
 
-## Aspectos Destacados de la Arquitectura
+`chatflow-agent` desacopla limpiamente el **razonamiento conversacional** (`Agent`), la **orquestación de ejecución** (`Runner`), la **inferencia de modelos** (`BaseEngine`), la **persistencia de estado** (`BaseSessionStore`) y los **canales de entrega** (`BaseChannel`):
 
-<Cards>
-  <Card
-    title="Novedades de 0.4.0"
-    description="Explora todas las nuevas funcionalidades, validación de herramientas con Pydantic, motor REST directo para Gemini y mejoras de fiabilidad."
-    href="/es/docs/v0.4/getting-started/whats-new"
-  />
-  <Card
-    title="Guía de Migración (0.3.4 → 0.4.0)"
-    description="Guía paso a paso para actualizar desde v0.3.4 con los 4 cambios incompatibles, ejemplos antes/después y tablas de compatibilidad."
-    href="/es/docs/v0.4/getting-started/migration"
-  />
-  <Card
-    title="Instalación y Extras"
-    description="Configura entornos virtuales, dependencias opcionales (telegram, whatsapp, webhook) y credenciales de proveedores."
-    href="/es/docs/v0.4/getting-started/installation"
-  />
-  <Card
-    title="Inicio Rápido en 5 Minutos"
-    description="Construye tu primer agente conversacional con herramientas y ejecuta sesiones multiturno."
-    href="/es/docs/v0.4/getting-started/quickstart"
-  />
-  <Card
-    title="Conceptos Fundamentales"
-    description="Comprende el ciclo de vida de Agents, Runners, Engines, Tools y SessionContexts."
-    href="/es/docs/v0.4/getting-started/core-concepts"
-  />
-  <Card
-    title="Herramientas y Validación"
-    description="Convierte funciones de Python en herramientas JSON Schema con validación Pydantic en tiempo de ejecución."
-    href="/es/docs/v0.4/guides/tools"
-  />
-  <Card
-    title="Handoffs Multiagente"
-    description="Diseña enjambres de agentes especializados con delegación determinista de contexto y límites de transferencia."
-    href="/es/docs/v0.4/guides/multi-agent-handoffs"
-  />
-  <Card
-    title="Patrones de Producción"
-    description="Configura manejo de errores, logging estructurado, seguridad y despliegues con Docker y FastAPI."
-    href="/es/docs/v0.4/production/error-handling"
-  />
-</Cards>
+```text
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Canales de Entrega                              │
+│     CLIChannel   │   TelegramChannel   │   WhatsAppChannel   │  FastAPI │
+└─────────┬───────────────────┬─────────────────────┬───────────────┬─────┘
+          │                   │                     │               │
+          ▼                   ▼                     ▼               ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      Runner (Orquestador de Turnos)                     │
+│  • Bloqueo Async por Sesión        • Bucle Acotado de Tools (def: 10)   │
+│  • Reversión Completa + Timeout    • Guardas de Handoffs (def: 5)       │
+└─────────┬─────────────────────────────────────────────────┬─────────────┘
+          │                                                 │
+          ▼                                                 ▼
+┌───────────────────────────────────┐     ┌───────────────────────────────┐
+│     Agente Activo y Enjambre      │     │    Persistencia de Sesión     │
+│  • Instructions (str | Callable)  │     │  • SessionStore (En Memoria)  │
+│  • Registro @tool / Tool          │     │  • SQLiteSessionStore (WAL)   │
+│  • Destinos Handoff (transfer_to) │     │  • Deduplicación Webhook 192h │
+└─────────┬─────────────────────────┘     └───────────────────────────────┘
+          │
+          ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Motores de Proveedores LLM                       │
+│  • GeminiEngine (REST vía httpx) • OpenAIEngine (OpenAI/Groq/DeepSeek)  │
+│  • AnthropicEngine (Claude)      • Ollama (Inferencia Local Offline)    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
----
+## Principios de Diseño
+
+1. **Cero Magia Oculta:** Cada transición de agente, invocación de herramienta y transacción de base de datos es explícita e inspeccionable. Los handoffs se sintetizan como herramientas deterministas (`transfer_to_<agent_name>`).
+2. **Concurrencia Async-First:** Construido nativamente sobre `asyncio` y `httpx.AsyncClient`. `Runner` utiliza bloqueos `asyncio.Lock` por sesión para evitar condiciones de carrera, detecta turnos reentrantes en la misma sesión (`ReentrantTurnError`) y soporta `async with runner:` para limpieza automática del motor.
+3. **Validación de Argumentos en Tiempo de Ejecución:** Las herramientas decoradas con `@tool` o `@agent.tool` validan y coaccionan los argumentos suministrados por el modelo frente a las anotaciones de tipo en Python usando Pydantic antes de ejecutar la función (`validate_args=True` por defecto), lanzando `ToolArgumentValidationError` ante entradas inválidas.
+4. **Integridad Transaccional de Estado:** `SQLiteSessionStore` funciona en modo `WAL` (Write-Ahead Logging) con el mismo esquema `user_version = 1` que `v0.3.4` y un journal de reversión en memoria. Si una excepción no controlada, cancelación o `turn_timeout` aborta un turno, el historial, `active_agent` y `metadata` se restauran al estado previo al turno. Pasar `db_path=":memory:"` mantiene una conexión compartida persistente durante toda la vida de la instancia.
+5. **Libertad Multi-Proveedor:** Alterna sin fricción entre OpenAI (`gpt-4o`), Google Gemini (`gemini-2.5-flash`), Anthropic Claude (`claude-3-5-sonnet-latest`), DeepSeek, Groq, xAI Grok y modelos locales Ollama — o combina varios proveedores en un mismo enjambre.
 
 ## Instalación Rápida
 
@@ -85,7 +77,53 @@ uv add chatflow-agent==0.4.0
   </Tab>
   <Tab value="Con Extras de Canales">
 ```bash
+# Instalar con todos los canales opcionales (Telegram, WhatsApp, Webhook/FastAPI)
 pip install "chatflow-agent[all]==0.4.0"
 ```
   </Tab>
 </Tabs>
+
+## Explorar la Documentación
+
+<Cards>
+  <Card
+    title="Novedades en 0.4.0"
+    description="Explora cada nueva funcionalidad, validación en tiempo de ejecución, motor REST directo de Gemini y mejoras de confiabilidad en 0.4.0."
+    href="/es/docs/v0.4/getting-started/whats-new"
+  />
+  <Card
+    title="Guía de Migración (0.3.4 → 0.4.0)"
+    description="Guía paso a paso cubriendo los 4 cambios incompatibles oficiales, ejemplos antes/después y matriz de compatibilidad."
+    href="/es/docs/v0.4/getting-started/migration"
+  />
+  <Card
+    title="Instalación y Extras"
+    description="Configura entornos virtuales, dependencias opcionales (telegram, whatsapp, webhook) y credenciales de API."
+    href="/es/docs/v0.4/getting-started/installation"
+  />
+  <Card
+    title="Inicio Rápido en 5 Minutos"
+    description="Construye tu primer agente conversacional con herramientas y sesiones multi-turno."
+    href="/es/docs/v0.4/getting-started/quickstart"
+  />
+  <Card
+    title="Conceptos Fundamentales"
+    description="Comprende el ciclo de vida de Agents, Runners, Engines, Tools y SessionContexts."
+    href="/es/docs/v0.4/getting-started/core-concepts"
+  />
+  <Card
+    title="Herramientas y Validación de Argumentos"
+    description="Convierte funciones Python en herramientas JSON Schema con validación Pydantic en tiempo de ejecución."
+    href="/es/docs/v0.4/guides/tools"
+  />
+  <Card
+    title="Handoffs Multi-Agente"
+    description="Diseña enjambres de agentes especializados con delegación determinista y protección contra ciclos."
+    href="/es/docs/v0.4/guides/multi-agent-handoffs"
+  />
+  <Card
+    title="Patrones de Producción"
+    description="Configura manejo de errores, logging estructurado, endurecimiento de seguridad y despliegues Docker/FastAPI."
+    href="/es/docs/v0.4/production/error-handling"
+  />
+</Cards>

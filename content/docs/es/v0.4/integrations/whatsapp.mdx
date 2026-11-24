@@ -2,7 +2,7 @@
 title: "WhatsApp Business Cloud API"
 description: "Integración de producción con WhatsApp utilizando Meta Cloud API, webhooks de FastAPI, verificación de firmas HMAC y gestión de ventana de 24 horas."
 sourceRevision: "d2c5d67"
-sourceHash: "89192ee056746793c141b385f79f18540b95ee87353760d729781817bedd7df8"
+sourceHash: "1b413b63aeb073bf0d783d57f11c838bc596507101080a94001eb5f79afa5516"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -156,16 +156,21 @@ El enmascaramiento se aplica tanto a esas líneas de log como al campo `"sender"
 
 Trata la base de datos de sesiones y cualquier log personalizado de tu aplicación como datos personales.
 
-## Concurrencia, Tiempos Límite y Plazos
+## Concurrencia, Tiempos Límite, Reintentos Salientes y Plazos
 
-La confirmación del webhook es inmediata; después, el turno se ejecuta en segundo plano con dos límites independientes:
+La confirmación del webhook es inmediata; después, el turno se ejecuta en segundo plano con límites configurables validados al construir con `ConfigurationError`:
 
 | Parámetro | Por Defecto | Propósito |
 | :--- | :--- | :--- |
-| `queue_timeout_seconds` | `120.0` | Espera máxima detrás de turnos anteriores de la misma sesión (número de teléfono). Debe ser un número finito positivo. Si expira, el usuario recibe `fallback_message` y el turno nunca se ejecuta, por lo que no se añade al historial. |
-| `llm_timeout_seconds` | `120.0` | Límite para el propio turno (llamadas al modelo, herramientas, transferencias), que empieza a contar cuando el turno obtiene la sesión. Al expirar, el turno se cancela y se revierte, y se envía `fallback_message`. `None` o `inf` no establecen ningún límite. |
+| `queue_timeout_seconds` | `120.0` | Keyword-only (`v0.4.0`). Espera máxima detrás de turnos anteriores de la misma sesión (número de teléfono). Debe ser un número finito positivo (booleanos rechazados). Si expira, el usuario recibe `fallback_message` y el turno nunca se ejecuta. |
+| `llm_timeout_seconds` | `120.0` | Límite (`float \| None`, cambiado desde `30.0` en `v0.3.4`) para el propio turno (llamadas al modelo, herramientas, transferencias), contado desde que el turno obtiene la sesión. Al expirar, el turno se cancela y se revierte, y se envía `fallback_message`. `None` o `inf` no establecen límite. |
+| `max_outbound_retries` | `3` | Máximo de reintentos (`0..10`) ante errores transitorios de entrega en Meta API (`429`, `5xx`, errores de red). |
+| `outbound_base_delay` | `1.0` | Espera base del backoff exponencial en segundos (`>= 0`). |
+| `outbound_max_delay` | `30.0` | Tope máximo del backoff exponencial en segundos (`>= 0`). |
+| `max_body_size` | `1_048_576` | Keyword-only (`v0.4.0`). Tamaño máximo en bytes del payload entrante (`> 0`). |
+| `enable_docs` | `False` | Keyword-only (`v0.4.0`). Habilita o deshabilita las rutas FastAPI `/docs`, `/redoc` y `/openapi.json`. |
 
-Por lo tanto, una respuesta puede tardar hasta `queue_timeout_seconds + llm_timeout_seconds`. No existe ninguna opción que limite cuántos turnos de webhook se ejecutan de forma concurrente.
+En `v0.4.0`, la entrega saliente aplica validación HTTP `2xx` estricta con `follow_redirects=False` (rechazando redirecciones `3xx` sin reintentar), detiene los fragmentos restantes inmediatamente si falla uno anterior y sustituye respuestas vacías por `fallback_message`. Al construir, también registra una advertencia si `access_token` o `phone_number_id` están vacíos.
 
 ## Control de la Ventana de Atención de 24 Horas
 

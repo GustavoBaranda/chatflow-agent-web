@@ -128,7 +128,8 @@ def update_email(user_id: int, new_email: str) -> str:
 
 In `v0.4.0`, `Runner` protects sessions against reentrant turns and concurrent reset races:
 - If code started by a running turn (a tool, or a task or thread it starts: `create_task`, `gather`, `wait_for`, `TaskGroup`, `asyncio.to_thread`) calls `runner.run_async`, `runner.run`, `runner.reset_session_async`, or `runner.reset_session` for the same session, `Runner` raises `ReentrantTurnError` immediately instead of deadlocking. Use `Runner.spawn_turn()` to queue a follow-up turn.
-- Independent requests for the same session—including `Runner.reset_session_async(session_id)` (`TelegramChannel` `/reset` and `CLIChannel` `/reset`)—are serialized by the session lock (per store instance, session ID, and event loop).
+- Independent requests for the same session—including `Runner.reset_session_async(session_id)` (used by `TelegramChannel` `/reset`)—are serialized by the session lock (per store instance, session ID, and event loop).
+- Note that `CLIChannel`'s interactive `/reset` command calls `session.clear_history()` directly and does **not** call `Runner.reset_session_async()` or acquire the runner's per-session lock.
 
 Architectural boundaries in `v0.4.0`:
 - Serialization is scoped to a single store instance and event loop; multi-process or distributed deployments require external coordination.

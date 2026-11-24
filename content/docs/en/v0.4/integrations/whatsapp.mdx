@@ -161,10 +161,10 @@ Webhook acknowledgement is immediate; the turn then runs in the background with 
 | Parameter | Default | Purpose |
 | :--- | :--- | :--- |
 | `queue_timeout_seconds` | `120.0` | Keyword-only (`v0.4.0`). Maximum wait behind earlier turns of the same session (phone number). Must be a positive finite number (booleans rejected). If it expires, the user receives `fallback_message` and the turn never runs. |
-| `llm_timeout_seconds` | `120.0` | Limit (`float \| None`) for the turn itself (model calls, tools, handoffs), starting once the turn holds the session. On expiry the turn is cancelled and rolled back, and `fallback_message` is sent. `None` or `inf` sets no limit. |
+| `llm_timeout_seconds` | `120.0` | Limit (`float \| None`, changed from `30.0` in `v0.3.4`) for the turn itself (model calls, tools, handoffs), starting once the turn holds the session. On expiry the turn is cancelled and rolled back, and `fallback_message` is sent. `None` or `inf` sets no limit. |
 | `max_outbound_retries` | `3` | Maximum retry attempts (`0..10`) for transient outbound Meta API delivery errors (`429`, `5xx`, network errors). |
 | `outbound_base_delay` | `1.0` | Base exponential backoff delay in seconds (`>= 0`). |
-| `outbound_max_delay` | `10.0` | Maximum exponential backoff delay cap in seconds (`>= 0`). |
+| `outbound_max_delay` | `30.0` | Maximum exponential backoff delay cap in seconds (`>= 0`). |
 | `max_body_size` | `1_048_576` | Keyword-only (`v0.4.0`). Maximum inbound webhook payload size in bytes (`> 0` integer). |
 | `enable_docs` | `False` | Keyword-only (`v0.4.0`). Whether to expose FastAPI `/docs`, `/redoc`, and `/openapi.json` routes. |
 

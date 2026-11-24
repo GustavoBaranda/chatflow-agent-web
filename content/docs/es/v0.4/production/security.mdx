@@ -2,7 +2,7 @@
 title: "Buenas Prácticas de Seguridad"
 description: "Directrices de defensa en profundidad para chatflow-agent, aislamiento de credenciales, mitigaciones de inyección de prompts, firmas de webhooks y privacidad de datos."
 sourceRevision: "db864ef"
-sourceHash: "7c278aa11880be670a96e0edd2882984d0e49cab3e297aaae51641d570f98bbe"
+sourceHash: "ebaf922fc7a25b1244272947619b593e7195a8d6383d7aa656be99da020290c9"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -128,11 +128,12 @@ def update_email(user_id: int, new_email: str) -> str:
 
 <VersionBadge version="0.4.0" status="stable" />
 
-A partir de `v0.4.0`, `Runner` protege las sesiones frente a turnos reentrantes:
-- Si código iniciado por un turno en curso (una herramienta, o una tarea o hilo que esta inicie: `create_task`, `gather`, `wait_for`, `TaskGroup`, `asyncio.to_thread`) invoca `runner.run_async` o `runner.run` para la misma sesión, `Runner` lanza `ReentrantTurnError` de inmediato en lugar de provocar un interbloqueo. Utiliza `Runner.spawn_turn()` para encolar un turno posterior.
-- Las peticiones independientes para la misma sesión se serializan mediante el bloqueo de sesión (por instancia de almacén, ID de sesión y bucle de eventos).
+A partir de `v0.4.0`, `Runner` protege las sesiones frente a turnos reentrantes y carreras con reinicios:
+- Si código iniciado por un turno en curso (una herramienta, o una tarea o hilo que esta inicie: `create_task`, `gather`, `wait_for`, `TaskGroup`, `asyncio.to_thread`) invoca `runner.run_async`, `runner.run`, `runner.reset_session_async` o `runner.reset_session` para la misma sesión, `Runner` lanza `ReentrantTurnError` de inmediato en lugar de provocar un interbloqueo. Utiliza `Runner.spawn_turn()` para encolar un turno posterior.
+- Las peticiones independientes para la misma sesión —incluido `Runner.reset_session_async(session_id)` (utilizado por el `/reset` de `TelegramChannel`)— se serializan mediante el bloqueo de sesión (por instancia de almacén, ID de sesión y bucle de eventos).
+- Ten en cuenta que el comando interactivo `/reset` de `CLIChannel` invoca directamente `session.clear_history()` y **no** llama a `Runner.reset_session_async()` ni adquiere el bloqueo de sesión del `Runner`.
 
-Limitaciones conocidas en v0.4.0:
-- No se proporciona serialización entre instancias de almacén sobre el mismo archivo, entre procesos ni entre hilos que ejecutan sus propios bucles de eventos.
-- Una herramienta que espera trabajo realizado por una tarea que no se inició desde el turno aún puede provocar un interbloqueo si ese trabajo ejecuta un turno de la misma sesión; esperar con await una tarea de `spawn_turn()` dentro del turno que la lanzó también provoca un interbloqueo.
-- `clear_history()` y `delete()` (y, por tanto, el `/reset` de Telegram) no se coordinan con los turnos en curso más allá de las garantías de reversión y de `SessionDeletedError`.
+Límites arquitectónicos en `v0.4.0`:
+- La serialización aplica a una sola instancia de almacén y bucle de eventos; despliegues multiproceso o distribuidos requieren coordinación externa.
+- Una herramienta que espera trabajo realizado por una tarea que no se inició desde el turno aún puede provocar un interbloqueo si ese trabajo ejecuta un turno de la misma sesión; esperar con `await` una tarea de `spawn_turn()` dentro del turno que la lanzó también provoca un interbloqueo.
+- Las llamadas directas a `store.clear_history()` o `store.delete()` omiten `Runner.reset_session_async()` y solo cuentan con las garantías de reversión de turno y `SessionDeletedError`. Utiliza siempre `await runner.reset_session_async(session_id)` para limpiar una sesión mientras pueda haber turnos activos.

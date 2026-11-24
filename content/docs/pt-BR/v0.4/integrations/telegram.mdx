@@ -2,7 +2,7 @@
 title: "Integração com Bots do Telegram"
 description: "Implante assistentes de IA multiagente no Telegram com python-telegram-bot, memória de sessão, divisão de mensagens e controles de administração em grupos."
 sourceRevision: "a362b6e"
-sourceHash: "77930f3e8ec1a78d3b827902715a4c82211bd076ca68010517e88978aeb4c11c"
+sourceHash: "407f8991385bee035a3daf7bdb33d7d8ba170842e59fa52e2863d6e124314d27"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -79,6 +79,8 @@ O construtor do `TelegramChannel` aceita as seguintes opções:
 | `start_message` | `str` | `"Hello! I am your AI..."` | Mensagem de saudação enviada quando um usuário aciona `/start`. |
 | `fallback_message` | `str` | `"Disculpa, ocurrió un..."` | Mensagem amigável enviada ao usuário quando a execução do modelo falha. |
 | `allowed_updates` | `list[str] \| None` | `None` | Restringe tipos de atualizações (ex.: `["message"]`). O padrão é todas. |
+| `concurrent_updates` | `bool \| int \| BaseUpdateProcessor` | `False` | Keyword-only (`v0.4.0`). Habilita processamento concorrente entre chats diferentes (validado com `ConfigurationError`). |
+| `max_retry_after_seconds` | `float` | `60.0` | Keyword-only (`v0.4.0`). Tempo máximo de espera (em segundos) em `RetryAfter` por bloco enviado (validado com `ConfigurationError`). |
 
 ## Comandos Embutidos e Segurança em Chats de Grupo
 
@@ -88,7 +90,7 @@ O `TelegramChannel` inclui manipuladores de comando pré-configurados:
 Responde com a `start_message` para apresentar o assistente aos novos usuários.
 
 ### Comando `/reset`
-Limpa o histórico da sessão no `runner.session_store` para o chat ID ativo, permitindo que os usuários recomecem a conversa do zero.
+Delega para `await runner.reset_session_async(session_id)` (`v0.4.0`), limpando o histórico sob o lock de turno da sessão, aguardando qualquer trabalho síncrono pendente e delegando escritas SQLite em arquivo ao `ThreadPoolExecutor` dedicado de 4 workers (`_run_blocking`).
 
 <Callout type="warn" title="Segurança em Grupos e Supergrupos">
 Em chats de grupo e supergrupos, permitir que qualquer participante limpe o histórico poderia prejudicar outros usuários. O `TelegramChannel` impõe verificação de funções:
@@ -121,6 +123,11 @@ chunks = split_message(long_text, max_len=4096)
 ```
 
 O canal entrega os blocos sequencialmente. `split_message` prefere limites de parágrafo, linha, frase e, por fim, de palavra; quando um bloco não contém nenhum separador (por exemplo, uma URL muito longa), recorre a um corte rígido em `max_len`. Os comprimentos são contados em caracteres Python, e `max_len` deve ser positivo.
+
+Na `v0.4.0`, se o Telegram lançar `telegram.error.RetryAfter` ao enviar um bloco, o `TelegramChannel` compara `retry_after` com `max_retry_after_seconds` (padrão `60.0`):
+* Se `retry_after <= max_retry_after_seconds`, aguarda `retry_after` segundos e tenta novamente **apenas o bloco não enviado** (até 3 tentativas) sem duplicar blocos já entregues.
+* Se `retry_after > max_retry_after_seconds`, registra um erro e **aborta o envio imediatamente** sem aguardar.
+* Se ocorrer uma falha após pelo menos um bloco já ter sido entregue, não envia uma `fallback_message` contraditória.
 
 ## Indicadores de Digitação e Experiência do Usuário
 

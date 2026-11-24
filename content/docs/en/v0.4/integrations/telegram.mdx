@@ -88,7 +88,7 @@ The `TelegramChannel` constructor accepts the following options:
 Responds with `start_message` to onboard new users.
 
 ### `/reset` Command
-Delegates to `await runner.reset_session_async(session_id)` (`v0.4.0`), clearing the session history under the session turn lock, waiting for any escaping synchronous thread work, and offloading SQLite writes to a worker thread.
+Delegates to `await runner.reset_session_async(session_id)` (`v0.4.0`), clearing the session history under the session turn lock, waiting for any escaping synchronous thread work, and offloading file-backed SQLite writes via the store's dedicated 4-worker `ThreadPoolExecutor` (`_run_blocking`).
 
 <Callout type="warn" title="Group and Supergroup Chat Security">
 In group and supergroup chats, allowing any participant to clear the conversation could disrupt other users. `TelegramChannel` enforces role verification:
@@ -122,7 +122,10 @@ chunks = split_message(long_text, max_len=4096)
 
 The channel delivers chunks sequentially. `split_message` prefers paragraph, line, sentence, and then word boundaries; when a chunk contains no separator (for example a very long URL), it falls back to a hard cut at `max_len`. Lengths are counted in Python characters, and `max_len` must be positive.
 
-In `v0.4.0`, if Telegram raises `telegram.error.RetryAfter` while sending a chunk, `TelegramChannel` sleeps for `retry_after` seconds (provided it does not exceed `max_retry_after_seconds`, default `60.0`) and retries **only the unsent chunk** (up to 3 times) without duplicating already-delivered chunks. If a failure occurs after at least one chunk was already sent, the channel does not send a contradictory `fallback_message`.
+In `v0.4.0`, if Telegram raises `telegram.error.RetryAfter` while sending a chunk, `TelegramChannel` compares the requested `retry_after` delay against `max_retry_after_seconds` (default `60.0`):
+* If `retry_after <= max_retry_after_seconds`, it sleeps for `retry_after` seconds and retries **only the unsent chunk** (up to 3 retries) without duplicating already-delivered chunks.
+* If `retry_after > max_retry_after_seconds`, it logs an error and **aborts sending the reply immediately** without sleeping.
+* If a failure occurs after at least one chunk was already sent, the channel does not send a contradictory `fallback_message`.
 
 ## Typing Indicators & User Experience
 

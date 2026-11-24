@@ -138,10 +138,10 @@ agent = Agent(
 )
 
 runner = Runner(starting_agent=agent)
-cli = CLIChannel(session_id="local-dev-session")
+cli = CLIChannel(session_id="local-dev-session", prompt_prefix="\nYou: ")
 cli.attach(runner)
 
 if __name__ == "__main__":
     # Type messages in the console; type '/reset' to clear history or 'exit' to quit
-    cli.run(prompt_prefix="You")
+    cli.run()
 ```

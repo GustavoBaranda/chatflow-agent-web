@@ -21,7 +21,7 @@ All exceptions in `chatflow-agent` inherit from `ChatFlowError`. This allows you
 ChatFlowError (Base)
 ├── ConfigurationError (Invalid provider, endpoint, engine, or channel parameter) [v0.4.0]
 ├── DependencyError (Missing optional extra dependencies)
-├── JsonCodecError (Non-JSON-serializable object in session metadata or payload) [v0.4.0]
+├── JsonCodecError (Non-JSON-serializable object in session metadata or strict JSON codec) [v0.4.0]
 ├── ToolExecutionError (Uncaught error during tool execution)
 │   └── ToolArgumentValidationError (Runtime Pydantic tool argument failure) [v0.4.0]
 ├── ToolSchemaError (Union annotation with an unmappable member) [v0.4.0]
@@ -157,7 +157,7 @@ async def execute_turn_with_recovery(
 
 <VersionBadge version="0.4.0" status="stable" />
 
-In `v0.4.0`, `run_async` and `run` support an explicit `turn_timeout` parameter (in seconds). Unlike generic request timeouts, `turn_timeout` begins counting only **after** the call acquires the session lock, ensuring queued turns do not expire prematurely while waiting behind earlier turns:
+In `v0.4.0`, `Runner.run_async()` supports an explicit keyword-only `turn_timeout: float | None = None` parameter (in seconds). The synchronous wrapper `Runner.run(session_id, user_message, metadata=None)` does **not** accept `turn_timeout`. Unlike generic request timeouts, `turn_timeout` begins counting only **after** the call acquires the session lock, ensuring queued turns do not expire prematurely while waiting behind earlier turns:
 
 ```python
 # [min-version: 0.4.0]

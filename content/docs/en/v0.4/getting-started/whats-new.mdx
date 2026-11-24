@@ -24,14 +24,14 @@ This page summarizes all new capabilities and behavioral improvements from `0.3.
 | :--- | :--- | :--- |
 | **Tool Argument Validation** | Schema-only; raw LLM arguments passed directly to functions | **Runtime Pydantic validation enabled by default (`validate_args=True`)**, raising `ToolArgumentValidationError` |
 | **Tool Schema Generation** | Basic primitive/collection mapping; silent union fallbacks | **Rich collection/union schemas**, fail-fast **`ToolSchemaError`** for unmappable union members, and `Tool.to_openai_parameters()` (non-union unknown types keep `STRING`/`string` fallback) |
-| **Gemini Transport** | Depended on `google-genai` SDK (with implicit Vertex AI / ADC) | **Direct Gemini REST API via `httpx.AsyncClient`** (`google-genai`, `GeminiEngine.client`, and implicit Vertex AI / ADC removed) |
+| **Gemini Transport** | Depended on `google-genai` SDK (with implicit Vertex AI / ADC) | **Direct Gemini REST API via `httpx.AsyncClient`** (`google-genai`, `GeminiEngine.client`, and implicit Vertex AI / ADC removed; missing key raises `ProviderError` on first turn) |
 | **Turn Rollback & Timeouts** | Rolled back messages and `active_agent` on standard `Exception` only | **Full transactional rollback of history, `active_agent`, and `metadata`** on `Exception`, `CancelledError`, and `run_async(..., turn_timeout=...)` |
 | **Session Concurrency & Reset** | Per-session `asyncio.Lock` (reentrant calls deadlocked) | **Reentrancy detection (`ReentrantTurnError`)**, `Runner.spawn_turn()`, and **`Runner.reset_session*()` returning `bool`** |
-| **Runner Lifecycle & Agents** | Manual engine cleanup; duplicate agent names overwritten silently | **`async with runner:`** context manager, strict duplicate `Agent.name` rejection (`ValueError`), and `Role.SYSTEM` history forwarding |
-| **SQLite `:memory:` & Persistence** | Opened a new empty in-memory DB per connection | **Persistent shared `:memory:` connection**, single-transaction reads, and **100% SQLite schema backward compatibility** |
+| **Runner Lifecycle & Agents** | Manual engine cleanup; duplicate agent names across branches kept first | **`async with runner:`** context manager, strict duplicate `Agent.name` rejection (`ValueError`) across distinct instances, and `Role.SYSTEM` history forwarding |
+| **SQLite `:memory:` & Persistence** | Opened a new empty in-memory DB per connection; `user_version = 1` | **Persistent shared `:memory:` connection**, single-transaction reads, dedicated 4-worker `ThreadPoolExecutor` (`_run_blocking`), and **identical `user_version = 1` schema** |
 | **Handoffs & Engine Resolution** | ASCII-oriented tool names; static `handoffs` list | **Unicode transliteration, hash fallback, collision disambiguation, dynamic `add_handoff()`**, and `resolve_engine(..., prefer_default_engine=True)` |
-| **Configuration & Codec Validation** | Generic `ValueError` or `TypeError` | Dedicated **`ConfigurationError`** and **`JsonCodecError`**, plus strict constructor/boolean validation across core classes |
-| **Channels (`CLI`, `Telegram`, `WhatsApp`)** | Basic loops; unused `WhatsAppChannel(dedup_ttl_hours=...)` | **`CLIChannel` `/reset`**, Telegram `concurrent_updates` + `RetryAfter` retries, WhatsApp `dedup_ttl_hours` removed + `llm_timeout_seconds: float \| None` |
+| **Configuration & Codec Validation** | Generic `ValueError` or `TypeError` | Dedicated **`ConfigurationError`** and **`JsonCodecError`** (strict JSON serialization for session `metadata`) |
+| **Channels (`CLI`, `Telegram`, `WhatsApp`)** | `WhatsAppChannel` `llm_timeout_seconds=30.0`, unused `dedup_ttl_hours` | **`CLIChannel` `/reset`** (direct `clear_history()`), Telegram `concurrent_updates` + `RetryAfter` (`max_retry_after_seconds=60.0`), WhatsApp `dedup_ttl_hours` removed + `llm_timeout_seconds=120.0 \| None` + `queue_timeout_seconds=120.0` |
 
 ---
 
@@ -81,13 +81,13 @@ except ToolArgumentValidationError as exc:
 
 ### Asynchronous Context Manager, `turn_timeout`, and `Role.SYSTEM` Forwarding
 * **`async with runner:`:** `Runner` implements the asynchronous context manager protocol (`__aenter__` / `__aexit__`), closing its pooled Gemini `httpx.AsyncClient` cleanly on exit.
-* **`turn_timeout: float | None = None` on `run_async()`:** Keyword-only parameter on **`await runner.run_async(session_id, user_message, metadata=None, *, turn_timeout=None)`** (the synchronous wrapper `runner.run(session_id, user_message, metadata=None)` does **not** accept `turn_timeout`). When a turn exceeds `turn_timeout` seconds (counted after acquiring the session lock), `Runner` aborts the turn, rolls back all session changes from that turn, and raises `TimeoutError`. Passing a boolean `True`/`False` raises `ValueError`.
-* **Duplicate `Agent` Name Rejection:** `Runner` rejects distinct `Agent` instances sharing the same `.name` with `ValueError` at initialization (reusing the same `Agent` instance in cyclic/diamond graphs remains valid).
-* **`Role.SYSTEM` History Forwarding:** System-role messages stored in session history are forwarded cleanly across providers alongside agent instructions.
+* **`turn_timeout: float | None = None` on `run_async()`:** Keyword-only parameter on **`await runner.run_async(session_id, user_message, metadata=None, *, turn_timeout=None)`** (the synchronous wrapper `runner.run(session_id, user_message, metadata=None)` does **not** accept `turn_timeout`). When a turn exceeds `turn_timeout` seconds (counted after acquiring the session lock), `Runner` aborts the turn, rolls back all session changes from that turn, and raises `TimeoutError`. Passing a boolean `True`/`False` or a non-positive/non-finite number raises `ValueError`.
+* **Duplicate `Agent` Name Rejection:** `Runner` rejects distinct `Agent` instances sharing the same `.name` across the tree with `ValueError` at initialization (reusing the same `Agent` instance in cyclic/diamond graphs remains valid).
+* **`Role.SYSTEM` History Forwarding:** In `0.3.4`, `Role.SYSTEM` messages in `session.history` were preserved during sliding-window trimming but not forwarded to model providers. In `0.4.0`, engines forward `Role.SYSTEM` messages from session history alongside the active agent's instructions.
 
 ### Full Transactional Rollback (History, Active Agent, and Metadata)
 * In `v0.3.4`, failed turns only rolled back newly appended messages and `active_agent` on standard `Exception` subclasses.
-* In `v0.4.0`, failed, timed-out (`TimeoutError`), or cancelled (`asyncio.CancelledError`) turns roll back **message history, `active_agent`, and `session.metadata`** in both `SessionStore` (via deep-copied snapshots) and `SQLiteSessionStore` (via the `_turn_journal.prev_metadata` column).
+* In `v0.4.0`, failed, timed-out (`TimeoutError`), or cancelled (`asyncio.CancelledError`) turns roll back **message history, `active_agent`, and `session.metadata`** in both `SessionStore` (via deep-copied snapshots) and `SQLiteSessionStore` (via an in-memory rollback journal over the existing `user_version = 1` SQLite schema).
 * If the session is deleted while a turn is running, committing or rolling back raises **`SessionDeletedError`** instead of silently recreating a zombie session row.
 
 ### Reentrant Turn Detection & `Runner.spawn_turn()`
@@ -95,7 +95,7 @@ except ToolArgumentValidationError as exc:
 * To schedule an independent background turn for the same session from inside a tool, use **`runner.spawn_turn(session_id, user_message, ...)`**, which returns an `asyncio.Task` queued outside the current turn's reentrancy lineage.
 
 ### Session-Safe Reset (`reset_session_async` & `reset_session` Returning `bool`)
-* `await runner.reset_session_async(session_id) -> bool` and `runner.reset_session(session_id) -> bool` clear a session's history under the session turn lock, wait for any escaping synchronous thread work from a timed-out or cancelled turn, reject reentrant resets from inside an active turn with `ReentrantTurnError`, and offload synchronous SQLite writes via `asyncio.to_thread()`.
+* `await runner.reset_session_async(session_id) -> bool` and `runner.reset_session(session_id) -> bool` clear a session's history under the session turn lock, wait for any escaping synchronous thread work from a timed-out or cancelled turn, reject reentrant resets from inside an active turn with `ReentrantTurnError`, and offload file-backed SQLite writes to the store's dedicated 4-worker `ThreadPoolExecutor` (`_run_blocking`).
 * Both methods return **`True`** if an existing session was found and cleared, or **`False`** if no session existed for `session_id`.
 
 ---
@@ -103,14 +103,14 @@ except ToolArgumentValidationError as exc:
 ## 4. Handoffs & Engine Resolution Enhancements
 
 * **Unicode-Safe Handoff Tool Names:** Handoff tool names now transliterate Unicode agent names to ASCII slugs, fall back to a deterministic hash when no ASCII letters remain, and automatically disambiguate slug collisions across distinct targets.
-* **Dynamic Handoffs (`agent.add_handoff()`):** Agents can register handoff targets dynamically via `agent.add_handoff(target_agent)` with validation against self-handoffs and duplicate names.
-* **`resolve_engine()` Precedence (`prefer_default_engine=True`):** Engine resolution honors `prefer_default_engine=True` when routing agents through a runner-level default engine, clones the default `GeminiEngine` with an agent's explicit `api_key` when no custom engine/provider/base_url is set, and recognizes `deepseek-` model prefixes automatically.
+* **Dynamic Handoffs (`agent.add_handoff()`):** Agents can register handoff targets dynamically via `agent.add_handoff(target_agent)`. Adding a handoff with the same `.name` on the **same parent** replaces the previous handoff entry on that parent (distinct from `Runner`'s tree-wide duplicate check across different parents).
+* **`resolve_engine()` Precedence (`prefer_default_engine=True`):** Engine resolution honors `prefer_default_engine=True` when routing agents through a runner-level default engine, clones the default `GeminiEngine` with an agent's explicit `api_key` when no custom engine/provider/base_url is set, supports provider identifiers `gemini`, `google`, `gemma`, `openai`, `grok`, `xai`, `groq`, `ollama`, `anthropic`, `claude`, and `deepseek`, and recognizes `deepseek-` model prefixes automatically.
 
 ---
 
 ## 5. Direct Gemini REST Engine & Provider Enhancements
 
-* **Direct `httpx` `GeminiEngine` (No `google-genai` or Implicit Vertex AI / ADC):** `GeminiEngine` talks directly to `https://generativelanguage.googleapis.com/v1beta` using a persistent `httpx.AsyncClient` (`follow_redirects=False`). It removes the `google-genai` dependency, `GeminiEngine.client`, and implicit Vertex AI / ADC fallback without an API key; accepts `http_client`, `timeout_seconds`, `max_retries`, `base_delay`, `max_delay`, and `api_key_in_query`; honors `Retry-After` headers; and supports `GOOGLE_GEMINI_BASE_URL`.
+* **Direct `httpx` `GeminiEngine` (No `google-genai` or Implicit Vertex AI / ADC):** `GeminiEngine` talks directly to `https://generativelanguage.googleapis.com/v1beta` using a persistent `httpx.AsyncClient` (`follow_redirects=False`). It removes the `google-genai` dependency, `GeminiEngine.client`, and implicit Vertex AI / ADC fallback without an API key (calling a turn without an API key raises `ProviderError`); accepts `http_client`, `timeout_seconds`, `max_retries`, `base_delay`, `max_delay`, and `api_key_in_query`; honors `Retry-After` headers; and supports `GOOGLE_GEMINI_BASE_URL`.
 * **Configurable `AnthropicEngine(max_tokens=4096)`:** Accepts a keyword-only `max_tokens: int = 4096` parameter (validated with `ConfigurationError`) and logs a warning when a response is truncated with `stop_reason == "max_tokens"`.
 * **Collision-Resistant Synthetic Tool-Call IDs & Normalization:** When a provider response omits a tool call `id`, `OpenAIEngine` generates a stateless 29-character ID (`call_<24 hex>`) and `GeminiEngine` generates a 34-character ID (`cf_gemini_<24 hex>`, omitted when sending `functionResponse` parts back to Gemini while preserving real provider IDs byte-for-byte). Cross-provider normalization uses deterministic `replacement_tool_call_id` mapping for incompatible historical IDs.
 * **Malformed Payload Wrapping & Shared Credential Redaction:** Non-JSON or malformed upstream provider payloads are wrapped in sanitized `ProviderError` exceptions with raw `httpx` / `json.JSONDecodeError` `__cause__` and `__context__` chains suppressed. All engines (`OpenAIEngine`, `AnthropicEngine`, `GeminiEngine`) and `WhatsAppChannel` share a unified secret-redaction pipeline covering plain, JSON-escaped, and URL percent-encoded tokens.
@@ -118,31 +118,31 @@ except ToolArgumentValidationError as exc:
 
 ---
 
-## 6. Session Stores, SQLite Compatibility & Constructor Validation
+## 6. Session Stores, SQLite Compatibility & Validations
 
-* **100% SQLite Backward Compatibility:** Existing `v0.3.4` SQLite database files open and upgrade seamlessly in `v0.4.0` without manual migration steps.
-* **Persistent `SQLiteSessionStore(db_path=":memory:")`:** Retains a single shared SQLite connection guarded by an internal `threading.RLock()` so tables and session rows survive across calls for the lifetime of the store instance.
-* **Single-Transaction Reads & Faster Turn Startup:** `SQLiteSessionStore.get()` reads session metadata and messages inside one transaction, and `Runner.run_async()` starts the SQLite turn journal directly from the `SessionContext` returned by `get_or_create()` without a redundant second `refresh()` query.
+* **Identical SQLite Schema (`user_version = 1`):** `v0.3.4` and `v0.4.0` share the exact same SQLite schema (`chatflow_sessions`, `chatflow_messages`, `chatflow_processed_messages`), so existing `v0.3.4` database files open directly in `v0.4.0` with zero schema migration.
+* **Persistent `SQLiteSessionStore(db_path=":memory:")` & Dedicated Worker Pool:** `:memory:` stores retain a single shared SQLite connection guarded by an internal `threading.RLock()` for the lifetime of the store instance. File-backed `SQLiteSessionStore` async calls offload blocking I/O onto a dedicated 4-worker `ThreadPoolExecutor` (`_run_blocking`), keeping the event loop responsive while preserving rollback ordering on cancellation.
+* **Single-Transaction Reads & Faster Turn Startup:** `SQLiteSessionStore.get()` reads session metadata and messages inside one transaction, and `Runner.run_async()` starts its turn rollback journal directly from the `SessionContext` returned by `get_or_create()` without a redundant second `refresh()` query.
 * **Deep-Copied In-Memory Session Metadata & Thread-Safe Deduplication:** `SessionContext` and `SessionStore` deep-copy `metadata` dictionaries on creation, turn updates, handoffs, and rollbacks; `SessionStore.record_processed_message()` and `is_message_processed()` are protected by an internal lock.
-* **`JsonCodecError` & ISO-8601 Date/Time Metadata:** Session metadata containing `datetime`, `date`, or `time` instances serializes automatically to ISO-8601 strings; non-JSON-serializable objects fail fast with **`JsonCodecError`**.
-* **Strict Constructor & Boolean Validation:** `Agent`, `SessionContext`, `SQLiteSessionStore`, `Runner`, and `split_message` reject booleans (`True`/`False`) for numeric limits and validate non-empty names and positive finite bounds at construction time.
+* **`JsonCodecError` & ISO-8601 Date/Time Metadata:** Session metadata containing `datetime`, `date`, or `time` instances serializes automatically to ISO-8601 strings; non-JSON-serializable objects in session `metadata` (or circular structures) fail fast with **`JsonCodecError`**.
+* **Targeted Constructor Validations:** `Agent(name=...)` rejects empty/whitespace names (`ValueError`); `SessionContext(max_turns=...)` and `SQLiteSessionStore(default_max_turns=...)` reject booleans (`True`/`False`) and `<= 0` (`ValueError`); `Runner.run_async(..., turn_timeout=...)` rejects booleans and non-positive/non-finite numbers (`ValueError`).
 
 ---
 
 ## 7. Channel Upgrades (`CLIChannel`, `TelegramChannel`, `WhatsAppChannel`)
 
 ### `CLIChannel`
-* **Interactive `/reset` Command:** Clears the active CLI session safely through `Runner.reset_session_async()` without restarting the terminal process.
+* **Interactive `/reset` Command:** Clears the active CLI session's history by calling `session.clear_history()` directly without restarting the terminal process (it does **not** invoke `Runner.reset_session_async()` or acquire the runner's per-session lock).
 
 ### `TelegramChannel`
 * **`concurrent_updates: bool | int | BaseUpdateProcessor = False`:** Keyword-only parameter enabling concurrent update processing across different chats while `Runner`'s per-session lock keeps turns within each chat serialized.
-* **Bounded Flood-Control Retries (`max_retry_after_seconds: float = 60.0`):** When Telegram returns `telegram.error.RetryAfter` during multi-chunk outbound replies, `TelegramChannel` sleeps for `retry_after` seconds and retries only the unsent chunk (up to 3 times) without duplicating already-sent chunks or sending a contradictory `fallback_message` after partial delivery.
+* **Bounded Flood-Control Retries (`max_retry_after_seconds: float = 60.0`):** When Telegram returns `telegram.error.RetryAfter` during multi-chunk outbound replies, `TelegramChannel` sleeps for `retry_after` seconds and retries only the unsent chunk (up to 3 times) if `retry_after <= max_retry_after_seconds`. If `retry_after > max_retry_after_seconds`, it logs an error and **aborts sending the reply immediately** without sleeping, and never sends a contradictory `fallback_message` after partial delivery.
 * **Session-Safe `/reset`:** Delegates to `await runner.reset_session_async(session_id)`.
 
 ### `WhatsAppChannel`
-* **Removed Unused `dedup_ttl_hours` Parameter (Breaking Change):** Webhook deduplication TTL is configured exclusively on the session store (`SessionStore(dedup_ttl_hours=...)` or `SQLiteSessionStore(dedup_ttl_hours=...)`). `max_body_size`, `enable_docs`, and `queue_timeout_seconds` are now keyword-only parameters.
-* **Flexible Timeouts (`llm_timeout_seconds: float | None` & `queue_timeout_seconds`):** `llm_timeout_seconds` accepts `None` to disable the per-turn channel timeout; both queue and LLM timeouts emit structured warning logs when triggered.
-* **Outbound & Configuration Validation (`ConfigurationError`):** Validates `max_outbound_retries` (`0..10`), `outbound_base_delay >= 0`, `outbound_max_delay >= 0`, and `max_body_size > 0` at construction time, and logs a startup warning if `access_token` or `phone_number_id` is empty.
+* **Removed Unused `dedup_ttl_hours` Parameter (Breaking Change):** Webhook deduplication TTL is configured exclusively on the session store (`SessionStore(dedup_ttl_hours=...)` or `SQLiteSessionStore(dedup_ttl_hours=...)`). `max_body_size`, `enable_docs`, and the new `queue_timeout_seconds` are keyword-only parameters.
+* **Updated Timeout Defaults (`llm_timeout_seconds: float | None = 120.0` & `queue_timeout_seconds: float = 120.0`):** `llm_timeout_seconds` increased its default from `30.0` in `v0.3.4` to `120.0` in `v0.4.0` and accepts `None` to disable the per-turn channel timeout. `queue_timeout_seconds` (new in `v0.4.0`, default `120.0`) caps wait time behind earlier turns of the same session; both timeouts emit structured warning logs when triggered.
+* **Outbound & Configuration Validation (`ConfigurationError`):** Validates `max_outbound_retries` (`0..10`), `outbound_base_delay >= 0`, `outbound_max_delay >= 0` (default `30.0`), and `max_body_size > 0` at construction time, and logs a startup warning if `access_token` or `phone_number_id` is empty.
 * **Strict `2xx` Outbound Delivery & Webhook Privacy:** Uses `follow_redirects=False`, treats only `2xx` responses as delivered, substitutes `fallback_message` on empty replies, masks `sender` phone numbers in webhook HTTP JSON responses, derives a deterministic SHA-256 fallback message ID (`gen_<sha256>`) when Meta omits `"id"`, and awaits awaitable `on_24h_window_expired` callbacks.
 
 ---
@@ -154,7 +154,7 @@ All 6 new exceptions are exported at the top level of `chatflow_agent` and `chat
 | Exception | Base Class(es) | When Raised |
 | :--- | :--- | :--- |
 | `ConfigurationError` | `ChatFlowError`, `ValueError` | Invalid provider/engine configuration, unsupported `provider`, missing `api_key` on custom remote `base_url`, invalid `AnthropicEngine(max_tokens=...)`, or invalid `TelegramChannel` / `WhatsAppChannel` parameters. |
-| `JsonCodecError` | `ChatFlowError` | Session `metadata` or tool payload contains an object that cannot be serialized to JSON. |
+| `JsonCodecError` | `ChatFlowError` | Session `metadata` or strict JSON codec input contains a non-JSON-serializable or circular object. |
 | `ToolSchemaError` | `ChatFlowError` | A `@tool` function or `Tool` definition uses a union annotation containing a member with no concrete schema type mapping (e.g., `CustomClass \| None` or `int \| datetime`). |
 | `ToolArgumentValidationError` | `ToolExecutionError` | Model-supplied or caller-supplied tool arguments fail runtime Pydantic validation (`validate_args=True`). |
 | `ReentrantTurnError` | `ChatFlowError`, `RuntimeError` | `runner.run()`, `runner.run_async()`, or `runner.reset_session*()` is called for the same `session_id` from inside an active turn on that session. |

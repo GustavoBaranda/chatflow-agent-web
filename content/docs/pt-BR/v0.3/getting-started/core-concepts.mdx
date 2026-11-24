@@ -205,7 +205,7 @@ Antes de processar um turno, a versão estável v0.3.4 registra o tamanho atual 
 ### Proteção de Loop de Eventos e Bloqueio de Concorrência
 
 - **Bloqueio de Sessão na v0.3.4:** Turnos que compartilham o mesmo `SessionContext` em memória são serializados por um `asyncio.Lock`; chamadas externas concorrentes aguardam e não geram `ReentrantTurnError`. Essa é uma garantia do loop de eventos, não de segurança entre threads ou processos.
-- <VersionBadge version="0.4.0" status="stable" /> **Proteções da Prévia:** O I/O de SQLite
+- <VersionBadge version="0.4.0" status="stable" /> **Proteções na v0.4.0:** O I/O de SQLite
   em arquivo é descarregado por `_run_blocking`, e `ReentrantTurnError` rejeita um turno aninhado da
   mesma sessão iniciado por código que já executa dentro desse turno. Chamadas externas
   independentes continuam aguardando na fila.

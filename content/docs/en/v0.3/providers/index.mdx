@@ -160,7 +160,7 @@ Understanding architectural differences between releases helps choose the right 
 | **Provider Presets** | OpenAI, Grok/xAI, Ollama/Gemma, DeepSeek, and Groq. | Retains the presets and improves model-prefix resolution. |
 | **Credential Guard** | `_resolve_api_key` restricts environment keys to exact official endpoints and requires explicit credentials for custom remote URLs. | Retains fail-closed credential isolation. |
 
-<Callout type="info" title="Preview Note: Connection Pooling in v0.4.0">
+<Callout type="info" title="Connection Pooling in v0.4.0">
 In stable `v0.3.4`, turns are executed directly via `await runner.run_async(...)`. In `v0.4.0`, wrap runner executions inside `async with runner:` to enable HTTP connection keepalive pooling across turns:
 
 ```python

@@ -205,7 +205,7 @@ async def handle_requests():
     res2 = await runner.run_async("s1", "Second query")
 ```
 
-<Callout type="info" title="Preview Note: v0.4.0 Upgrades">
+<Callout type="info" title="v0.4.0 Upgrades">
 Asynchronous connection pooling via <code>async with runner:</code> (for Gemini requests), reentrant turn prevention with <code>ReentrantTurnError</code>, per-session serialization for SQLite stores, full-state rollback including cancellation, and worker thread cancellation tracking are introduced in v0.4.0 <strong>v0.4.0</strong>. In stable v0.3.4, execute turns directly on the shared runner instance.
 </Callout>
 

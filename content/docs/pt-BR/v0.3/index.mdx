@@ -1,35 +1,35 @@
 ---
 title: "Visão Geral da Documentação"
-description: "Documentação oficial estável do chatflow-agent v0.3.4: um framework leve e assíncrono para múltiplos agentes com handoffs nativos em Python."
-sourceRevision: "8be3a1c"
-sourceHash: "6b2579815a19093b2474560d18b2c363f22e82928110eb2e1df32e48fb9d74ae"
+description: "Documentação histórica do chatflow-agent v0.3.4 (Estável Anterior): um framework leve e assíncrono para múltiplos agentes com handoffs nativos em Python."
+sourceRevision: "5d2d319"
+sourceHash: "e09ae5fa824a623e0711c712c54d89012acd66493dcc99e264a9d7a5601677c7"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
 import { Card, Cards } from 'fumadocs-ui/components/card';
 import { Callout } from 'fumadocs-ui/components/callout';
 
-<Callout type="info" title="Linha de Versão Estável (v0.3.4)">
-Você está visualizando a documentação oficial estável do <strong>chatflow-agent v0.3.4</strong>, recomendada para implantações em produção.
+<Callout type="info" title="Linha Histórica (v0.3.4 — Estável Anterior)">
+Você está visualizando a documentação histórica do <strong>chatflow-agent v0.3.4</strong> (Estável Anterior). A versão estável atual e padrão é a <strong>v0.4.0</strong> — para novos projetos ou atualizações, alterne para a linha <strong>v0.4</strong> no seletor de versões.
 </Callout>
 
-Bem-vindo à documentação oficial do **chatflow-agent**, um framework assíncrono e leve em Python projetado para construir agentes conversacionais modulares e enxames multiagente com transferências (*handoffs*) nativas e fortemente tipadas.
+Bem-vindo à documentação histórica `v0.3` do **chatflow-agent**, um framework assíncrono e leve em Python projetado para construir agentes conversacionais modulares e enxames multiagente com transferências (*handoffs*) nativas e fortemente tipadas.
 
 Criado e liderado por **Gustavo Baranda**, o `chatflow-agent` concentra-se em uma API Python compacta, serialização assíncrona de turnos por sessão para sessões em memória, sessões persistentes em SQLite e conectividade multicanal.
 
 ---
 
-## Destaques da Arquitetura
+## Destaques da Arquitetura (`v0.3.4`)
 
 <Cards>
   <Card title="Motores para Vários Provedores">
-    Usa `google-genai` para Gemini na versão estável v0.3.4 e clientes HTTP dedicados para Anthropic e provedores compatíveis com OpenAI. Gemini somente por REST é recurso da v0.4.0.
+    Usa `google-genai` para Gemini na `v0.3.4` e clientes HTTP dedicados para Anthropic e provedores compatíveis com OpenAI. Gemini somente por REST (`httpx`) foi introduzido na `v0.4.0`.
   </Card>
   <Card title="Handoffs Multiagente Nativos">
     Declare enxames colaborativos. Os agentes delegam tarefas dinamicamente usando ferramentas sintetizadas `transfer_to_*`, com as transferências por turno limitadas por `max_handoffs_per_turn`.
   </Card>
   <Card title="Memória de Sessão">
-    Persiste conversas em memória ou SQLite. Para exceções comuns, a v0.3.4 restaura o tamanho do histórico; não garante rollback de todo o estado nem em cancelamentos. O pool de threads para SQLite pertence à v0.4.0.
+    Persiste conversas em memória ou SQLite. Para exceções comuns, a `v0.3.4` restaura o tamanho do histórico; não garante rollback de todo o estado nem em cancelamentos. O pool dedicado de threads para SQLite foi introduzido na `v0.4.0`.
   </Card>
   <Card title="Pronto para Múltiplos Canais">
     Implante seus agentes facilmente em terminais REPL, bots do Telegram ou na API do WhatsApp Business Cloud com verificação de assinatura HMAC SHA-256.
@@ -40,29 +40,29 @@ Criado e liderado por **Gustavo Baranda**, o `chatflow-agent` concentra-se em um
 
 ## Estratégia de Lançamentos e Versionamento
 
-O `chatflow-agent` segue rigorosamente o Versionamento Semântico (SemVer). A documentação é organizada por faixas de versão:
+O `chatflow-agent` segue rigorosamente o Versionamento Semântico (SemVer). A documentação mantém duas linhas estáveis:
 
-* <VersionBadge version="0.3.4" status="stable" /> **Versão Estável Atual (Padrão):** Recomendada para todas as implantações em produção. Publicada no PyPI em 23 de outubro de 2026.
-* <VersionBadge version="0.4.0" status="stable" /> **Versão Candidata 1 (v0.4.0):** Disponível no PyPI para testes de novos aprimoramentos arquiteturais, incluindo execução nativa do Gemini via REST e validação de nomes duplicados em enxames.
+* <VersionBadge version="0.4.0" status="stable" /> **Última Versão Estável (Padrão):** Recomendada para todas as novas implantações em produção. Inclui transporte REST direto para Gemini via `httpx`, validação de argumentos de ferramentas em tempo de execução e reversão transacional completa de turnos.
+* <VersionBadge version="0.3.4" status="stable" /> **Versão Estável Anterior (Linha Histórica):** Documentada em `/docs/v0.3` para equipes que mantêm implantações existentes na série `0.3.x`.
 
 ```bash
-# Instalar a versão estável atual (padrão)
-pip install chatflow-agent
+# Instalar a versão v0.3.4 documentada nesta linha
+pip install "chatflow-agent==0.3.4"
 
-# Instalar a versão candidata da v0.4.0
-pip install "chatflow-agent==0.4.0"
+# Ou instalar a última versão estável (v0.4.0 — recomendada para novos projetos)
+pip install chatflow-agent
 ```
 
-<Callout type="info" title="Documentação Orientada à Versão Estável">
-Todos os trechos de código e assinaturas de API nesta documentação correspondem por padrão à versão estável <code>v0.3.4</code>. Aprimoramentos ou mudanças disruptivas introduzidas na versão <code>v0.4.0</code> são explicitamente destacados com a insígnia <VersionBadge version="0.4.0" status="stable" />.
+<Callout type="info" title="Referência Histórica da v0.3.4">
+Todos os trechos de código e assinaturas de API em `/docs/v0.3` correspondem à versão <code>v0.3.4</code>. Aprimoramentos introduzidos posteriormente na <code>v0.4.0</code> são explicitamente destacados com a insígnia <VersionBadge version="0.4.0" status="stable" />.
 </Callout>
 
 ---
 
-## Trilha de Primeiros Passos
+## Trilha de Primeiros Passos (`v0.3.4`)
 
-Siga nosso guia passo a passo estruturado para ir da instalação a um agente rodando em produção em poucos minutos:
+Siga nosso guia estruturado para a `v0.3.4`:
 
-1. **[Instalação](/pt-BR/docs/v0.3/getting-started/installation):** Verifique seu ambiente Python (`>=3.10`), instale os pacotes principais e configure dependências extras opcionais para canais.
+1. **[Instalação](/pt-BR/docs/v0.3/getting-started/installation):** Verifique seu ambiente Python (`>=3.10`), instale `chatflow-agent==0.3.4` e configure dependências extras opcionais para canais.
 2. **[Início Rápido](/pt-BR/docs/v0.3/getting-started/quickstart):** Construa seu primeiro agente em menos de 5 minutos, registre ferramentas com `@tool` e explore a execução assíncrona.
 3. **[Conceitos Fundamentais](/pt-BR/docs/v0.3/getting-started/core-concepts):** Conheça os pilares da arquitetura: `Agent`, `Runner`, `Engines`, `Tools`, `Memory` e `Handoffs`.

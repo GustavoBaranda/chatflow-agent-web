@@ -2,7 +2,7 @@
 title: "Gestión de Errores y Recuperación"
 description: "Estrategias de gestión de errores en producción en chatflow-agent v0.3.4, la jerarquía de excepciones del SDK, el aislamiento de errores de herramientas y la reversión del historial en turnos fallidos."
 sourceRevision: "0ca4592"
-sourceHash: "6578acaa629712fcac38d47b4c932e4c730510cfbdce56df9c75dff04e049b68"
+sourceHash: "f798cc0686e75dbedbb9d2e4a1bef2ecde2b7311fcb88205f00c75b962197e87"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -35,7 +35,7 @@ ChatFlowError (Base)
 | Clase de Excepción | Hereda de | Generada Cuando | Estrategia de Recuperación |
 | :--- | :--- | :--- | :--- |
 | `ChatFlowError` | `Exception` | Clase base para todas las excepciones del SDK. | Capturar en las fronteras superiores de petición. |
-| `DependencyError` | `ChatFlowError` | Un extra opcional de canal (ej. `[telegram]`, `[whatsapp]`) no está instalado. | Instalar el extra requerido mediante `pip install "chatflow-agent[extra]"`. |
+| `DependencyError` | `ChatFlowError` | Un extra opcional de canal (ej. `[telegram]`, `[whatsapp]`) no está instalado. | Instalar el extra requerido mediante `pip install "chatflow-agent[extra]==0.3.4"`. |
 | `ToolExecutionError` | `ChatFlowError` | Una función de herramienta lanza una excepción no controlada en su ejecución. | Dentro de un turno, el `Runner` lo registra y devuelve al modelo un `ToolResult(is_error=True)` genérico. |
 | `ToolSchemaError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | Se crea una herramienta con una anotación de unión que contiene un miembro sin mapeo de esquema. Los parámetros sin anotar están permitidos. | Corregir las firmas de tipo de la función en tiempo de desarrollo. |
 | `AgentHandoffError` | `ChatFlowError` | El destino del handoff no existe en el registro del `Runner`. Superar `max_handoffs_per_turn` no lanza la excepción: en su lugar añade un resultado de herramienta con error. | Verificar destinos de handoff. |

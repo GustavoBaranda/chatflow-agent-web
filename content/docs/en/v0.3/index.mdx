@@ -1,33 +1,33 @@
 ---
 title: "Documentation Overview (v0.3 Stable)"
-description: "Official stable documentation for chatflow-agent v0.3.4: a lightweight, async multi-agent framework with native handoffs for Python."
+description: "Historical documentation for chatflow-agent v0.3.4 (Previous Stable): a lightweight, async multi-agent framework with native handoffs for Python."
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
 import { Card, Cards } from 'fumadocs-ui/components/card';
 import { Callout } from 'fumadocs-ui/components/callout';
 
-<Callout type="info" title="Stable Release Track (v0.3.4)">
-You are viewing the official stable documentation for <strong>chatflow-agent v0.3.4</strong>, recommended for production deployments.
+<Callout type="info" title="Historical Release Track (v0.3.4 — Previous Stable)">
+You are viewing the historical documentation for <strong>chatflow-agent v0.3.4</strong> (Previous Stable). The current latest stable release is <strong>v0.4.0</strong>—for new projects or upgrades, switch to the <strong>v0.4</strong> track in the version selector.
 </Callout>
 
-Welcome to the official documentation for **chatflow-agent**, a lightweight, async-first Python framework engineered for building modular conversational agents and multi-agent swarms with native, type-safe handoffs.
+Welcome to the historical `v0.3` documentation for **chatflow-agent**, a lightweight, async-first Python framework engineered for building modular conversational agents and multi-agent swarms with native, type-safe handoffs.
 
 Created and led by **Gustavo Baranda**, `chatflow-agent` focuses on a compact Python API, per-session async turn serialization for in-memory sessions, persistent SQLite sessions, and multi-channel connectivity.
 
 ---
 
-## Architecture Highlights
+## Architecture Highlights (`v0.3.4`)
 
 <Cards>
   <Card title="Multiple Provider Engines">
-    Uses `google-genai` for Gemini in stable v0.3.4 and dedicated HTTP clients for Anthropic and OpenAI-compatible providers. REST-only Gemini is a v0.4.0 feature.
+    Uses `google-genai` for Gemini in `v0.3.4` and dedicated HTTP clients for Anthropic and OpenAI-compatible providers. REST-only Gemini (`httpx`) was introduced in `v0.4.0`.
   </Card>
   <Card title="Native Multi-Agent Handoffs">
     Declare collaborative swarms. Agents delegate tasks dynamically using synthesized `transfer_to_*` tools, with transfers per turn capped by `max_handoffs_per_turn`.
   </Card>
   <Card title="Session Memory">
-    Persists conversations with in-memory or SQLite stores. For ordinary exceptions, v0.3.4 restores conversation history length; it does not promise full-state or cancellation rollback. SQLite thread-pool offloading is a v0.4.0 feature.
+    Persists conversations with in-memory or SQLite stores. For ordinary exceptions, `v0.3.4` restores conversation history length; it does not promise full-state or cancellation rollback. Dedicated SQLite worker thread-pool offloading was introduced in `v0.4.0`.
   </Card>
   <Card title="Multi-Channel Readiness">
     Deploy your agents seamlessly to terminal REPLs, Telegram bots, or WhatsApp Business Cloud API with HMAC SHA-256 signature verification.
@@ -38,29 +38,29 @@ Created and led by **Gustavo Baranda**, `chatflow-agent` focuses on a compact Py
 
 ## Release & Versioning Strategy
 
-`chatflow-agent` strictly adheres to Semantic Versioning (SemVer). The documentation is version-aware:
+`chatflow-agent` strictly adheres to Semantic Versioning (SemVer). The documentation maintains two stable tracks:
 
-* <VersionBadge version="0.3.4" status="stable" /> **Current Stable Release (Default):** Recommended for all production deployments. Published on PyPI on October 23, 2026.
-* <VersionBadge version="0.4.0" status="stable" /> **v0.4.0 Candidate 1:** Available on PyPI for testing upcoming architecture enhancements, including REST-native Gemini execution and swarm duplicate validation.
+* <VersionBadge version="0.4.0" status="stable" /> **Latest Stable Release (Default):** Recommended for all new production deployments. Includes direct `httpx` Gemini transport, default runtime tool argument validation, and full transactional turn rollbacks.
+* <VersionBadge version="0.3.4" status="stable" /> **Previous Stable Release (Historical Track):** Documented in `/docs/v0.3` for teams maintaining existing `0.3.x` deployments.
 
 ```bash
-# Install stable release (default)
-pip install chatflow-agent
+# Install the v0.3.4 release documented on this track
+pip install "chatflow-agent==0.3.4"
 
-# Install v0.4.0 candidate
-pip install "chatflow-agent==0.4.0"
+# Or install the latest stable release (v0.4.0 — recommended for new projects)
+pip install chatflow-agent
 ```
 
-<Callout type="info" title="Stable-First Documentation">
-All code snippets and API signatures in this documentation default to the stable <code>v0.3.4</code> release. Enhancements or breaking changes introduced in <code>v0.4.0</code> are explicitly highlighted with the <VersionBadge version="0.4.0" status="stable" /> badge.
+<Callout type="info" title="Historical v0.3.4 Reference">
+All code snippets and API signatures in `/docs/v0.3` target the <code>v0.3.4</code> release. Enhancements introduced later in <code>v0.4.0</code> are explicitly noted with the <VersionBadge version="0.4.0" status="stable" /> badge.
 </Callout>
 
 ---
 
-## Getting Started Path
+## Getting Started Path (`v0.3.4`)
 
-Follow our structured onboarding guide to go from installation to a running production agent in minutes:
+Follow our structured onboarding guide for `v0.3.4`:
 
-1. **[Installation](/en/docs/v0.3/getting-started/installation):** Verify your Python environment (`>=3.10`), install core packages, and configure optional channel extras.
+1. **[Installation](/en/docs/v0.3/getting-started/installation):** Verify your Python environment (`>=3.10`), install `chatflow-agent==0.3.4`, and configure optional channel extras.
 2. **[Quickstart](/en/docs/v0.3/getting-started/quickstart):** Build your first agent in under 5 minutes, invoke custom tools with `@tool`, and explore asynchronous execution.
 3. **[Core Concepts](/en/docs/v0.3/getting-started/core-concepts):** Learn the foundational architecture: `Agent`, `Runner`, `Engines`, `Tools`, `Memory`, and `Handoffs`.

@@ -33,7 +33,7 @@ ChatFlowError (Base)
 | Exception Class | Inherits From | Raised When | Recovery Strategy |
 | :--- | :--- | :--- | :--- |
 | `ChatFlowError` | `Exception` | Base class for all SDK exceptions. | Catch at top-level request boundaries. |
-| `DependencyError` | `ChatFlowError` | An optional channel extra (e.g. `[telegram]`, `[whatsapp]`) is not installed. | Install the required extra via `pip install "chatflow-agent[extra]"`. |
+| `DependencyError` | `ChatFlowError` | An optional channel extra (e.g. `[telegram]`, `[whatsapp]`) is not installed. | Install the required extra via `pip install "chatflow-agent[extra]==0.3.4"`. |
 | `ToolExecutionError` | `ChatFlowError` | A tool function raises an uncaught exception during execution. | Inside a turn, `Runner` logs it and returns a generic `ToolResult(is_error=True)` to the model. |
 | `ToolSchemaError` <VersionBadge version="0.4.0" status="stable" /> | `ChatFlowError` | A tool is created with a union annotation that contains a member with no schema mapping. Unannotated parameters are allowed. | Fix function type signatures at development time. |
 | `AgentHandoffError` | `ChatFlowError` | The handoff target does not exist in the `Runner` registry. Exceeding `max_handoffs_per_turn` does not raise: it adds an error tool result instead. | Verify handoff targets. |

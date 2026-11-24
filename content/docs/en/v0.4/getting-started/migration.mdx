@@ -329,16 +329,15 @@ except ToolSchemaError:
 from chatflow_agent import Agent, ConfigurationError, OpenAIEngine
 from chatflow_agent.core.engines import resolve_engine
 
-# Unlisted provider name on Agent raises ConfigurationError even with base_url:
-bad_agent = Agent(
-    name="MistralViaProvider",
-    instructions="Be concise.",
-    provider="mistral",
-    base_url="https://api.mistral.ai/v1",
-    api_key="test-key",
-)
+# Unlisted provider name on Agent raises ConfigurationError at construction even with base_url:
 try:
-    resolve_engine(bad_agent)
+    Agent(
+        name="MistralViaProvider",
+        instructions="Be concise.",
+        provider="mistral",
+        base_url="https://api.mistral.ai/v1",
+        api_key="test-key",
+    )
     raise AssertionError("Expected ConfigurationError")
 except ConfigurationError:
     pass

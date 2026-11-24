@@ -365,4 +365,213 @@ describe('PR #48 Audit Remediation — Full SDK Parity, i18n Fixtures, STABLE-ON
     expect(fallbackRes.status).toBe(0);
     expect(fallbackRes.stderr).toContain('OFFLINE SOURCE FALLBACK ACTIVE');
   }, 30000);
+
+  it('P-01: core-concepts.mdx matches SDK 0.4.0 max_turns=40, _run_sync_tool, Role.SYSTEM pruning, and no BFS/System Note claims', () => {
+    const py = requireSdkPython('0.4.0');
+    const out = execFileSync(
+      py,
+      [
+        '-c',
+        [
+          'import inspect, json',
+          'from chatflow_agent import Agent, SessionStore, SQLiteSessionStore',
+          'from chatflow_agent.core.memory import SessionContext',
+          'from chatflow_agent.core.tools import Tool',
+          'from chatflow_agent.types import Message, Role',
+          'ctx = SessionContext("s", Agent(name="A", instructions="i"), max_turns=2)',
+          'ctx.add_message(Message(role=Role.SYSTEM, content="sys"))',
+          'for i in range(3): ctx.add_message(Message(role=Role.USER, content=f"u{i}")); ctx.add_message(Message(role=Role.MODEL, content=f"m{i}"))',
+          'print(json.dumps({',
+          '  "ctx_default": inspect.signature(SessionContext.__init__).parameters["max_turns"].default,',
+          '  "store_default": inspect.signature(SessionStore.__init__).parameters["default_max_turns"].default,',
+          '  "sqlite_default": inspect.signature(SQLiteSessionStore.__init__).parameters["default_max_turns"].default,',
+          '  "uses_run_sync_tool": "_run_sync_tool" in inspect.getsource(Tool.execute_async),',
+          '  "sys_preserved": ctx.history[0].role == Role.SYSTEM and ctx.history[0].content == "sys",',
+          '  "retained_users": [m.content for m in ctx.history if m.role == Role.USER]',
+          '}))',
+        ].join('\n'),
+      ],
+      { encoding: 'utf8' },
+    );
+    const res = JSON.parse(out.trim()) as {
+      ctx_default: number;
+      store_default: number;
+      sqlite_default: number;
+      uses_run_sync_tool: boolean;
+      sys_preserved: boolean;
+      retained_users: string[];
+    };
+    expect(res.ctx_default).toBe(40);
+    expect(res.store_default).toBe(40);
+    expect(res.sqlite_default).toBe(40);
+    expect(res.uses_run_sync_tool).toBe(true);
+    expect(res.sys_preserved).toBe(true);
+    expect(res.retained_users).toEqual(['u1', 'u2']);
+
+    for (const locale of LOCALES) {
+      const p = path.join(DOCS_DIR, locale, 'v0.4', 'getting-started', 'core-concepts.mdx');
+      const text = fs.readFileSync(p, 'utf8');
+      expect(text, `${locale} core-concepts must document max_turns 40`).toContain('40');
+      expect(text, `${locale} core-concepts must reference _run_sync_tool`).toContain('_run_sync_tool');
+      expect(text, `${locale} core-concepts must not claim [System Note] anchor`).not.toContain('[System Note]');
+      expect(text, `${locale} core-concepts must not claim breadth-first/BFS`).not.toMatch(/breadth-first|\bBFS\b/i);
+    }
+  }, 30000);
+
+  it('P-02: installation.mdx across en/es/pt-BR matches exact SDK 0.4.0 wheel METADATA and supported env vars', () => {
+    const py = requireSdkPython('0.4.0');
+    const out = execFileSync(
+      py,
+      [
+        '-c',
+        [
+          'import importlib.metadata as md, json',
+          'from chatflow_agent.core.engines.openai_compatible import PROVIDER_PRESETS',
+          'meta = md.metadata("chatflow-agent")',
+          'print(json.dumps({"requires_python": meta.get("Requires-Python"), "requires_dist": meta.get_all("Requires-Dist"), "xai_env": PROVIDER_PRESETS["grok"]["env_key"]}))',
+        ].join('; '),
+      ],
+      { encoding: 'utf8' },
+    );
+    const meta = JSON.parse(out.trim()) as {
+      requires_python: string;
+      requires_dist: string[];
+      xai_env: string;
+    };
+    expect(meta.requires_python).toBe('>=3.10');
+    expect(meta.xai_env).toBe('XAI_API_KEY');
+    expect(meta.requires_dist).toContain("python-telegram-bot>=21.0; extra == 'telegram'");
+    expect(meta.requires_dist).toContain("fastapi>=0.110.0; extra == 'whatsapp'");
+    expect(meta.requires_dist).toContain("uvicorn>=0.29.0; extra == 'whatsapp'");
+    expect(meta.requires_dist).toContain("ruff>=0.4.0; extra == 'dev'");
+
+    for (const locale of LOCALES) {
+      const p = path.join(DOCS_DIR, locale, 'v0.4', 'getting-started', 'installation.mdx');
+      const text = fs.readFileSync(p, 'utf8');
+      expect(text, `${locale} installation must list python-telegram-bot>=21.0`).toContain('python-telegram-bot>=21.0');
+      expect(text, `${locale} installation must list fastapi>=0.110.0`).toContain('fastapi>=0.110.0');
+      expect(text, `${locale} installation must list uvicorn>=0.29.0`).toContain('uvicorn>=0.29.0');
+      expect(text, `${locale} installation must list ruff>=0.4.0`).toContain('ruff>=0.4.0');
+      expect(text, `${locale} installation must list XAI_API_KEY`).toContain('XAI_API_KEY');
+      expect(text, `${locale} installation must NOT mention GROK_API_KEY`).not.toContain('GROK_API_KEY');
+      expect(text, `${locale} installation webhook extra must NOT duplicate pydantic`).not.toMatch(
+        /webhook[^\n]*pydantic/i,
+      );
+    }
+  }, 30000);
+
+  it('P-03 & P-04: response.handoff is Handoff | None and Agent(provider="mistral") fails while OpenAIEngine(provider="mistral", base_url=...) succeeds', () => {
+    const py = requireSdkPython('0.4.0');
+    const out = execFileSync(
+      py,
+      [
+        '-c',
+        [
+          'import json, chatflow_agent',
+          'from chatflow_agent import Agent, ConfigurationError, OpenAIEngine',
+          'from chatflow_agent.core.engines import resolve_engine',
+          'from chatflow_agent.types import AgentResponse',
+          'bad_raised = False',
+          'try:',
+          '    Agent(name="B", instructions="i", provider="mistral", base_url="https://api.mistral.ai/v1", api_key="k")',
+          'except ConfigurationError:',
+          '    bad_raised = True',
+          'eng = OpenAIEngine(provider="mistral", base_url="https://api.mistral.ai/v1", api_key="k")',
+          'good = Agent(name="G", instructions="i", model="mistral-large-latest", engine=eng)',
+          'print(json.dumps({',
+          '  "has_agent_handoff": hasattr(chatflow_agent, "AgentHandoff"),',
+          '  "has_handoff": hasattr(chatflow_agent, "Handoff"),',
+          '  "handoff_ann": str(AgentResponse.model_fields["handoff"].annotation),',
+          '  "bad_raised": bad_raised,',
+          '  "good_ok": resolve_engine(good) is eng',
+          '}))',
+        ].join('\n'),
+      ],
+      { encoding: 'utf8' },
+    );
+    const res = JSON.parse(out.trim()) as {
+      has_agent_handoff: boolean;
+      has_handoff: boolean;
+      handoff_ann: string;
+      bad_raised: boolean;
+      good_ok: boolean;
+    };
+    expect(res.has_agent_handoff).toBe(false);
+    expect(res.has_handoff).toBe(true);
+    expect(res.handoff_ann).toContain('Handoff');
+    expect(res.bad_raised).toBe(true);
+    expect(res.good_ok).toBe(true);
+
+    for (const locale of LOCALES) {
+      const qs = fs.readFileSync(path.join(DOCS_DIR, locale, 'v0.4', 'getting-started', 'quickstart.mdx'), 'utf8');
+      expect(qs).toContain('Handoff | None');
+      expect(qs).not.toContain('AgentHandoff');
+
+      const mig = fs.readFileSync(path.join(DOCS_DIR, locale, 'v0.4', 'getting-started', 'migration.mdx'), 'utf8');
+      expect(mig).toContain('provider="mistral"');
+      expect(mig).toContain('OpenAIEngine');
+    }
+  }, 30000);
+
+  it('N-05: check-i18n.mjs verifies real Git sourceRevision (fails on non-existent SHA and mismatched SHA, passes on matching SHA)', () => {
+    const scriptPath = path.join(ROOT, 'scripts', 'check-i18n.mjs');
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cf-i18n-git-'));
+    try {
+      const git = (args: string[]) =>
+        execFileSync('git', ['-C', tmpDir, ...args], {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            GIT_AUTHOR_NAME: 'Test',
+            GIT_AUTHOR_EMAIL: 'test@example.com',
+            GIT_COMMITTER_NAME: 'Test',
+            GIT_COMMITTER_EMAIL: 'test@example.com',
+          },
+        }).trim();
+
+      git(['init']);
+      fs.mkdirSync(path.join(tmpDir, 'messages'), { recursive: true });
+      fs.mkdirSync(path.join(tmpDir, 'content', 'docs', 'en'), { recursive: true });
+      fs.mkdirSync(path.join(tmpDir, 'content', 'docs', 'es'), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, 'messages', 'en.json'), JSON.stringify({ k: 'v' }));
+      fs.writeFileSync(path.join(tmpDir, 'messages', 'es.json'), JSON.stringify({ k: 'v' }));
+
+      // Commit 1: v1 of English doc
+      fs.writeFileSync(path.join(tmpDir, 'content', 'docs', 'en', 'page.mdx'), '---\ntitle: V1\ndescription: D1\n---\nBody V1\n');
+      git(['add', '.']);
+      git(['commit', '-m', 'en v1']);
+      const shaV1 = git(['rev-parse', '--short', 'HEAD']);
+
+      // Commit 2: v2 of English doc
+      const enV2 = '---\ntitle: V2\ndescription: D2\n---\nBody V2\n';
+      fs.writeFileSync(path.join(tmpDir, 'content', 'docs', 'en', 'page.mdx'), enV2);
+      git(['add', '.']);
+      git(['commit', '-m', 'en v2']);
+      const shaV2 = git(['rev-parse', '--short', 'HEAD']);
+      const hashV2 = crypto.createHash('sha256').update(enV2, 'utf8').digest('hex');
+
+      // Case 1: Non-existent SHA -> FAIL
+      fs.writeFileSync(
+        path.join(tmpDir, 'content', 'docs', 'es', 'page.mdx'),
+        `---\ntitle: Es\ndescription: D\nsourceRevision: "deadbee"\nsourceHash: "${hashV2}"\n---\nCuerpo\n`,
+      );
+      expect(spawnSync(process.execPath, [scriptPath, '--root', tmpDir], { encoding: 'utf8' }).status).toBe(1);
+
+      // Case 2: Valid SHA (v1) whose content does NOT reproduce sourceHash (v2) -> FAIL
+      fs.writeFileSync(
+        path.join(tmpDir, 'content', 'docs', 'es', 'page.mdx'),
+        `---\ntitle: Es\ndescription: D\nsourceRevision: "${shaV1}"\nsourceHash: "${hashV2}"\n---\nCuerpo\n`,
+      );
+      expect(spawnSync(process.execPath, [scriptPath, '--root', tmpDir], { encoding: 'utf8' }).status).toBe(1);
+
+      // Case 3: Valid SHA (v2) whose content reproduces sourceHash (v2) -> PASS
+      fs.writeFileSync(
+        path.join(tmpDir, 'content', 'docs', 'es', 'page.mdx'),
+        `---\ntitle: Es\ndescription: D\nsourceRevision: "${shaV2}"\nsourceHash: "${hashV2}"\n---\nCuerpo\n`,
+      );
+      expect(spawnSync(process.execPath, [scriptPath, '--root', tmpDir], { encoding: 'utf8' }).status).toBe(0);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }, 30000);
 });

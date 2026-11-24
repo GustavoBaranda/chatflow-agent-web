@@ -170,7 +170,7 @@ assert any(t.name == "query_active_users" for t in agent.tools)
 * <VersionBadge version="0.3.4" status="stable" /> The constructor does not validate `name`; the only check is that `add_handoff()` rejects a handoff to the agent itself.
 * Synthetic handoff tools are formatted as `transfer_to_<sanitized_name>`.
 
-### v0.4.0 Enhancements (`v0.4.0`)
+### Enhancements in `v0.4.0`
 * <VersionBadge version="0.4.0" status="stable" /> **Non-Empty Name Validation:** The constructor explicitly rejects empty or whitespace-only names:
 
 ```python

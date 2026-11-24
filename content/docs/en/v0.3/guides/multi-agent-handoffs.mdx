@@ -166,7 +166,7 @@ Handoff generation and sanitization include major reliability enhancements in ne
 * Shared session history maintains full conversational context across handoffs.
 * `Handoff.context_updates` exists as a field, but the v0.3.4 runner ignores it when a handoff happens.
 
-### v0.4.0 Enhancements (`v0.4.0`)
+### Enhancements in `v0.4.0`
 * <VersionBadge version="0.4.0" status="stable" /> **NFKD Unicode Transliteration:** Automatically normalizes accented characters into clean ASCII (e.g., `AtenciónAlCliente` becomes `transfer_to_atencionalcliente`).
 * <VersionBadge version="0.4.0" status="stable" /> **Deterministic Hash Fallbacks:** Agent names in non-Latin scripts (e.g., Japanese, Arabic, Cyrillic) or emojis fall back to a deterministic SHA-256 hash prefix (`transfer_to_u<hash>`) to guarantee valid identifier syntax.
 * <VersionBadge version="0.4.0" status="stable" /> **Disambiguation on Collisions:** If two agents produce conflicting sanitized names, numeric suffixes (`_2`, `_3`) are automatically appended to prevent schema overwrites.

@@ -98,7 +98,7 @@ Every call to `runner.run_async()` follows a deterministic, transactionally prot
    ├── D. If Model Requests Tools:
    │      ├── Append Message(role=Role.MODEL, tool_calls=[...])
    │      ├── Execute tools / evaluate synthetic handoffs
-   │      ├── If Handoff: swap active agent & check max_handoffs_per_turn
+   │      ├── If Handoff: check max_handoffs_per_turn, then swap active agent
    │      └── Append Message(role=Role.TOOL, tool_results=[...])
    │      └── Continue loop for next agent evaluation
    └── E. If Final Text Generated:

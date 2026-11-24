@@ -73,7 +73,7 @@ if __name__ == "__main__" and False:  # Set API key to execute live turn
 ```
 
 <Callout type="info" title="Inspecting Executed Tools">
-Every `AgentResponse` returned by `runner.run()` or `await runner.run_async()` includes `response.tool_calls_executed` (a `list[str]` of tool names invoked during the turn), `response.active_agent_name`, and `response.handoff` (an `AgentHandoff` record if control transferred to another agent).
+Every `AgentResponse` returned by `runner.run()` or `await runner.run_async()` includes `response.tool_calls_executed` (a `list[str]` of tool names invoked during the turn), `response.active_agent_name`, and `response.handoff` (`Handoff | None`, populated if control transferred to another agent).
 </Callout>
 
 ## 3. Asynchronous Execution & Persistent SQLite Memory

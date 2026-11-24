@@ -46,7 +46,7 @@ assert "Current server time:" in agent.get_instructions()
 
 The `Runner` (`chatflow_agent.core.runner.Runner`) coordinates execution across sessions, agents, engines, and tools:
 
-1. **Agent Registry Discovery:** At initialization, `Runner` performs a breadth-first traversal starting from `starting_agent` across all `.handoffs` edges, registering every reachable `Agent`. If two distinct `Agent` instances share the same `.name`, `Runner` raises `ValueError` immediately.
+1. **Agent Registry Discovery:** At initialization, `Runner` traverses all reachable `Agent` instances starting from `starting_agent` across all `.handoffs` edges, registering every reachable `Agent`. If two distinct `Agent` instances share the same `.name`, `Runner` raises `ValueError` immediately.
 2. **Per-Session Concurrency Lock:** Calls to `run_async()` for the same `session_id` acquire a dedicated `asyncio.Lock`, preventing concurrent turns from corrupting conversation history. In `v0.4.0`, if a tool or background task spawned inside a turn attempts to call `run()` or `run_async()` on the **same** `session_id`, `Runner` immediately raises `ReentrantTurnError` instead of deadlocking.
 3. **Session-Safe Reset (`reset_session_async`):** `await runner.reset_session_async(session_id) -> bool` and `runner.reset_session(session_id) -> bool` coordinate history clearing with the session turn lock, sync-work barrier, and reentrancy guard, returning `True` if an existing session was cleared and `False` otherwise.
 4. **Bounded Execution Loop:** Within a single turn, `Runner` enforces `max_tool_iterations` (default `10`) and `max_handoffs_per_turn` (default `5`) so runaway tool loops or circular handoffs never hang your service.
@@ -77,7 +77,7 @@ A `Tool` (`chatflow_agent.core.tools.Tool`) wraps a sync or async Python functio
 
 * Inspects Python type hints (`str`, `int`, `float`, `bool`, `list[T]`, `Sequence[T]`, `set[T]`, `frozenset[T]`, `tuple[T, ...]`, `dict`, `Optional[T]` / `T | None`, unions of supported types, and `Annotated[T, ...]`) to compile function-calling schemas. Raises `ToolSchemaError` at definition time if a union annotation contains an unmappable member (e.g., `CustomClass | None`), while non-union unsupported types retain the backward-compatible `STRING` / `string` fallback.
 * Validates and coerces model-supplied arguments at runtime before calling the function (`validate_args=True` by default), raising `ToolArgumentValidationError` (a `ToolExecutionError` subclass) on invalid arguments.
-* Dispatches sync functions directly and awaits coroutine functions (`inspect.iscoroutinefunction`).
+* Awaits coroutine functions directly (`inspect.iscoroutinefunction`) and executes synchronous `def` functions in a worker thread via `_run_sync_tool` during `execute_async()` so blocking tool code does not freeze the event loop (synchronous threads cannot be forcefully interrupted if a turn is cancelled or times out; subsequent turns of the same session wait for residual sync work to finish).
 * If a tool raises an exception at runtime, `Runner` catches it, logs a correlation `trace_id` with stack trace, and returns a sanitized `ToolResult` (`is_error=True`) to the LLM so the agent can recover gracefully without leaking internal stack traces to end users.
 
 ## 5. `BaseSessionStore` & `SessionContext` — State & Memory
@@ -85,10 +85,29 @@ A `Tool` (`chatflow_agent.core.tools.Tool`) wraps a sync or async Python functio
 Conversation state is encapsulated in `SessionContext`:
 
 * **`session_id`** (`str`): Unique conversation key (e.g., a WhatsApp phone number, Telegram chat ID, or UUID).
-* **`history`** (`list[Message]`): Ordered sequence of `USER`, `ASSISTANT`, `TOOL`, and `SYSTEM` messages, bounded by a sliding window (`max_turns`, default `50` user turns) that preserves tool-call pairs and keeps a `[System Note]` anchor at the head of trimmed conversations.
+* **`history`** (`list[Message]`): Ordered sequence of `USER`, `ASSISTANT`, `TOOL`, and `SYSTEM` messages, bounded by a sliding window (`max_turns`, default `40` complete user turns). During pruning (`_prune_history()`), all `Role.SYSTEM` messages are preserved at the beginning of `history` while older non-system turns are discarded forward so the retained window starts on a `Role.USER` message and never severs tool-call / tool-result pairs.
 * **`active_agent`** (`Agent`): The agent currently handling the session. When a handoff occurs, `active_agent` updates and persists across future turns.
 * **`metadata`** (`dict[str, Any]`): Arbitrary JSON-serializable key-value dictionary persisted alongside the session (with deep-copy isolation in `SessionStore`, ISO-8601 serialization for `datetime`/`date`/`time` values, and `JsonCodecError` for non-serializable objects).
 
+```python
+# [min-version: 0.4.0]
+# [executable]
+from chatflow_agent import Agent
+from chatflow_agent.core.memory import SessionContext
+from chatflow_agent.types import Message, Role
+
+agent = Agent(name="Helper", instructions="Be concise.")
+ctx = SessionContext(session_id="demo", initial_agent=agent, max_turns=2)
+ctx.add_message(Message(role=Role.SYSTEM, content="Account tier: enterprise"))
+for i in range(3):
+    ctx.add_message(Message(role=Role.USER, content=f"Question {i}"))
+    ctx.add_message(Message(role=Role.MODEL, content=f"Answer {i}"))
+
+# Role.SYSTEM is preserved at the head; only the 2 most recent complete turns remain
+assert ctx.history[0].role == Role.SYSTEM
+assert [m.content for m in ctx.history if m.role == Role.USER] == ["Question 1", "Question 2"]
+```
+
 Choose between:
-* **`SessionStore`**: Fast in-memory dictionary store with deep-copied metadata isolation and thread-safe message deduplication.
-* **`SQLiteSessionStore`**: Durable SQLite database store with `WAL` journaling, persistent `:memory:` support, single-transaction reads, transactional turn rollback journals, and 192-hour (`8-day`) webhook message deduplication.
+* **`SessionStore`**: Fast in-memory dictionary store (`default_max_turns=40`) with deep-copied metadata isolation and thread-safe message deduplication.
+* **`SQLiteSessionStore`**: Durable SQLite database store (`default_max_turns=40`) with `WAL` journaling on file-backed databases, persistent `:memory:` support, single-transaction reads, transactional turn rollback journals, and 192-hour (`8-day`) webhook message deduplication.

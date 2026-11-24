@@ -16,11 +16,13 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
 ## System Requirements
 
-* **Python:** `>= 3.10` (tested across Python 3.10, 3.11, 3.12, and 3.13)
-* **Operating Systems:** Linux, macOS, and Windows
+* **Python:** `>= 3.10` (`Requires-Python: >=3.10`; tested across Python 3.10, 3.11, 3.12, and 3.13)
+* **Package Managers:** `pip`, `uv`, or `poetry`
+* **Operating Systems:** The SDK CI runs on Linux (Ubuntu) and Windows. Because `chatflow-agent` is pure Python with no platform-specific markers, it is expected to work on macOS and arm64 as well, though they are not part of the CI matrix.
 * **Core Dependencies (Installed Automatically):**
-  * `pydantic >= 2.6.0` (Data validation, runtime tool argument validation, and JSON Schema generation)
-  * `httpx >= 0.27.0, < 1.0` (Async HTTP transport for OpenAI, Gemini, Anthropic, Ollama, and WhatsApp engines)
+  * `pydantic >= 2.6.0` (Data validation, runtime tool argument validation, and schema helpers)
+  * `httpx >= 0.27.0, < 1.0` (Async HTTP transport for OpenAI, Gemini, Anthropic, Ollama, and WhatsApp)
+  * SQLite persistence uses Python's built-in `sqlite3` library with no third-party database drivers.
 
 ## Installing the Package
 
@@ -30,7 +32,7 @@ import { VersionBadge } from '@/components/docs/VersionBadge';
 
     Always install `chatflow-agent` inside a dedicated virtual environment:
 
-    <Tabs items={['venv (Standard)', 'uv']}>
+    <Tabs items={['venv (Standard)', 'uv', 'poetry']}>
       <Tab value="venv (Standard)">
 ```bash
 python -m venv .venv
@@ -46,6 +48,11 @@ source .venv/bin/activate
 ```bash
 uv venv
 source .venv/bin/activate
+```
+      </Tab>
+      <Tab value="poetry">
+```bash
+poetry add chatflow-agent@0.4.0
 ```
       </Tab>
     </Tabs>
@@ -100,18 +107,18 @@ print("Installed version:", chatflow_agent.__version__)
   </Step>
 </Steps>
 
-## Optional Dependency Extras Matrix
+## Core Dependencies & Optional Extras Matrix
 
-The table below lists every optional extra defined in `pyproject.toml` for `v0.4.0` and when to install it:
+The table below reflects the exact `METADATA` (`Requires-Dist` and `Provides-Extra`) published in the **`chatflow-agent==0.4.0`** wheel:
 
-| Extra Name | Install Command | Included Packages | Required By |
+| Track / Extra | Install Command | Packages Added | Required By |
 | :--- | :--- | :--- | :--- |
-| *(Core)* | `pip install chatflow-agent==0.4.0` | `pydantic>=2.6.0`, `httpx>=0.27.0,<1.0` | `Agent`, `Runner`, `OpenAIEngine`, `GeminiEngine`, `AnthropicEngine`, `SessionStore`, `SQLiteSessionStore`, `CLIChannel` |
-| `telegram` | `pip install "chatflow-agent[telegram]==0.4.0"` | `python-telegram-bot>=20.0` | `TelegramChannel` |
-| `whatsapp` | `pip install "chatflow-agent[whatsapp]==0.4.0"` | `fastapi>=0.100.0`, `uvicorn>=0.23.0` | `WhatsAppChannel` |
-| `webhook` | `pip install "chatflow-agent[webhook]==0.4.0"` | `fastapi>=0.100.0`, `uvicorn>=0.23.0`, `pydantic>=2.6.0` | Custom FastAPI webhook servers (`examples/webhook_bot.py`) |
-| `all` | `pip install "chatflow-agent[all]==0.4.0"` | `python-telegram-bot>=20.0`, `fastapi>=0.100.0`, `uvicorn>=0.23.0` | Full multi-channel deployments |
-| `dev` | `pip install "chatflow-agent[dev]==0.4.0"` | `pytest>=8.0.0`, `pytest-asyncio>=0.23.0`, `ruff>=0.3.0`, `mypy>=1.9.0` | Contributing and running the test suite |
+| *(Core — always installed)* | `pip install chatflow-agent==0.4.0` | `pydantic>=2.6.0`, `httpx>=0.27.0,<1.0` | `Agent`, `Runner`, `OpenAIEngine`, `GeminiEngine`, `AnthropicEngine`, `SessionStore`, `SQLiteSessionStore`, `CLIChannel` |
+| `telegram` | `pip install "chatflow-agent[telegram]==0.4.0"` | `python-telegram-bot>=21.0` | `TelegramChannel` |
+| `whatsapp` | `pip install "chatflow-agent[whatsapp]==0.4.0"` | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | `WhatsAppChannel` |
+| `webhook` | `pip install "chatflow-agent[webhook]==0.4.0"` | `fastapi>=0.110.0`, `uvicorn>=0.29.0` | Custom FastAPI HTTP endpoints (there is no built-in generic webhook channel; see [Custom Webhooks](/en/docs/v0.4/integrations/webhook)) |
+| `all` | `pip install "chatflow-agent[all]==0.4.0"` | `python-telegram-bot>=21.0`, `fastapi>=0.110.0`, `uvicorn>=0.29.0` | Full multi-channel deployments |
+| `dev` | `pip install "chatflow-agent[dev]==0.4.0"` | `pytest>=8.0.0`, `pytest-asyncio>=0.23.0`, `ruff>=0.4.0`, `mypy>=1.9.0` | Contributing and running the SDK test suite |
 
 <Callout type="info" title="Lazy Channel Imports & DependencyError">
 If you attempt to instantiate `TelegramChannel` or `WhatsAppChannel` without installing its corresponding extra, `chatflow-agent` raises a descriptive `DependencyError` with the exact `pip install` command needed.
@@ -119,22 +126,41 @@ If you attempt to instantiate `TelegramChannel` or `WhatsAppChannel` without ins
 
 ## Configuring Provider API Keys
 
-`chatflow-agent` automatically resolves provider credentials from standard environment variables when `api_key` is not passed explicitly to an `Agent` or engine constructor:
+`chatflow-agent` automatically resolves provider credentials from standard environment variables when `api_key` is not passed explicitly to an `Agent` or engine constructor. Each provider reads only its own variable—and only when sending requests to that provider's official endpoint (`OPENAI_API_KEY` is never sent to another provider or custom remote host):
 
-| Provider | Environment Variable | Default Model Example | Engine Class |
+| Provider | Environment Variable | Default Model Preset | Engine Class |
 | :--- | :--- | :--- | :--- |
-| **Google Gemini** | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | `gemini-2.5-flash` | `GeminiEngine` |
-| **OpenAI** | `OPENAI_API_KEY` | `gpt-4o`, `gpt-4o-mini` | `OpenAIEngine` |
+| **Google Gemini** | `GEMINI_API_KEY` *(falls back to `GOOGLE_API_KEY` if unset; optional `GOOGLE_GEMINI_BASE_URL` for proxies)* | `gemini-2.5-flash` | `GeminiEngine` |
+| **OpenAI** | `OPENAI_API_KEY` | `gpt-4o-mini` | `OpenAIEngine` |
 | **Anthropic** | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-latest` | `AnthropicEngine` |
 | **DeepSeek** | `DEEPSEEK_API_KEY` | `deepseek-chat` | `OpenAIEngine(provider="deepseek")` |
 | **Groq** | `GROQ_API_KEY` | `llama-3.3-70b-versatile` | `OpenAIEngine(provider="groq")` |
-| **xAI Grok** | `XAI_API_KEY` or `GROK_API_KEY` | `grok-2-latest` | `OpenAIEngine(provider="grok")` |
-| **Ollama (Local)** | `OLLAMA_API_KEY` *(optional; defaults to `"ollama"`)* | `llama3.2`, `qwen2.5` | `OpenAIEngine(provider="ollama")` |
+| **xAI Grok** (`provider="grok"` or `"xai"`) | `XAI_API_KEY` | `grok-2` | `OpenAIEngine(provider="grok")` |
+| **Ollama / Gemma (Local)** (`provider="ollama"` or `"gemma"`) | `OLLAMA_API_KEY` *(optional; local Ollama servers require no key)* | `gemma2:9b` | `OpenAIEngine(provider="ollama")` |
 
-Export the variables in your shell or load them via your process manager before starting your application:
+Export the variables in your shell before starting your application:
 
+<Tabs items={['Linux / macOS (bash/zsh)', 'Windows (PowerShell)']}>
+  <Tab value="Linux / macOS (bash/zsh)">
 ```bash
 export OPENAI_API_KEY="sk-..."
-export GOOGLE_API_KEY="AIza..."
+export GEMINI_API_KEY="AIza..."
 export ANTHROPIC_API_KEY="sk-ant-..."
+export XAI_API_KEY="xai-..."
+export DEEPSEEK_API_KEY="sk-..."
+export GROQ_API_KEY="gsk_..."
 ```
+  </Tab>
+  <Tab value="Windows (PowerShell)">
+```powershell
+$env:OPENAI_API_KEY="sk-..."
+$env:GEMINI_API_KEY="AIza..."
+$env:ANTHROPIC_API_KEY="sk-ant-..."
+$env:XAI_API_KEY="xai-..."
+```
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+Once your environment is ready, continue to the [Quickstart Guide](/en/docs/v0.4/getting-started/quickstart) to run your first conversational agent in under 5 minutes.

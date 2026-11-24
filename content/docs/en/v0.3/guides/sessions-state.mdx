@@ -173,7 +173,7 @@ Session management introduces high-concurrency optimizations in newer versions:
 * In-memory `SessionStore` and persistent `SQLiteSessionStore`.
 * 8-day message deduplication TTL (`DEFAULT_DEDUP_TTL_HOURS = 192`).
 
-### v0.4.0 Enhancements (`v0.4.0`)
+### Enhancements in `v0.4.0`
 * <VersionBadge version="0.4.0" status="stable" /> **Dedicated Blocking I/O Worker Pool:** For file-backed `SQLiteSessionStore`, disk read and write operations are offloaded to a private 4-worker thread pool (`_BLOCKING_IO_WORKERS = 4`) via `_run_blocking`. This prevents disk latency and file locks from stalling the asynchronous event loop.
 * <VersionBadge version="0.4.0" status="stable" /> **`SessionDeletedError`:** If an active task attempts to commit or read from a session that was deleted via `store.delete(session_id)`, `chatflow-agent` raises an explicit `SessionDeletedError`.
 * <VersionBadge version="0.4.0" status="stable" /> **Strict Parameter Validation:** Passing `max_turns <= 0` or `default_max_turns <= 0` raises an immediate `ValueError`.

@@ -86,7 +86,7 @@
     "p3Title": "Canales del Mundo Real",
     "p3Desc": "Soporte integrado para WhatsApp, Telegram y línea de comandos, además de guías para webhooks personalizados. Consultá la documentación técnica para recomendaciones de despliegue y seguridad.",
     "p4Title": "Integridad de Estado y Memoria",
-    "p4Desc": "Mantené el historial y el estado de cada conversación en memoria o con SQLite. Para despliegues distribuidos o multiproceso, revisá la guía de concurrencia en la documentación.",
+    "p4Desc": "Mantené el historial y el estado de cada conversación en memoria o con SQLite. Para despliegues distribuidos o multiproceso, revisá las recomendaciones de concurrencia en la documentación de despliegue.",
     "leadershipTitle": "Liderazgo del Proyecto",
     "creatorTitle": "Creador y Mantenedor Principal",
     "creatorName": "Gustavo Baranda",

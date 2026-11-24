@@ -128,7 +128,7 @@ If you attempt to instantiate `TelegramChannel` or `WhatsAppChannel` without ins
 
 `chatflow-agent` automatically resolves provider credentials from standard environment variables when `api_key` is not passed explicitly to an `Agent` or engine constructor. Each provider reads only its own variable—and only when sending requests to that provider's official endpoint (`OPENAI_API_KEY` is never sent to another provider or custom remote host):
 
-| Provider | Environment Variable | Default Model Preset | Engine Class |
+| Provider | Environment Variable | Example Model | Engine Class |
 | :--- | :--- | :--- | :--- |
 | **Google Gemini** | `GEMINI_API_KEY` *(falls back to `GOOGLE_API_KEY` if unset; optional `GOOGLE_GEMINI_BASE_URL` for proxies)* | `gemini-2.5-flash` | `GeminiEngine` |
 | **OpenAI** | `OPENAI_API_KEY` | `gpt-4o-mini` | `OpenAIEngine` |

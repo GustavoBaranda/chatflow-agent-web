@@ -6,11 +6,16 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const rootDir = path.resolve(__dirname, '..');
+const rootFlagIdx = process.argv.indexOf('--root');
+const rootDir =
+  rootFlagIdx !== -1 && process.argv[rootFlagIdx + 1]
+    ? path.resolve(process.argv[rootFlagIdx + 1])
+    : path.resolve(__dirname, '..');
 
 const MESSAGES_DIR = path.join(rootDir, 'messages');
 const CONTENT_DOCS_DIR = path.join(rootDir, 'content', 'docs');
 const AUTHORITATIVE_LOCALE = 'en';
+const SOURCE_REVISION_RE = /^[0-9a-f]{7,40}$/;
 
 /**
  * Recursively flatten a nested object into dot-notation paths
@@ -185,6 +190,16 @@ if (!fs.existsSync(CONTENT_DOCS_DIR)) {
           incomplete++;
           hasErrors = true;
           console.error(`    ❌ INCOMPLETE: ${relativePath} (Missing sourceHash frontmatter)`);
+        } else if (!frontmatter.sourceRevision) {
+          incomplete++;
+          hasErrors = true;
+          console.error(`    ❌ INCOMPLETE: ${relativePath} (Missing sourceRevision frontmatter)`);
+        } else if (!SOURCE_REVISION_RE.test(frontmatter.sourceRevision)) {
+          incomplete++;
+          hasErrors = true;
+          console.error(
+            `    ❌ INVALID_REVISION: ${relativePath} (sourceRevision "${frontmatter.sourceRevision}" is not a valid 7-40 char Git SHA)`,
+          );
         } else if (frontmatter.sourceHash !== enHash) {
           outdated++;
           hasErrors = true;

@@ -19,8 +19,8 @@ import type { DocVersionTrack } from '@/config/docs-versions';
 export function DocsSearchDialog(props: DefaultSearchDialogProps) {
   const pathname = usePathname() || '';
 
-  // Determine active track: explicitly v0.4 if inside prerelease docs, else stable v0.3
-  const activeTrack: DocVersionTrack = pathname.includes('/docs/v0.4') ? 'v0.4' : 'v0.3';
+  // Determine active track: explicitly v0.3 if inside previous stable docs, else default latest stable v0.4
+  const activeTrack: DocVersionTrack = pathname.includes('/docs/v0.3') ? 'v0.3' : 'v0.4';
 
   // Do not render anything into DOM when dialog is closed to prevent footer leakage above navbar
   if (!props.open) {

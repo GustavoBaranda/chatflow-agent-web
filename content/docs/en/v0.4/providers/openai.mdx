@@ -111,7 +111,7 @@ reasoning_agent = Agent(
 import os
 from chatflow_agent import Agent
 
-# provider="grok" selects the xAI preset (api.x.ai); a "grok" model prefix alone also works in v0.4.0rc1
+# provider="grok" selects the xAI preset (api.x.ai); a "grok" model prefix alone also works in v0.4.0
 # Requires XAI_API_KEY environment variable
 grok_agent = Agent(
     name="GrokAgent",
@@ -176,13 +176,13 @@ open_engine = OpenAIEngine(
 
 OpenAI enforces a strict maximum length of 40 characters on `tool_call_id` in function calling responses. In multi-agent environments where agents hand off sessions across different providers (for example, Anthropic Claude tools generating IDs longer than 40 characters), `chatflow-agent` guarantees protocol compliance:
 
-1. **Deterministic Replacement:** With `provider="openai"`, if a historical message contains a tool call ID that is empty or longer than 40 characters, `OpenAIEngine` sends a deterministic SHA-256 derived identifier instead (`call_` + 24 hex characters), the same in the call and in its result. Other providers (Groq, DeepSeek, Ollama, and so on) receive the original ID. The stored session history keeps the original ID.
+1. **Deterministic Replacement & Stateless Fallback IDs:** With `provider="openai"`, if a historical message contains a tool call ID that is empty or longer than 40 characters, `OpenAIEngine` sends a deterministic SHA-256 derived identifier instead (`call_` + 24 hex characters), the same in the call and in its result. When an OpenAI-compatible response omits a tool call `id`, `OpenAIEngine` generates a unique stateless 29-character synthetic ID (`call_<24 hex>`) so tool calls across multiple turns never collide.
 2. **Schema Type Normalization:** The engine automatically normalizes JSON schema parameter types (`_lowercase_schema_types`) while preserving custom property schemas, ensuring tool compatibility across different OpenAI model versions.
 
 ## Troubleshooting
 
 | Error | Cause | Resolution |
 | :--- | :--- | :--- |
-| `ValueError: A custom or unofficial base_url was provided ... without an explicit api_key` | Security guard detected a custom `base_url` while `api_key` was not explicitly passed. | Pass `api_key="your-key"` or `api_key=""` explicitly to confirm the destination host. |
+| `ConfigurationError: A custom or unofficial base_url was provided ... without an explicit api_key` | Security guard detected a custom `base_url` while `api_key` was not explicitly passed (note: `ConfigurationError` is a subclass of `ValueError`). | Pass `api_key="your-key"` or `api_key=""` explicitly to confirm the destination host. |
 | `ProviderError: 401 Unauthorized` | Invalid or expired API key. | Verify `OPENAI_API_KEY`, `GROQ_API_KEY`, or `DEEPSEEK_API_KEY` in your environment. |
 | `ProviderError: 429 Too Many Requests` | Rate limit or quota exhaustion. | Implement rate limiting, upgrade your tier, or fall back to an alternate provider preset. |

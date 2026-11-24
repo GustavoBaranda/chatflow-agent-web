@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { source, resolveDocPage, getVersionPageTree } from '@/lib/source';
 import { TRACK_AVAILABLE_TOPICS } from '@/config/docs-topics-manifest';
-import { DEFAULT_STABLE_TRACK } from '@/config/docs-versions';
+import { PREVIOUS_STABLE_TRACK } from '@/config/docs-versions';
 import { isGenuineTranslation, resolveDocSeo, SITE_ORIGIN } from '@/config/docs-seo';
 import sitemap from '@/app/sitemap';
 
@@ -21,12 +21,12 @@ describe('Phase 6T.2: Complete Brazilian Portuguese Documentation Coverage Suite
         const { page, isFallback, track } = resolveDocPage(['v0.3', ...cleanSlug], 'pt-BR');
 
         expect(page).toBeDefined();
-        expect(track).toBe(DEFAULT_STABLE_TRACK);
+        expect(track).toBe(PREVIOUS_STABLE_TRACK);
         expect(isFallback).toBe(false);
         expect(page?.path).toMatch(/^pt-BR\/v0\.3\//);
 
         // Verify genuine translation detection
-        expect(isGenuineTranslation(DEFAULT_STABLE_TRACK, cleanSlug, 'pt-BR')).toBe(true);
+        expect(isGenuineTranslation(PREVIOUS_STABLE_TRACK, cleanSlug, 'pt-BR')).toBe(true);
       });
 
       it(`defines valid Portuguese frontmatter for topic [${topicPath}]`, () => {
@@ -47,7 +47,7 @@ describe('Phase 6T.2: Complete Brazilian Portuguese Documentation Coverage Suite
 
       it(`resolves correct canonical SEO and indexable robots for topic [${topicPath}]`, () => {
         const seo = resolveDocSeo({
-          track: DEFAULT_STABLE_TRACK,
+          track: PREVIOUS_STABLE_TRACK,
           cleanSlug,
           locale: 'pt-BR',
           isExplicitTrack: true,

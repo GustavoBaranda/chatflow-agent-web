@@ -1,8 +1,8 @@
 ---
 title: "Visão Geral dos Provedores de LLM"
 description: "Arquitetura de motores, resolução dinâmica de provedores, políticas de segurança e execução de múltiplos modelos no chatflow-agent."
-sourceRevision: "37f2a36"
-sourceHash: "7f47e4e0e777e19d67a64c04572aca500298d5ad3203bc214e07aecbedeb717e"
+sourceRevision: "9f730ce"
+sourceHash: "81fe42bfd660f703b843ab618759f739c98ab08004492dc31dcff70574d47e1b"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -71,9 +71,9 @@ O motor retorna um `EngineTurnResult` contendo:
 | `tool_calls` | `list[ToolCall]` | Requisições estruturadas de execução de ferramentas solicitadas pelo modelo. |
 | `raw_response` | `Any \| None` | Carga de resposta nativa do provedor para depuração ou inspeção de tokens. |
 
-### Normalização de IDs de Chamada de Ferramenta (Pré-lançamento)
+### Normalização de IDs de Chamada de Ferramenta (v0.4.0)
 
-<VersionBadge version="0.4.0rc1" status="prerelease" /> adiciona a substituição determinística de IDs históricos incompatíveis. A versão estável v0.3.4 não oferece essa garantia de normalização entre provedores:
+<VersionBadge version="0.4.0" status="stable" /> adiciona a substituição determinística de IDs históricos incompatíveis. A versão estável v0.3.4 não oferece essa garantia de normalização entre provedores:
 
 ```python
 # [no-exec: illustrative tool call normalization]
@@ -119,8 +119,8 @@ flowchart TD
 5. **Heurística do Modelo:** Reconhece prefixos de Gemini, Claude, OpenAI, Grok e da família Ollama. A v0.3.4 não reconhece `deepseek-`: use `provider="deepseek"` ou um motor explícito. Um modelo Llama da Groq também exige `provider="groq"` ou motor Groq; caso contrário, `llama` seleciona o Ollama local.
 6. **Fallback Final:** `GeminiEngine(api_key=...)`.
 
-<Callout type="info" title="Mudanças de resolução na v0.4.0rc1">
-<VersionBadge version="0.4.0rc1" status="prerelease" /> adiciona `prefer_default_engine` e a heurística do prefixo `deepseek-`. Essas regras não se aplicam à versão estável v0.3.4.
+<Callout type="info" title="Mudanças de resolução na v0.4.0">
+<VersionBadge version="0.4.0" status="stable" /> adiciona `prefer_default_engine` e a heurística do prefixo `deepseek-`. Essas regras não se aplicam à versão estável v0.3.4.
 </Callout>
 
 ## Regras de Segurança e Isolamento de Credenciais
@@ -151,19 +151,19 @@ local_engine = OpenAIEngine(
 )
 ```
 
-## Evolução de Versões: v0.3.4 vs v0.4.0rc1
+## Evolução de Versões: v0.3.4 vs v0.4.0
 
 Compreender as diferenças arquiteturais entre versões auxilia na escolha da configuração ideal:
 
-| Área Arquitetural | Linha de Base `v0.3.4` (Estável) | Pré-lançamento `v0.4.0rc1` |
+| Área Arquitetural | Linha de Base `v0.3.4` (Estável) | Última Estável `v0.4.0` |
 | :--- | :--- | :--- |
 | **Motor Gemini em Tempo de Execução** | Baseado no SDK `google-genai` do Google (`from google import genai`). | **Zero Bloqueio de SDK**: Reimplementado com `httpx` assíncrono nativo diretamente contra `https://generativelanguage.googleapis.com/v1beta`. |
 | **Pool de Conexões** | Manipuladores de conexão separados por requisição. | **Pool de Conexões com Ciclo de Vida do Runner**: O `_ClientPool` gerencia conexões persistentes *keepalive* compartilhadas entre turnos via `async with runner:`. |
 | **Predefinições de Provedores** | OpenAI, Grok/xAI, Ollama/Gemma, DeepSeek e Groq. | Mantém as predefinições e melhora a resolução pelo prefixo do modelo. |
 | **Guarda de Credenciais** | `_resolve_api_key` limita chaves de ambiente aos endpoints oficiais exatos e exige credenciais explícitas para URLs remotas customizadas. | Mantém o isolamento *fail-closed*. |
 
-<Callout type="info" title="Nota de Prévia: Pool de Conexões na v0.4.0rc1">
-Na versão estável `v0.3.4`, turnos são executados diretamente via <code>await runner.run_async(...)</code>. Na versão preliminar `v0.4.0rc1`, envolva as execuções do runner dentro de <code>async with runner:</code> para habilitar conexões HTTP persistentes (*keepalive*) compartilhadas entre turnos:
+<Callout type="info" title="Pool de Conexões na v0.4.0">
+Na versão estável `v0.3.4`, turnos são executados diretamente via <code>await runner.run_async(...)</code>. Na versão v0.4.0 `v0.4.0`, envolva as execuções do runner dentro de <code>async with runner:</code> para habilitar conexões HTTP persistentes (*keepalive*) compartilhadas entre turnos:
 
 ```python
 # [no-exec: requires real provider engine for turn execution]

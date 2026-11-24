@@ -84,7 +84,7 @@ test.describe('Home and Community Navigation Suite', () => {
     await expect(docsCard).toBeVisible();
     const docsLink = docsCard.locator('a[href="/en/docs"]');
     await expect(docsLink).toBeVisible();
-    const quickstartBannerLink = docsCard.locator('a[href="/en/docs/v0.3/getting-started/quickstart"]');
+    const quickstartBannerLink = docsCard.locator('a[href="/en/docs/v0.4/getting-started/quickstart"]');
     await expect(quickstartBannerLink).toBeVisible();
 
     // Balanced 3x2 External Resource Grid (6 external cards)

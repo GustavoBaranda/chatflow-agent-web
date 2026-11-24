@@ -1,8 +1,8 @@
 ---
 title: "Agentes e Instrucciones Dinámicas"
 description: "Profundización en la abstracción Agent, callables de instrucciones dinámicas en tiempo de ejecución, vinculación de herramientas y parámetros de configuración en chatflow-agent."
-sourceRevision: "0ffb562"
-sourceHash: "6e638cf75b663b725af86706bb656b2c4c9064ae1fbe010b9ff37835d5992ea1"
+sourceRevision: "fe6b247"
+sourceHash: "4442abc1449ccfccaac616926414069ed7ad528f5035d92c5a44a5713f1ddfe2"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -164,7 +164,7 @@ assert any(t.name == "query_active_users" for t in agent.tools)
 
 ---
 
-## Diferencias de Versión y Características de Pre-lanzamiento
+## Diferencias de Versión y Características de v0.4.0
 
 `chatflow-agent` ofrece una mecánica consistente de agentes al tiempo que introduce validación estricta y normalización de caracteres en versiones más recientes:
 
@@ -172,22 +172,22 @@ assert any(t.name == "query_active_users" for t in agent.tools)
 * <VersionBadge version="0.3.4" status="stable" /> El constructor no valida `name`; la única comprobación es que `add_handoff()` rechaza una transferencia hacia el propio agente.
 * Las herramientas de transferencia sintetizadas tienen el formato `transfer_to_<sanitized_name>`.
 
-### Mejoras de Pre-lanzamiento (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Validación de Nombres No Vacíos:** El constructor rechaza explícitamente nombres vacíos o que solo contengan espacios en blanco:
+### Mejoras en `v0.4.0`
+* <VersionBadge version="0.4.0" status="stable" /> **Validación de Nombres No Vacíos:** El constructor rechaza explícitamente nombres vacíos o que solo contengan espacios en blanco:
 
 ```python
 from chatflow_agent import Agent
 
-# En v0.4.0rc1: genera ValueError("Agent name must be a non-empty string.")
+# En v0.4.0: genera ValueError("Agent name must be a non-empty string.")
 try:
     Agent(name="   ", instructions="test")
 except ValueError as err:
     print("Caught expected validation error:", err)
 ```
 
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Transliteración Unicode NFKD:** Los nombres de agentes con acentos (ej. `AtenciónAlCliente`) se transliteran limpiamente a identificadores ASCII válidos (`transfer_to_atencionalcliente`).
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Desambiguación en Colisiones:** Si varios destinos de transferencia producen nombres sanitizados equivalentes, se añaden sufijos numéricos (`_2`, `_3`) automáticamente.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Límite de Longitud en Nombres de Herramientas:** Los nombres de herramientas sintetizadas tienen un límite estricto de 60 caracteres para cumplir con las restricciones de todas las APIs upstream.
+* <VersionBadge version="0.4.0" status="stable" /> **Transliteración Unicode NFKD:** Los nombres de agentes con acentos (ej. `AtenciónAlCliente`) se transliteran limpiamente a identificadores ASCII válidos (`transfer_to_atencionalcliente`).
+* <VersionBadge version="0.4.0" status="stable" /> **Desambiguación en Colisiones:** Si varios destinos de transferencia producen nombres sanitizados equivalentes, se añaden sufijos numéricos (`_2`, `_3`) automáticamente.
+* <VersionBadge version="0.4.0" status="stable" /> **Límite de Longitud en Nombres de Herramientas:** Los nombres de herramientas sintetizadas tienen un límite estricto de 60 caracteres para cumplir con las restricciones de todas las APIs upstream.
 
 ---
 
@@ -217,7 +217,7 @@ agent.current_user = "user_123"  # ¡Se filtrará entre sesiones concurrentes!
 # )
 ```
 
-En v0.3.4, los `metadata` pasados a `run()` / `run_async()` solo se aplican cuando se crea la sesión; las llamadas posteriores para la misma sesión no los actualizan. La fusión de metadatos en cada turno se añadió en <VersionBadge version="0.4.0rc1" status="prerelease" />.
+En v0.3.4, los `metadata` pasados a `run()` / `run_async()` solo se aplican cuando se crea la sesión; las llamadas posteriores para la misma sesión no los actualizan. La fusión de metadatos en cada turno se añadió en <VersionBadge version="0.4.0" status="stable" />.
 
 ### 3. Registro de Auto-Transferencia (Self-Handoff)
 Un agente no puede registrar una transferencia hacia sí mismo. Hacerlo produce un error inmediato:

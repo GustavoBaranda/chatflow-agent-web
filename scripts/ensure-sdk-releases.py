@@ -33,13 +33,13 @@ TARGET_VERSIONS: dict[str, dict[str, str]] = {
         "tag": "v0.3.4",
         "pypi_version": "0.3.4",
         "expected_sha256": "f2d5e2a03822dfe1fa23824a04c608760063e9caea0e95149a1d437ffffa866e",
-        "status": "stable",
+        "status": "legacy",
     },
-    "0.4.0rc1": {
-        "tag": "v0.4.0rc1",
-        "pypi_version": "0.4.0rc1",
-        "expected_sha256": "3286d49301ee939cca2d47b145ba88f930d5135e8457d89e0e311009912105f2",
-        "status": "prerelease",
+    "0.4.0": {
+        "tag": "v0.4.0",
+        "pypi_version": "0.4.0",
+        "expected_sha256": "3fa43c231afb68d9b2d9f6760a24f4109fbf7cd677fb5f8d4989f29690f28ffa",
+        "status": "stable",
     },
 }
 
@@ -185,7 +185,7 @@ def ensure_virtual_environment(version: str, wheel_path: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Ensure isolated SDK releases from PyPI wheels")
-    parser.add_argument("--version", choices=["0.3.4", "0.4.0rc1", "all"], default="all")
+    parser.add_argument("--version", choices=["0.3.4", "0.4.0", "all"], default="all")
     parser.add_argument(
         "--allow-offline-git-fallback",
         action="store_true",
@@ -193,7 +193,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    versions = ["0.3.4", "0.4.0rc1"] if args.version == "all" else [args.version]
+    versions = ["0.3.4", "0.4.0"] if args.version == "all" else [args.version]
     meta = get_pypi_metadata()
 
     results: dict[str, Any] = {}
@@ -208,7 +208,7 @@ def main() -> int:
                 "provenance": "pypi-wheel",
             }
         except Exception as e:
-            if args.allow_offline_git-fallback:
+            if args.allow_offline_git_fallback:
                 print(
                     f"\n[WARNING] OFFLINE SOURCE FALLBACK ACTIVE FOR {v} - THIS IS NOT EQUIVALENT TO PYPI RELEASE VALIDATION!\n"
                     f"Reason: {e}\n",

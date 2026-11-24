@@ -9,7 +9,7 @@ export interface VersionBadgeProps {
 }
 
 export function VersionBadge({
-  version = '0.3.4',
+  version = '0.4.0',
   status = 'stable',
   children,
   className = '',

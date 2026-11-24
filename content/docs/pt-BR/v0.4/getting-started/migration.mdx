@@ -1,0 +1,407 @@
+---
+title: Migração de 0.3.4 para 0.4.0
+description: Guia passo a passo para atualizar chatflow-agent de v0.3.4 para v0.4.0, alinhado às 4 mudanças incompatíveis oficiais, comportamento verificado do SDK e verificações.
+sourceRevision: "7471e08"
+sourceHash: "a61ccef9fbd1273252432cc96677d8a9cd0c003e046120ac18dc07a50f667c10"
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { VersionBadge } from '@/components/docs/VersionBadge';
+
+<div className="mb-4 flex flex-wrap items-center gap-2">
+  <VersionBadge version="0.4.0" status="stable" />
+  <span className="text-xs text-slate-500 dark:text-slate-400">Caminho de atualização: v0.3.4 → v0.4.0</span>
+</div>
+
+Este guia cobre tudo o que é necessário para atualizar uma aplicação existente em **`chatflow-agent` `0.3.4`** para **`0.4.0`**. A maioria das aplicações que utilizam `Agent`, `Runner`, `@tool` e `SQLiteSessionStore` exige pouca ou nenhuma alteração, obtendo automaticamente validação de argumentos em tempo de execução, reversão transacional completa e transporte REST direto do Gemini via `httpx`.
+
+Bancos **`SQLiteSessionStore` criados pela `v0.3.4` são 100% compatíveis com a `v0.4.0`**: ambas as versões compartilham **exatamente o mesmo esquema SQLite** (`PRAGMA user_version = 1` e tabelas idênticas `chatflow_sessions`, `chatflow_messages` e `chatflow_processed_messages`), portanto não é necessária nenhuma migração de esquema.
+
+## 1. Pré-requisitos e Comando de Atualização
+
+* **Python:** `>= 3.10` (`3.10`, `3.11`, `3.12` ou `3.13`)
+* **Dependências Core:** `pydantic>=2.6.0` e `httpx>=0.27.0,<1.0` (`google-genai` não é mais necessária).
+
+<Tabs items={['pip', 'uv', 'Com Extras']}>
+  <Tab value="pip">
+```bash
+pip install --upgrade "chatflow-agent==0.4.0"
+```
+  </Tab>
+  <Tab value="uv">
+```bash
+uv add "chatflow-agent==0.4.0"
+```
+  </Tab>
+  <Tab value="Com Extras">
+```bash
+pip install --upgrade "chatflow-agent[all]==0.4.0"
+```
+  </Tab>
+</Tabs>
+
+---
+
+## 2. Resumo das 4 Mudanças Incompatíveis Oficiais (`0.3.4` → `0.4.0`)
+
+O `chatflow-agent` `0.4.0` introduz **4 mudanças incompatíveis oficiais**:
+
+| # | Área | Comportamento na `0.3.4` | Comportamento na `0.4.0` | Ação Necessária |
+| :--- | :--- | :--- | :--- | :--- |
+| **1** | **Transporte `GeminiEngine` e Vertex AI / ADC** | Dependia de `google-genai`, que suportava implicitamente Vertex AI / Application Default Credentials (ADC) sem chave de API | Usa `httpx.AsyncClient` diretamente contra a Gemini Developer REST API (`generativelanguage.googleapis.com`); ausência de chave API lança **`ProviderError`** no primeiro turno | Forneça `GEMINI_API_KEY` ou `GOOGLE_API_KEY`, use Vertex AI via `OpenAIEngine` (endpoint compatível com OpenAI) ou implemente um `BaseEngine` próprio. |
+| **2** | **Atributo `GeminiEngine.client`** | Expunha `engine.client` (`google.genai.Client`) | `engine.client` removido; aceita `http_client: httpx.AsyncClient \| None = None` | Substitua mocks/hooks sobre `engine.client` por `http_client=httpx.AsyncClient(transport=httpx.MockTransport(...))` ou um stub de `BaseEngine`. |
+| **3** | **Nomes duplicados de `Agent` no `Runner`** | Instâncias distintas de `Agent` com o mesmo `.name` em ramos diferentes da árvore do `Runner` mantinham silenciosamente a primeira instância registrada | `Runner` lança **`ValueError`** quando duas instâncias distintas de `Agent` compartilham o mesmo `.name` na árvore | Atribua nomes únicos a cada instância distinta de `Agent` (reutilizar a *mesma* instância em grafos cíclicos ou em diamante continua suportado). |
+| **4** | **`dedup_ttl_hours` e parâmetros keyword-only em `WhatsAppChannel`** | Aceitava `dedup_ttl_hours` sem efeito; `max_body_size` e `enable_docs` permitiam argumentos posicionais (`queue_timeout_seconds` não existia na `0.3.4`) | `dedup_ttl_hours` removido (`TypeError` se passado); `max_body_size`, `enable_docs` e o novo `queue_timeout_seconds` são *keyword-only* | Mova `dedup_ttl_hours` para `SessionStore` ou `SQLiteSessionStore` e passe `max_body_size`, `enable_docs` e `queue_timeout_seconds` por nome. |
+
+---
+
+## 3. Detalhe das Mudanças Incompatíveis e Exemplos Antes / Depois
+
+### Mudança Incompatível 1: `GeminiEngine` Usa a API REST com `httpx` (Sem `google-genai` nem Vertex AI / ADC Implícito)
+
+O `GeminiEngine` agora se comunica diretamente com a Gemini Developer REST API (`https://generativelanguage.googleapis.com/v1beta`) via `httpx.AsyncClient`. O pacote `google-genai` foi removido das dependências do `chatflow-agent`.
+
+Com a remoção de `google-genai`, **a autenticação implícita via Google Cloud Vertex AI / Application Default Credentials (ADC) sem chave de API não é mais suportada no `GeminiEngine`**. Instanciar `GeminiEngine()` sem chave continua funcionando, mas o primeiro turno lança **`ProviderError`** se `api_key`, `GEMINI_API_KEY` ou `GOOGLE_API_KEY` não for fornecido.
+
+**Antes (`0.3.4` — ADC / Vertex AI implícito via `google-genai`):**
+```python
+import os
+from chatflow_agent import Agent, GeminiEngine
+
+# Na 0.3.4, google-genai podia autenticar via GOOGLE_GENAI_USE_VERTEXAI=true
+# e Application Default Credentials sem GEMINI_API_KEY.
+os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "true"
+engine = GeminiEngine()
+agent = Agent(name="GeminiBot", instructions="Be concise.", engine=engine)
+```
+
+**Depois (`0.4.0` — Chave API Gemini, endpoint compatível com OpenAI do Vertex AI ou `BaseEngine` customizado):**
+```python
+# [min-version: 0.4.0]
+# [executable]
+import asyncio
+from chatflow_agent import Agent, GeminiEngine, OpenAIEngine, Runner
+
+async def main() -> None:
+    # Opção A: Gemini Developer API com GEMINI_API_KEY / GOOGLE_API_KEY
+    gemini_engine = GeminiEngine(
+        api_key="AIza-mock-key",
+        timeout_seconds=60.0,
+        max_retries=3,
+        base_delay=1.0,
+        max_delay=10.0,
+    )
+    agent = Agent(name="GeminiBot", instructions="Be concise.", engine=gemini_engine)
+    async with Runner(starting_agent=agent) as runner:
+        assert runner.starting_agent.name == "GeminiBot"
+
+    # Opção B: Vertex AI via endpoint compatível com OpenAI
+    vertex_engine = OpenAIEngine(
+        api_key="vertex-oauth-token",
+        base_url="https://us-central1-aiplatform.googleapis.com/v1beta1/projects/MY_PROJECT/locations/us-central1/endpoints/openapi",
+    )
+    assert vertex_engine is not None
+
+asyncio.run(main())
+```
+
+<Callout type="tip" title="Desinstale google-genai se não for usado">
+Se nenhum outro pacote no seu ambiente importar `google-genai`, você pode removê-lo (`pip uninstall google-genai`). Caso precise de recursos nativos do SDK do Vertex AI, crie uma subclasse de `BaseEngine` implementando `generate_turn_async()`.
+</Callout>
+
+---
+
+### Mudança Incompatível 2: Atributo `GeminiEngine.client` Removido
+
+Na `0.3.4`, `GeminiEngine` expunha `engine.client` (`google.genai.Client`). Na `0.4.0`, esse atributo foi removido. Em seu lugar, injete `http_client: httpx.AsyncClient | None = None` (por exemplo com `httpx.MockTransport`) ou use um stub de `BaseEngine` em testes.
+
+**Antes (`0.3.4`):**
+```python
+from chatflow_agent import GeminiEngine
+
+engine = GeminiEngine(api_key="AIza-test")
+# Acessar ou aplicar monkey-patch em engine.client funcionava na 0.3.4,
+# mas lança AttributeError na 0.4.0.
+# engine.client.aio.models.generate_content = fake_generate
+```
+
+**Depois (`0.4.0` — Injete `httpx.AsyncClient` com `MockTransport` ou crie um `BaseEngine`):**
+```python
+# [min-version: 0.4.0]
+# [executable]
+import httpx
+from chatflow_agent import GeminiEngine
+
+def mock_handler(request: httpx.Request) -> httpx.Response:
+    return httpx.Response(
+        200,
+        json={
+            "candidates": [
+                {"content": {"role": "model", "parts": [{"text": "Hello from mock"}]}}
+            ]
+        },
+    )
+
+mock_client = httpx.AsyncClient(transport=httpx.MockTransport(mock_handler))
+engine = GeminiEngine(api_key="AIza-test", http_client=mock_client)
+assert not hasattr(engine, "client")
+```
+
+---
+
+### Mudança Incompatível 3: `Runner` Rejeita Nomes de `Agent` Duplicados
+
+Quando duas instâncias **distintas** de `Agent` alcançáveis por ramos diferentes de um grafo do `Runner` (por exemplo `P1 -> Support` e `P2 -> Support`) compartilham o mesmo `.name`:
+
+* Na **`0.3.4`**, o `Runner` mantinha silenciosamente a **primeira** instância registrada (`Support` de `P1`) e ignorava a segunda.
+* Na **`0.4.0`**, o `Runner` lança **`ValueError`** na inicialização (`Duplicate agent name 'Support': distinct Agent instances cannot share a name in one Runner tree.`).
+
+Observe que adicionar dois handoffs com o mesmo `.name` no **mesmo pai** `Agent` (seja em `Agent(handoffs=[...])` ou via `agent.add_handoff(...)`) **substitui** o handoff anterior nesse pai em vez de manter ambos, de modo que o `Runner` enxerga apenas uma instância. Reutilizar exatamente a **mesma** instância de `Agent` em grafos cíclicos ou em diamante continua totalmente suportado.
+
+**Antes (`0.3.4` mantinha o primeiro `Support`; `0.4.0` lança `ValueError`):**
+```python
+# [min-version: 0.4.0]
+# [executable]
+from chatflow_agent import Agent, Runner
+
+support_billing = Agent(name="Support", instructions="Handle billing.")
+support_tech = Agent(name="Support", instructions="Handle technical issues.")
+p1 = Agent(name="BillingTriage", instructions="Route billing.", handoffs=[support_billing])
+p2 = Agent(name="TechTriage", instructions="Route tech.", handoffs=[support_tech])
+root = Agent(name="Root", instructions="Route.", handoffs=[p1, p2])
+
+try:
+    Runner(starting_agent=root)
+    raise AssertionError("Expected ValueError for duplicate distinct Agent names")
+except ValueError as exc:
+    assert "Duplicate agent name 'Support'" in str(exc)
+```
+
+**Depois (`0.4.0` — Nomes únicos para cada instância distinta de `Agent`):**
+```python
+# [min-version: 0.4.0]
+# [executable]
+from chatflow_agent import Agent, Runner
+
+billing = Agent(name="BillingSupport", instructions="Handle billing.")
+technical = Agent(name="TechSupport", instructions="Handle technical issues.")
+p1 = Agent(name="BillingTriage", instructions="Route billing.", handoffs=[billing])
+p2 = Agent(name="TechTriage", instructions="Route tech.", handoffs=[technical])
+root = Agent(name="Root", instructions="Route.", handoffs=[p1, p2])
+
+# Reutilizar exatamente a mesma instância em um ciclo continua válido:
+billing.add_handoff(root)
+
+runner = Runner(starting_agent=root)
+assert runner.starting_agent is root
+```
+
+---
+
+### Mudança Incompatível 4: Remoção de `dedup_ttl_hours` e Parâmetros Keyword-Only em `WhatsAppChannel`
+
+Na `0.3.4`, `WhatsAppChannel` aceitava `dedup_ttl_hours` sem utilizá-lo (a deduplicação sempre dependeu do `SessionStore` ou `SQLiteSessionStore` conectado ao `Runner`), enquanto `max_body_size` e `enable_docs` podiam ser passados posicionalmente. `queue_timeout_seconds` não existia na `0.3.4`.
+
+Na `0.4.0`:
+* `dedup_ttl_hours` foi removido de `WhatsAppChannel.__init__` (passá-lo lança `TypeError`).
+* `max_body_size`, `enable_docs` e o novo `queue_timeout_seconds` (padrão `120.0`) são parâmetros **keyword-only**.
+* `llm_timeout_seconds` mudou seu padrão de `30.0` para `120.0` segundos e agora aceita `float | None` (`None` desativa o timeout por turno).
+
+**Antes (`0.3.4`):**
+```python
+from chatflow_agent import Agent, Runner, SQLiteSessionStore
+from chatflow_agent.channels import WhatsAppChannel
+
+store = SQLiteSessionStore(db_path="sessions.db")
+runner = Runner(starting_agent=Agent(name="Bot", instructions="Help."), session_store=store)
+
+# Passar dedup_ttl_hours no WhatsAppChannel não tinha efeito na 0.3.4
+# e lança TypeError na 0.4.0:
+# channel = WhatsAppChannel(
+#     verify_token="verify-token",
+#     access_token="access-token",
+#     phone_number_id="1234567890",
+#     app_secret="app-secret",
+#     dedup_ttl_hours=48,
+# )
+```
+
+**Depois (`0.4.0`):**
+```python
+# [min-version: 0.4.0]
+# [no-exec: requires whatsapp optional extra]
+from chatflow_agent import Agent, Runner, SQLiteSessionStore
+from chatflow_agent.channels import WhatsAppChannel
+
+store = SQLiteSessionStore(
+    db_path=":memory:",
+    dedup_ttl_hours=48,
+)
+runner = Runner(
+    starting_agent=Agent(name="Bot", instructions="Help."),
+    session_store=store,
+)
+
+channel = WhatsAppChannel(
+    verify_token="verify-token",
+    access_token="access-token",
+    phone_number_id="1234567890",
+    app_secret="app-secret",
+    llm_timeout_seconds=120.0,  # Padrão alterado de 30.0 para 120.0 (ou None)
+    max_body_size=1_048_576,  # Keyword-only na 0.4.0
+    enable_docs=False,  # Keyword-only na 0.4.0
+    queue_timeout_seconds=120.0,  # Novo parâmetro keyword-only na 0.4.0
+)
+channel.attach(runner)
+```
+
+---
+
+## 4. Mudanças Compatíveis de Comportamento e Validação em Tempo de Execução
+
+As melhorias abaixo na `0.4.0` são **compatíveis para uso válido**, mas aplicam validações mais rigorosas:
+
+### Validação de Argumentos de Ferramentas em Tempo de Execução (`validate_args=True` por padrão)
+
+Na `0.4.0`, cada ferramenta valida e coage argumentos fornecidos pelo modelo com Pydantic antes de chamar a função. Argumentos inválidos lançam **`ToolArgumentValidationError`** (subclasse de `ToolExecutionError`), que o `Runner` captura e reporta ao LLM para autocorreção.
+
+```python
+# [min-version: 0.4.0]
+# [executable]
+from typing import Any
+from chatflow_agent import tool
+
+@tool
+def typed_lookup(payload: int | str) -> str:
+    """Lookup by integer ID or string code."""
+    return str(payload)
+
+@tool(validate_args=False)
+def legacy_lookup(payload: Any) -> str:
+    """Desativa a validação Pydantic em tempo de execução quando necessário."""
+    return str(payload)
+
+assert typed_lookup.execute(payload=42) == "42"
+assert legacy_lookup.execute(payload={"raw": True}) == "{'raw': True}"
+```
+
+### `ToolSchemaError` em Uniões Não Mapeáveis (Fallback Preservado para Tipos Não-União)
+
+O `chatflow-agent` mapeia primitivos e coleções suportadas (`str`, `int`, `float`, `bool`, `list[T]`, `Sequence[T]`, `set[T]`, `frozenset[T]`, `tuple[T, ...]`, `tuple`, `dict`, `Optional[T]` / `T | None`, uniões de tipos suportados e `Annotated[T, ...]`) para JSON Schema:
+
+* **Anotações não-união não suportadas** (como classes customizadas, `BaseModel`, `TypedDict`, `dataclass`, `Enum` ou `Literal`) **não lançam `ToolSchemaError`**: mantêm o fallback compatível `STRING` / `string` no schema e validação `Any` em tempo de execução (não há introspecção profunda de schemas de Pydantic ou dataclasses).
+* **Anotações de união contendo um membro sem mapeamento** (como `CustomClass | None`, `BaseModel | None` ou `int | datetime`) **lançam `ToolSchemaError` imediatamente na criação da ferramenta**.
+
+```python
+# [min-version: 0.4.0]
+# [executable]
+from datetime import datetime
+from chatflow_agent import ToolSchemaError, tool
+
+@tool
+def schedule_reminder(when_iso: str | None = None) -> str:
+    """Schedule a reminder using an ISO-8601 timestamp string."""
+    return when_iso or "immediate"
+
+assert "when_iso" in schedule_reminder.to_openai_parameters()["properties"]
+
+try:
+    @tool
+    def bad_reminder(when: datetime | None = None) -> str:
+        """Unmappable union member."""
+        return str(when)
+    raise AssertionError("Expected ToolSchemaError")
+except ToolSchemaError:
+    pass
+```
+
+### Validações Adicionais e Mudanças de Comportamento
+* **Resolução de Provedores e Endpoints Compatíveis com OpenAI (`ConfigurationError`):** `ConfigurationError` herda de `ChatFlowError` e `ValueError`, mantendo compatibilidade com `except ValueError:`. `Agent(provider=...)` valida estritamente contra a lista integrada de provedores (`anthropic`, `claude`, `deepseek`, `gemini`, `gemma`, `google`, `grok`, `groq`, `ollama`, `openai`, `xai`) mesmo quando `base_url` é informado: passar um nome não listado como `Agent(provider="mistral", base_url=..., api_key=...)` lança `ConfigurationError`. Para usar um provedor compatível com OpenAI customizado, instancie `OpenAIEngine(provider="mistral", base_url=..., api_key=...)` explicitamente e associe-o via `Agent(..., engine=engine)` (ou omita `provider` e passe `base_url` + `api_key` diretamente ao `Agent`).
+
+```python
+# [min-version: 0.4.0]
+# [executable]
+from chatflow_agent import Agent, ConfigurationError, OpenAIEngine
+from chatflow_agent.core.engines import resolve_engine
+
+try:
+    Agent(
+        name="MistralViaProvider",
+        instructions="Be concise.",
+        provider="mistral",
+        base_url="https://api.mistral.ai/v1",
+        api_key="test-key",
+    )
+    raise AssertionError("Expected ConfigurationError")
+except ConfigurationError:
+    pass
+
+mistral_engine = OpenAIEngine(
+    provider="mistral",
+    base_url="https://api.mistral.ai/v1",
+    api_key="test-key",
+)
+good_agent = Agent(
+    name="MistralAgent",
+    instructions="Be concise.",
+    model="mistral-large-latest",
+    engine=mistral_engine,
+)
+assert resolve_engine(good_agent) is mistral_engine
+```
+* **Serialização de `metadata` (`JsonCodecError`):** `datetime`, `date` e `time` serializam automaticamente como ISO-8601; valores não serializáveis em `metadata` de sessão (ou estruturas circulares passadas ao codec JSON estrito) lançam `JsonCodecError`. Retornos de ferramentas continuam sendo convertidos para string na codificação de envio.
+* **Validações de Construtores Verificadas:** `Agent(name=...)` rejeita nomes vazios ou em branco (`ValueError`); `SessionContext(max_turns=...)` e `SQLiteSessionStore(default_max_turns=...)` rejeitam booleanos (`True`/`False`) e `<= 0` (`ValueError`); `Runner.run_async(..., turn_timeout=...)` rejeita booleanos e valores não positivos ou não finitos (`ValueError`); `WhatsAppChannel`, `TelegramChannel` e `AnthropicEngine` validam limites de configuração com `ConfigurationError`.
+* **Encaminhamento de Histórico `Role.SYSTEM`:** Na `0.3.4`, mensagens `Role.SYSTEM` em `session.history` eram preservadas no recorte de janela mas não encaminhadas aos provedores; na `0.4.0`, os motores as encaminham junto às instruções do agente.
+* **Tratamento de `RetryAfter` no Telegram (`max_retry_after_seconds=60.0`):** Tenta novamente até 3 vezes quando `retry_after <= max_retry_after_seconds`, e registra erro abortando o envio imediatamente sem aguardar quando `retry_after > max_retry_after_seconds`.
+* **Payloads Malformados de Provedores:** Respostas não JSON ou malformadas são encapsuladas em `ProviderError` sanitizados sem cadeias `__cause__` brutas de `httpx` ou `JSONDecodeError`.
+
+---
+
+## 5. Melhorias Recomendadas Após a Atualização
+
+<Steps>
+  <Step>
+    ### Use `async with runner:` em Execuções Assíncronas
+
+```python
+# [min-version: 0.4.0]
+from chatflow_agent import Agent, Runner
+
+async def run_once() -> None:
+    runner = Runner(starting_agent=Agent(name="Assistant", instructions="Be concise."))
+    async with runner:
+        response = await runner.run_async("sess-1", "Hello!", turn_timeout=30.0)
+        print(response.content)
+```
+  </Step>
+
+  <Step>
+    ### Substitua `store.clear_history()` Direto em Endpoints Ativos por `Runner.reset_session_async()`
+
+    Se sua API ou bot expõe uma ação para limpar a conversa enquanto turnos podem estar em execução, use `cleared = await runner.reset_session_async(session_id)`. `Runner.reset_session_async(session_id) -> bool` adquire o lock de sessão, aguarda trabalho síncrono pendente, delega o I/O de SQLite em arquivo ao `ThreadPoolExecutor` dedicado de 4 workers (`_run_blocking`) e retorna `True` se uma sessão existente foi limpa, ou `False` se nenhuma sessão existia para `session_id`.
+  </Step>
+
+  <Step>
+    ### Use `SQLiteSessionStore(db_path=":memory:")` em Testes Unitários
+
+    Na `0.4.0`, `SQLiteSessionStore(db_path=":memory:")` mantém uma conexão compartilhada persistente durante todo o ciclo de vida da instância e fecha de forma limpa com `store.close()`.
+  </Step>
+</Steps>
+
+---
+
+## 6. Solução de Erros Comuns ao Atualizar
+
+| Erro / Exceção | Causa | Correção |
+| :--- | :--- | :--- |
+| `ProviderError` no primeiro turno Gemini (sem chave API) | Código dependia de Vertex AI / ADC implícito via `google-genai` sem chave API | Configure `GEMINI_API_KEY` ou `GOOGLE_API_KEY`, use `OpenAIEngine` com o endpoint compatível com OpenAI do Vertex AI ou implemente um `BaseEngine`. |
+| `AttributeError: 'GeminiEngine' object has no attribute 'client'` | Testes ou código acessavam `engine.client` | Injete `http_client=httpx.AsyncClient(transport=httpx.MockTransport(...))` em `GeminiEngine` ou use um stub de `BaseEngine`. |
+| `ValueError: Duplicate agent name '...'` | Duas instâncias distintas de `Agent` alcançáveis em ramos diferentes da árvore compartilham `.name` | Dê um `.name` único a cada instância distinta, ou reutilize a mesma instância em grafos cíclicos/diamante. |
+| `TypeError: WhatsAppChannel.__init__() got an unexpected keyword argument 'dedup_ttl_hours'` | `dedup_ttl_hours` foi passado para `WhatsAppChannel(...)` | Passe `dedup_ttl_hours=...` para `SQLiteSessionStore(...)` ou `SessionStore(...)`. |
+| `ToolSchemaError` em parâmetro de união | Uma ferramenta usa uma união com membro sem mapeamento (ex.: `CustomClass \| None` ou `int \| datetime`) | Substitua o membro por primitivos ou coleções suportadas (`str`, `int`, `float`, `bool`, `list`, `tuple`, `set`, `frozenset`, `dict`) ou use um `str` ISO-8601. |
+| `ToolArgumentValidationError` ao chamar ferramenta | Argumentos inválidos para as anotações de tipo | Amplie a anotação (ex.: `int \| str`) ou passe `@tool(validate_args=False)`. |
+| `ConfigurationError` em provedor ou canal | `Agent(provider=...)` recebeu um provedor não listado (mesmo com `base_url`), uma `base_url` remota omitiu `api_key` ou um canal recebeu limites inválidos | Use um provedor integrado (`anthropic`, `claude`, `deepseek`, `gemini`, `gemma`, `google`, `grok`, `groq`, `ollama`, `openai`, `xai`), ou para endpoints compatíveis com OpenAI customizados passe `engine=OpenAIEngine(provider="...", base_url="...", api_key="...")` ao `Agent`. |
+| `ReentrantTurnError` durante um turno ativo | Código iniciado por um turno ativo chamou `runner.run()`, `runner.run_async()` ou `runner.reset_session*()` para o mesmo `session_id` | Use `runner.spawn_turn(session_id, user_message)` para enfileirar um turno independente. |
+| `JsonCodecError` ao persistir sessão | `metadata` contém um objeto não serializável em JSON | Converta os valores para tipos JSON (`dict`, `list`, `str`, `int`, `float`, `bool`, `None`) ou `datetime`/`date`/`time`. |

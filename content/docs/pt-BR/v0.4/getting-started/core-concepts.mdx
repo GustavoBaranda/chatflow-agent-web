@@ -1,254 +1,115 @@
 ---
-title: 'Conceitos Fundamentais'
-description: 'Compreenda como os chatflows se desenvolvem no chatflow-agent e como Agentes, Motores, Ferramentas, Runner, Memória e Handoffs trabalham juntos.'
-sourceRevision: '6f2be16'
-sourceHash: 'b48c33fada230cdf08d600497824b6fcc66b615e6991c64ad5180edd17895958'
+title: Conceitos Fundamentais
+description: Mergulho profundo nas cinco abstrações fundamentais do chatflow-agent — Agents, Runners, Engines, Tools e Sessions.
+sourceRevision: "fe6b247"
+sourceHash: "066968bc595565cfc0ed5df647c2d592932cfe65184974b406d8e74f712730d8"
 ---
 
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Card, Cards } from 'fumadocs-ui/components/card';
 import { VersionBadge } from '@/components/docs/VersionBadge';
 
-O `chatflow-agent` é construído sobre seis primitivas arquiteturais fundamentais que, combinadas, viabilizam sistemas conversacionais de IA leves, modulares e tolerantes a falhas:
+<div className="mb-4">
+  <VersionBadge version="0.4.0" status="stable" />
+</div>
 
-## O que é um chatflow?
+O `chatflow-agent` é construído em torno de cinco abstrações componíveis. Entender como elas interagem torna simples projetar desde um chatbot com ferramentas até um enxame multi-provedor.
 
-No `chatflow-agent`, chamamos de **chatflow** o percurso que uma conversa desenvolve enquanto os agentes processam mensagens, usam ferramentas e transferem tarefas para outros agentes. O `Runner` coordena cada turno, carrega e preserva o estado da sessão e invoca o agente ativo. Os agentes interpretam a solicitação atual e decidem se respondem, usam uma ferramenta ou transferem a conversa; as ferramentas executam as operações determinísticas definidas pela aplicação.
+## 1. `Agent` — Persona, Ferramentas e Regras de Roteamento
 
-O percurso se desenvolve de acordo com as solicitações do usuário e o [estado persistente da sessão](/pt-BR/docs/v0.4/guides/sessions-state), sem exigir uma sequência fixa. Os guias de [ferramentas](/pt-BR/docs/v0.4/guides/tools) e [handoffs](/pt-BR/docs/v0.4/guides/multi-agent-handoffs) explicam esses recursos em detalhes. As integrações de canais, como [Telegram](/pt-BR/docs/v0.4/integrations/telegram), [WhatsApp](/pt-BR/docs/v0.4/integrations/whatsapp) e [webhooks](/pt-BR/docs/v0.4/integrations/webhook), transportam mensagens entre plataformas externas e o runner.
+Um `Agent` (`chatflow_agent.core.agent.Agent`) é um objeto declarativo que representa um especialista de IA. Um agente **não** guarda estado conversacional; ele define:
 
-**Exemplo conceitual:** Uma aplicação construída com a biblioteca poderia permitir que um usuário solicitasse um agendamento. Um agente identifica a especialidade, outro consulta a disponibilidade por meio de uma ferramenta definida pela aplicação e a aplicação registra o agendamento depois que o usuário o confirma. O sistema de agendamento e suas ferramentas de negócio pertencem à aplicação; eles não são recursos integrados do `chatflow-agent`.
-
----
-
-## 1. O Agente (`Agent`)
-
-Um `Agent` representa um ator autônomo com persona explícita, instruções em prompt de sistema, um modelo e motor de LLM designados e acesso a ferramentas ou agentes de transferência (_handoffs_).
+* **`name`** (`str`): Identificador único dentro de um enxame (ex.: `"TriageAgent"`, `"BillingSpecialist"`). Usado para sintetizar ferramentas de handoff (`transfer_to_billingspecialist`).
+* **`instructions`** (`str | Callable[[], str]`): O prompt do sistema — string estática ou função sem argumentos avaliada dinamicamente no início de cada turno.
+* **`model`** (`str`): Identificador do modelo (padrão `"gemini-2.5-flash"`).
+* **`tools`** (`list[Tool | Callable]`): Funções autorizadas que o agente pode executar, validadas em tempo de execução pelo Pydantic (`validate_args=True` por padrão).
+* **`handoffs`** (`list[Agent]`): Agentes destino para os quais este agente pode delegar a conversa.
+* **`provider` / `base_url` / `api_key` / `engine`**: Sobrescritas opcionais de roteamento para que cada agente de um enxame use um provedor LLM diferente. Nomes de provedor inválidos ou ausência de credenciais em endpoints remotos customizados falham imediatamente com `ConfigurationError`.
 
 ```python
-# [min-version: 0.3.0]
 # [executable]
+from datetime import datetime, timezone
 from chatflow_agent import Agent
 
-# Instruções de prompt estáticas com modelo alvo
+def dynamic_prompt() -> str:
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    return f"You are a support specialist. Current server time: {now}."
+
 agent = Agent(
-    name="TriageBot",
-    instructions="You are the front desk concierge. Route questions to specialists.",
+    name="SupportSpecialist",
+    instructions=dynamic_prompt,
     model="gpt-4o",
 )
+
+assert "Current server time:" in agent.get_instructions()
 ```
 
-### Instruções Dinâmicas
+## 2. `Runner` — O Orquestrador de Turnos
 
-As instruções podem ser uma string estática ou um invocável (_callable_) em Python (`Callable[[], str]`). Instruções dinâmicas são avaliadas no início de cada turno:
+O `Runner` (`chatflow_agent.core.runner.Runner`) coordena a execução entre sessões, agentes, motores e ferramentas:
+
+1. **Descoberta do Registro de Agentes:** Na inicialização, o `Runner` percorre todas as instâncias de `Agent` alcançáveis a partir de `starting_agent` pelas arestas `.handoffs`, registrando cada `Agent` alcançável. Se duas instâncias distintas de `Agent` compartilharem o mesmo `.name`, o `Runner` lança `ValueError` imediatamente.
+2. **Bloqueio de Concorrência por Sessão:** Chamadas a `run_async()` para o mesmo `session_id` adquirem um `asyncio.Lock` dedicado para impedir corrupção do histórico. Na `v0.4.0`, se uma ferramenta ou task em segundo plano iniciada dentro de um turno tentar chamar `run()` ou `run_async()` para o **mesmo** `session_id`, o `Runner` lança `ReentrantTurnError` imediatamente em vez de entrar em deadlock.
+3. **Redefinição Segura de Sessão (`reset_session_async`):** `await runner.reset_session_async(session_id) -> bool` e `runner.reset_session(session_id) -> bool` coordenam a limpeza do histórico com o lock de turno, a barreira de trabalho síncrono e a guarda de reentrância, retornando `True` se uma sessão existente foi limpa e `False` caso contrário.
+4. **Loop de Execução Limitado:** Dentro de um turno, o `Runner` aplica `max_tool_iterations` (padrão `10`) e `max_handoffs_per_turn` (padrão `5`) para evitar loops infinitos.
+5. **Reversão Transacional de Turno:** Se um motor lançar `ProviderError`, um handoff falhar, ou um turno for cancelado ou exceder `turn_timeout`, o `Runner` restaura o histórico de mensagens, `active_agent` e `metadata` ao estado exato anterior ao turno.
+
+## 3. `BaseEngine` — Inferência LLM Intercambiável
+
+Os motores (`chatflow_agent.core.engines.base.BaseEngine`) implementam um único contrato assíncrono:
 
 ```python
-# [min-version: 0.3.0]
+async def generate_turn_async(
+    self,
+    agent: Agent,
+    history: list[Message],
+) -> EngineTurnResult:
+    ...
+```
+
+De fábrica, o `chatflow-agent` traz três motores de produção — todos baseados em `httpx.AsyncClient` sem dependências pesadas de SDKs de provedores:
+
+* **`GeminiEngine`**: Comunica-se diretamente com a API REST do Google Gemini (`https://generativelanguage.googleapis.com/v1beta`), com backoff exponencial automático, suporte a `Retry-After`, IDs sintéticos resistentes a colisões (`cf_gemini_<24 hex>`) e redação de chaves API.
+* **`OpenAIEngine`**: Suporta OpenAI (`https://api.openai.com/v1`) além de presets integrados para `deepseek`, `groq`, `grok` e `ollama` local, com IDs sintéticos sem estado (`call_<24 hex>`).
+* **`AnthropicEngine`**: Conecta-se à API de Mensagens da Anthropic (`/v1/messages`) com tradução nativa de blocos `tool_use` / `tool_result` e `max_tokens: int = 4096` configurável.
+
+## 4. `Tool` e `@tool` — Chamada de Funções Validada
+
+Um `Tool` (`chatflow_agent.core.tools.Tool`) encapsula uma função Python síncrona ou assíncrona:
+
+* Inspeciona anotações de tipo Python (`str`, `int`, `float`, `bool`, `list[T]`, `Sequence[T]`, `set[T]`, `frozenset[T]`, `tuple[T, ...]`, `dict`, `Optional[T]` / `T | None`, uniões de tipos suportados e `Annotated[T, ...]`) para compilar schemas de function-calling. Lança `ToolSchemaError` na definição se uma anotação de união contiver um membro sem mapeamento (ex.: `CustomClass | None`), enquanto tipos não-união não suportados preservam o fallback compatível `STRING` / `string`.
+* Valida e coage argumentos fornecidos pelo modelo em tempo de execução antes de chamar a função (`validate_args=True` por padrão), lançando `ToolArgumentValidationError` (subclasse de `ToolExecutionError`) em entradas inválidas.
+* Aguarda corrotinas diretamente (`inspect.iscoroutinefunction`) e executa funções síncronas `def` em uma thread trabalhadora via `_run_sync_tool` durante `execute_async()` para que código bloqueante não trave o event loop (threads síncronas não podem ser interrompidas à força se um turno for cancelado ou expirar; turnos posteriores da mesma sessão aguardam a conclusão do trabalho síncrono residual).
+* Se uma ferramenta lançar uma exceção em tempo de execução, o `Runner` a captura, registra um `trace_id` no log e retorna um `ToolResult` sanitizado (`is_error=True`) ao LLM sem expor stack traces aos usuários finais.
+
+## 5. `BaseSessionStore` e `SessionContext` — Estado e Memória
+
+O estado conversacional é encapsulado em `SessionContext`:
+
+* **`session_id`** (`str`): Chave única de conversa (ex.: telefone do WhatsApp, chat ID do Telegram ou UUID).
+* **`history`** (`list[Message]`): Sequência ordenada de mensagens `USER`, `ASSISTANT`, `TOOL` e `SYSTEM`, limitada por janela deslizante (`max_turns`, padrão `40` turnos de usuário completos). Durante o recorte (`_prune_history()`), todas as mensagens `Role.SYSTEM` são preservadas no início de `history` enquanto turnos antigos não-sistema são descartados para que a janela retida comece em uma mensagem `Role.USER` e nunca separe pares `tool_call` / `tool_result`.
+* **`active_agent`** (`Agent`): Agente atendendo a sessão atualmente; atualizado e persistido após cada handoff.
+* **`metadata`** (`dict[str, Any]`): Dicionário JSON-serializável persistido junto à sessão (com isolamento por cópia profunda em `SessionStore`, serialização ISO-8601 para `datetime`/`date`/`time` e `JsonCodecError` para objetos não serializáveis).
+
+```python
+# [min-version: 0.4.0]
 # [executable]
-from datetime import datetime
 from chatflow_agent import Agent
+from chatflow_agent.core.memory import SessionContext
+from chatflow_agent.types import Message, Role
 
-def get_live_instructions() -> str:
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    return f"You are a scheduling assistant. Current server time is {now}."
+agent = Agent(name="Helper", instructions="Be concise.")
+ctx = SessionContext(session_id="demo", initial_agent=agent, max_turns=2)
+ctx.add_message(Message(role=Role.SYSTEM, content="Account tier: enterprise"))
+for i in range(3):
+    ctx.add_message(Message(role=Role.USER, content=f"Question {i}"))
+    ctx.add_message(Message(role=Role.MODEL, content=f"Answer {i}"))
 
-agent = Agent(
-    name="ScheduleBot",
-    instructions=get_live_instructions,
-    model="gemini-2.5-flash",
-)
+# Role.SYSTEM é preservado no início; apenas os 2 turnos completos mais recentes permanecem
+assert ctx.history[0].role == Role.SYSTEM
+assert [m.content for m in ctx.history if m.role == Role.USER] == ["Question 1", "Question 2"]
 ```
 
-<Callout type="info" title="Validação de Identidade no Enxame em v0.4.0rc1">
-  Na versão <VersionBadge version="0.4.0rc1" status="prerelease" />, o <code>Runner</code> valida
-  estritamente que todos os agentes de um enxame possuam atributos <code>name</code> distintos,
-  lançando um <code>ValueError</code> caso nomes duplicados sejam detectados para evitar colisões na
-  geração de ferramentas.
-</Callout>
-
----
-
-## 2. O Motor de Execução (`Runner`)
-
-O `Runner` orquestra o ciclo de vida da conversação, gerenciando:
-
-1. O carregamento do contexto da sessão e histórico de mensagens a partir do `SessionStore`.
-2. A criação de um ponto de verificação (_checkpoint_) do histórico, do agente ativo e dos metadados da sessão antes de executar o turno.
-3. A invocação do motor do modelo.
-4. O parsing de chamadas a ferramentas, a execução das funções correspondentes e o envio dos resultados de volta ao modelo até a obtenção de uma resposta textual final.
-5. A manutenção das alterações em caso de sucesso, ou a restauração do checkpoint se o turno lançar uma exceção, for cancelado ou atingir seu `turn_timeout`.
-
-Invocação síncrona, para scripts e ferramentas de CLI (sem um event loop em execução):
-
-```python
-from chatflow_agent import Agent, Runner, SessionStore
-
-agent = Agent(
-    name="Assistant",
-    instructions="Concise scheduling assistant.",
-    model="gpt-4o",
-)
-
-store = SessionStore()
-
-runner = Runner(
-    starting_agent=agent,
-    session_store=store,
-)
-
-response = runner.run(
-    session_id="user_123",
-    user_message="Book a meeting tomorrow at 3 PM",
-)
-```
-
-Invocação assíncrona, dentro de um event loop (servidores web, bots, aplicações `asyncio`):
-
-```python
-# [min-version: 0.4.0rc1]
-# [no-exec: requires real openai api key for live response]
-import asyncio
-
-from chatflow_agent import Agent, Runner
-
-async def main() -> None:
-    agent = Agent(
-        name="Assistant",
-        instructions="Concise scheduling assistant.",
-        model="gpt-4o",
-    )
-    async with Runner(starting_agent=agent) as runner:
-        response = await runner.run_async(
-            session_id="user_123",
-            user_message="Book a meeting tomorrow at 3 PM",
-        )
-        print(response.content)
-
-asyncio.run(main())
-```
-
-<Callout type="info" title="turn_timeout em v0.4.0rc1">
-  Na versão <VersionBadge version="0.4.0rc1" status="prerelease" />, <code>Runner.run_async</code>{' '}
-  introduz o parâmetro opcional nomeado <code>turn_timeout: float | None = None</code> (por exemplo,{' '}
-  <code>turn_timeout=30.0</code>). Se um turno exceder o prazo limite, ele é cancelado e o estado é
-  revertido atomicamente.
-</Callout>
-
----
-
-## 3. Motores de Provedores (`Engines`)
-
-Toda a comunicação com modelos no `chatflow-agent` é desacoplada sob a interface `BaseEngine`. Os motores comunicam-se através de REST HTTP assíncrono via `httpx`, eliminando a necessidade de bibliotecas cliente monolíticas de fornecedores:
-
-- **`OpenAIEngine`**: Suporta modelos OpenAI e qualquer API compatível com OpenAI (Groq, DeepSeek, xAI Grok, Ollama, vLLM) através de `base_url`.
-- **`AnthropicEngine`**: Integração REST direta com modelos Claude da Anthropic.
-- **`GeminiEngine`**: Integração com Google Gemini. Na versão <VersionBadge version="0.4.0rc1" status="prerelease" />, foi totalmente reescrito com chamadas REST nativas.
-
-```python
-from chatflow_agent import Agent, OpenAIEngine
-
-# Motor universal compatível com OpenAI para endpoints customizados ou locais
-local_engine = OpenAIEngine(
-    base_url="http://localhost:11434/v1",
-    provider="ollama",
-    api_key="ollama",
-)
-
-local_agent = Agent(
-    name="LocalBot",
-    instructions="You run locally via Ollama.",
-    model="llama3.2:latest",
-    engine=local_engine,
-)
-```
-
----
-
-## 4. Ferramentas Determinísticas (`Tool` e `@tool`)
-
-As ferramentas conferem aos agentes poder de execução determinístico. Quando decoradas com `@tool`, o `chatflow-agent` constrói o schema de parâmetros a partir das anotações de tipo do Python e dos valores padrão. A descrição da ferramenta é o argumento `description=`, ou a docstring da função quando nenhuma descrição é informada; seções da docstring como `Args:` não são interpretadas como descrições por parâmetro:
-
-```python
-# [min-version: 0.3.0]
-# [executable]
-from chatflow_agent import tool
-
-@tool(name="fetch_user_profile", description="Fetch user metadata from internal database.")
-def fetch_user_profile(user_id: str) -> dict[str, str]:
-    """Retrieve user details."""
-    return {"user_id": user_id, "tier": "enterprise", "status": "active"}
-```
-
-Funções síncronas (`def`) e assíncronas (`async def`) são suportadas nativamente. Alternativamente, você pode usar o decorador `@agent.tool` diretamente em uma instância de agente.
-
----
-
-## 5. Memória Resiliente e Concorrência (`SessionStore`)
-
-O `chatflow-agent` trata a persistência de estado e a segurança de concorrência como prioridades de primeira classe:
-
-```python
-from chatflow_agent import SQLiteSessionStore
-
-# Armazenamento persistente de sessões em SQLite. default_max_turns é uma janela
-# deslizante de histórico: mantém os últimos 40 turnos completos de cada sessão.
-store = SQLiteSessionStore(
-    db_path="./chat_sessions.db",
-    default_max_turns=40,
-)
-```
-
-### A Garantia de Reversão Transacional (_Rollback_)
-
-Antes de processar um turno, o `Runner` cria um checkpoint do histórico, do agente ativo e dos metadados da sessão. Se uma exceção escapar do turno (por exemplo, uma indisponibilidade do provedor), o turno for cancelado ou o `turn_timeout` expirar, o checkpoint é restaurado antes que o erro seja lançado. Assim, turnos corrompidos ou parciais nunca degradam o histórico da conversação.
-
-### Proteção do Event Loop e Escudos de Concorrência
-
-- **Descarga para Pools de Threads:** A E/S de SQLite baseado em arquivo roda nas threads trabalhadoras dedicadas do próprio store, impedindo que bloqueios de sistema de arquivos travem o loop de eventos asyncio do Python. Stores `":memory:"` permanecem no event loop.
-- **Bloqueio de Sessão:** Os turnos de uma mesma sessão são serializados (por store e por event loop, tanto para `SessionStore` quanto para `SQLiteSessionStore`); requisições simultâneas para uma sessão aguardam o bloqueio.
-- **Proteção contra Reentrância (`ReentrantTurnError`):** Iniciar um turno para uma sessão a partir de código iniciado pelo turno em execução dessa mesma sessão (uma ferramenta, ou uma task ou thread criada por ela) lança `ReentrantTurnError` em vez de causar um deadlock. Use `Runner.spawn_turn()` para enfileirar um turno de acompanhamento.
-
----
-
-## 6. Handoffs Multiagente (`Handoffs`)
-
-Enxames multiagente delegam tarefas dinamicamente através de transferências declarativas (_handoffs_). Quando um agente declara um par em `handoffs=[...]`, o `chatflow-agent` sintetiza uma ferramenta de transferência nomeada a partir do `name` do par, transliterado para ASCII, convertido para minúsculas e sanitizado: um par chamado `BillingAgent` se torna `transfer_to_billingagent`:
-
-```python
-from chatflow_agent import Agent, Runner
-
-# Agente Especialista
-billing_agent = Agent(
-    name="BillingAgent",
-    instructions="You specialize in invoices, receipts, and refund requests.",
-    model="gpt-4o",
-)
-
-# Agente de Triagem Inicial
-triage_agent = Agent(
-    name="TriageAgent",
-    instructions="Greet users. Transfer billing issues to BillingAgent.",
-    model="gpt-4o",
-    handoffs=[billing_agent],
-)
-
-runner = Runner(starting_agent=triage_agent)
-
-# Executar turno com transferência
-response = runner.run(
-    session_id="user_billing_query",
-    user_message="I need a copy of my invoice from last month.",
-)
-
-print(f"Responding agent: {response.active_agent_name}")
-print(f"Message content: {response.content}")
-```
-
-O agente que gerou a resposta final fica visível através de `response.active_agent_name`. As transferências dentro de um turno são limitadas por `Runner(max_handoffs_per_turn=5)`; não existe uma detecção de ciclos separada.
-
----
-
-## Próximos Passos
-
-Agora que você compreende os pilares arquiteturais do `chatflow-agent`:
-
-- Consulte o [Guia de Instalação](/pt-BR/docs/v0.4/getting-started/installation) para configurar o framework.
-- Explore o [Guia de Início Rápido](/pt-BR/docs/v0.4/getting-started/quickstart) para criar um projeto prático.
+Escolha entre:
+* **`SessionStore`**: Armazenamento rápido em memória (`default_max_turns=40`) com isolamento por cópia profunda de metadados e deduplicação thread-safe.
+* **`SQLiteSessionStore`**: Armazenamento durável em SQLite (`default_max_turns=40`) com journaling `WAL` em bancos baseados em arquivo, suporte persistente a `:memory:`, leituras em transação única, reversão transacional de turnos e deduplicação de webhooks de 192 horas (`8 dias`).

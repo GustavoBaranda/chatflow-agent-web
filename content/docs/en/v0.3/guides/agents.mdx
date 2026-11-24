@@ -162,7 +162,7 @@ assert any(t.name == "query_active_users" for t in agent.tools)
 
 ---
 
-## Version Differences & Prerelease Features
+## Version Differences (v0.3.4 vs v0.4.0)
 
 `chatflow-agent` provides consistent agent mechanics while introducing robust validation and character normalization in newer releases:
 
@@ -170,22 +170,22 @@ assert any(t.name == "query_active_users" for t in agent.tools)
 * <VersionBadge version="0.3.4" status="stable" /> The constructor does not validate `name`; the only check is that `add_handoff()` rejects a handoff to the agent itself.
 * Synthetic handoff tools are formatted as `transfer_to_<sanitized_name>`.
 
-### Prerelease Enhancements (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Non-Empty Name Validation:** The constructor explicitly rejects empty or whitespace-only names:
+### Enhancements in `v0.4.0`
+* <VersionBadge version="0.4.0" status="stable" /> **Non-Empty Name Validation:** The constructor explicitly rejects empty or whitespace-only names:
 
 ```python
 from chatflow_agent import Agent
 
-# In v0.4.0rc1: raises ValueError("Agent name must be a non-empty string.")
+# In v0.4.0: raises ValueError("Agent name must be a non-empty string.")
 try:
     Agent(name="   ", instructions="test")
 except ValueError as err:
     print("Caught expected validation error:", err)
 ```
 
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **NFKD Unicode Transliteration:** Agent names with accents (e.g., `AtenciónAlCliente`) are transliterated cleanly to valid ASCII identifiers (`transfer_to_atencionalcliente`).
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Collision Disambiguation:** If multiple handoff targets produce equivalent sanitized tool names, numeric suffixes (`_2`, `_3`) are automatically appended.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Tool Name Length Capping:** Synthetic tool names are strictly capped at 60 characters to comply with all upstream provider API limits.
+* <VersionBadge version="0.4.0" status="stable" /> **NFKD Unicode Transliteration:** Agent names with accents (e.g., `AtenciónAlCliente`) are transliterated cleanly to valid ASCII identifiers (`transfer_to_atencionalcliente`).
+* <VersionBadge version="0.4.0" status="stable" /> **Collision Disambiguation:** If multiple handoff targets produce equivalent sanitized tool names, numeric suffixes (`_2`, `_3`) are automatically appended.
+* <VersionBadge version="0.4.0" status="stable" /> **Tool Name Length Capping:** Synthetic tool names are strictly capped at 60 characters to comply with all upstream provider API limits.
 
 ---
 
@@ -215,7 +215,7 @@ agent.current_user = "user_123"  # Will leak across concurrent sessions!
 # )
 ```
 
-In v0.3.4, `metadata` passed to `run()` / `run_async()` is applied only when the session is created; later calls for the same session do not update it. Merging metadata on every turn was added in <VersionBadge version="0.4.0rc1" status="prerelease" />.
+In v0.3.4, `metadata` passed to `run()` / `run_async()` is applied only when the session is created; later calls for the same session do not update it. Merging metadata on every turn was added in <VersionBadge version="0.4.0" status="stable" />.
 
 ### 3. Self-Handoff Registration
 An agent cannot register a handoff to itself. Doing so raises an immediate error:

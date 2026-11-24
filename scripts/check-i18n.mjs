@@ -2,15 +2,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const rootDir = path.resolve(__dirname, '..');
+const rootFlagIdx = process.argv.indexOf('--root');
+const rootDir =
+  rootFlagIdx !== -1 && process.argv[rootFlagIdx + 1]
+    ? path.resolve(process.argv[rootFlagIdx + 1])
+    : path.resolve(__dirname, '..');
 
 const MESSAGES_DIR = path.join(rootDir, 'messages');
 const CONTENT_DOCS_DIR = path.join(rootDir, 'content', 'docs');
 const AUTHORITATIVE_LOCALE = 'en';
+const SOURCE_REVISION_RE = /^[0-9a-f]{7,40}$/;
 
 /**
  * Recursively flatten a nested object into dot-notation paths
@@ -69,6 +75,53 @@ function findFiles(dir, ext = '.mdx') {
 
 function calculateSha256(content) {
   return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+function detectGitTraceability(dir) {
+  try {
+    const inside = execFileSync('git', ['-C', dir, 'rev-parse', '--is-inside-work-tree'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (inside !== 'true') return { available: false, shallow: false };
+    const shallow =
+      execFileSync('git', ['-C', dir, 'rev-parse', '--is-shallow-repository'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim() === 'true';
+    return { available: true, shallow };
+  } catch {
+    return { available: false, shallow: false };
+  }
+}
+
+function verifyGitSourceRevision(dir, revision, enRelativePosix, expectedHash) {
+  try {
+    execFileSync('git', ['-C', dir, 'cat-file', '-e', `${revision}^{commit}`], {
+      stdio: ['ignore', 'ignore', 'ignore'],
+    });
+  } catch {
+    return { ok: false, reason: `commit "${revision}" does not exist in Git history` };
+  }
+  const gitPath = `content/docs/${AUTHORITATIVE_LOCALE}/${enRelativePosix}`;
+  let blob;
+  try {
+    blob = execFileSync('git', ['-C', dir, 'show', `${revision}:${gitPath}`], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    return { ok: false, reason: `"${gitPath}" does not exist at commit "${revision}"` };
+  }
+  const blobHash = calculateSha256(blob);
+  const blobLfHash = calculateSha256(blob.replace(/\r\n/g, '\n'));
+  if (blobHash !== expectedHash && blobLfHash !== expectedHash) {
+    return {
+      ok: false,
+      reason: `content of "${gitPath}" at commit "${revision}" does not reproduce sourceHash`,
+    };
+  }
+  return { ok: true };
 }
 
 console.log('='.repeat(70));
@@ -144,7 +197,15 @@ if (!fs.existsSync(CONTENT_DOCS_DIR)) {
     console.log(`ℹ️  No authoritative docs found in ${enDocsDir}. Skipping.`);
   } else {
     const enDocs = findFiles(enDocsDir, '.mdx');
-    console.log(`ℹ️  Found ${enDocs.length} authoritative MDX doc(s) in English.`);
+    const gitState = detectGitTraceability(rootDir);
+    console.log(
+      `ℹ️  Found ${enDocs.length} authoritative MDX doc(s) in English.` +
+        (gitState.available && !gitState.shallow
+          ? ' (Git sourceRevision traceability: ENABLED)'
+          : gitState.shallow
+            ? ' (Shallow Git clone detected — skipping historical Git object lookup)'
+            : ''),
+    );
 
     const localeDirs = fs
       .readdirSync(CONTENT_DOCS_DIR, { withFileTypes: true })
@@ -166,7 +227,8 @@ if (!fs.existsSync(CONTENT_DOCS_DIR)) {
 
         if (!fs.existsSync(localizedPath)) {
           missing++;
-          console.log(`    ⚠️  MISSING: ${relativePath}`);
+          hasErrors = true;
+          console.error(`    ❌ MISSING: ${relativePath}`);
           continue;
         }
 
@@ -178,10 +240,36 @@ if (!fs.existsSync(CONTENT_DOCS_DIR)) {
 
         if (!frontmatter.title || !frontmatter.description || body.trim().length === 0) {
           incomplete++;
-          console.log(`    ⚠️  INCOMPLETE: ${relativePath} (Missing title/description frontmatter or body)`);
-        } else if (frontmatter.sourceHash && frontmatter.sourceHash !== enHash) {
+          hasErrors = true;
+          console.error(`    ❌ INCOMPLETE: ${relativePath} (Missing title/description frontmatter or body)`);
+        } else if (!frontmatter.sourceHash) {
+          incomplete++;
+          hasErrors = true;
+          console.error(`    ❌ INCOMPLETE: ${relativePath} (Missing sourceHash frontmatter)`);
+        } else if (!frontmatter.sourceRevision) {
+          incomplete++;
+          hasErrors = true;
+          console.error(`    ❌ INCOMPLETE: ${relativePath} (Missing sourceRevision frontmatter)`);
+        } else if (!SOURCE_REVISION_RE.test(frontmatter.sourceRevision)) {
+          incomplete++;
+          hasErrors = true;
+          console.error(
+            `    ❌ INVALID_REVISION: ${relativePath} (sourceRevision "${frontmatter.sourceRevision}" is not a valid 7-40 char Git SHA)`,
+          );
+        } else if (frontmatter.sourceHash !== enHash) {
           outdated++;
-          console.log(`    ⚠️  OUTDATED: ${relativePath} (sourceHash differs from current English hash)`);
+          hasErrors = true;
+          console.error(`    ❌ OUTDATED: ${relativePath} (sourceHash differs from current English hash)`);
+        } else if (gitState.available && !gitState.shallow) {
+          const relPosix = relativePath.split(path.sep).join('/');
+          const revCheck = verifyGitSourceRevision(rootDir, frontmatter.sourceRevision, relPosix, frontmatter.sourceHash);
+          if (!revCheck.ok) {
+            incomplete++;
+            hasErrors = true;
+            console.error(`    ❌ REVISION_MISMATCH: ${relativePath} (${revCheck.reason})`);
+          } else {
+            upToDate++;
+          }
         } else {
           upToDate++;
         }

@@ -73,6 +73,9 @@ jobs:
       - name: Documentation topic synchronization
         run: pnpm run check:topics
 
+      - name: STABLE-ONLY policy check
+        run: pnpm run check:stable
+
       - name: Provision strict isolated SDK releases from PyPI
         run: python scripts/ensure-sdk-releases.py --version all
 

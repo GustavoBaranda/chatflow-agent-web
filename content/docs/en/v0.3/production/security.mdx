@@ -126,9 +126,9 @@ def update_email(user_id: int, new_email: str) -> str:
 
 In stable v0.3.4 there is no reentrancy guard. A tool that calls `runner.run_async()` or `runner.run()` for its own session waits forever with the in-memory `SessionStore` (the outer turn holds the lock), and with `SQLiteSessionStore` the nested turn runs unserialized alongside the outer one. Do not start a turn of a session from inside that session's running turn.
 
-<VersionBadge version="0.4.0rc1" status="prerelease" />
+<VersionBadge version="0.4.0" status="stable" />
 
-Starting in `v0.4.0rc1`, `Runner` rejects these nested turns:
+Starting in `v0.4.0`, `Runner` rejects these nested turns:
 - If code started by a running turn (a tool, or a task or thread it starts) calls `runner.run_async` or `runner.run` for the same session, `Runner` raises `ReentrantTurnError` immediately instead of deadlocking. `Runner.spawn_turn()` queues a follow-up turn instead.
 - The guard covers nested calls only. It does not serialize sessions across store instances, processes, or threads running their own event loops.
 

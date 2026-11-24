@@ -14,9 +14,10 @@ import {
 
 export interface VersionSelectorProps {
   className?: string;
+  currentTrack?: DocVersionTrack;
 }
 
-export function VersionSelector({ className = '' }: VersionSelectorProps) {
+export function VersionSelector({ className = '', currentTrack }: VersionSelectorProps) {
   const t = useTranslations('versionSelector');
   const locale = useLocale();
   const pathname = usePathname() || '';
@@ -25,8 +26,9 @@ export function VersionSelector({ className = '' }: VersionSelectorProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listboxId = useId();
 
-  // Detect active version track from current pathname
-  const activeTrack: DocVersionTrack = pathname.includes('/docs/v0.4') ? 'v0.4' : 'v0.3';
+  // Detect active version track from explicit prop or current pathname
+  const activeTrack: DocVersionTrack =
+    currentTrack ?? (pathname.includes('/docs/v0.3') ? 'v0.3' : 'v0.4');
   const activeConfig = getVersionConfig(activeTrack);
 
   // Close dropdown on click outside

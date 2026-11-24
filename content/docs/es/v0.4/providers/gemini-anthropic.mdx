@@ -1,8 +1,8 @@
 ---
 title: "Google Gemini y Anthropic Claude"
 description: "Integración de modelos fundacionales de alto rendimiento con Google Gemini REST v1beta y Anthropic Claude Messages API."
-sourceRevision: "82d8ebf"
-sourceHash: "9eb8468fcc81dccbdb8dd2176d913db697901d5f1004fc9f5f1783c132baa0f8"
+sourceRevision: "90324d3"
+sourceHash: "114e401860712898ffab50f923f5b4a157f1ad8c2943edb7e80fb38f8d094a7a"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -55,17 +55,17 @@ assistant = Agent(
 ### Pool de Conexiones y Arquitectura sin Dependencias Cautivas
 
 <div className="flex gap-2 my-3">
-  <VersionBadge version="0.4.0rc1" status="prerelease" />
+  <VersionBadge version="0.4.0" status="stable" />
   <VersionBadge version="0.3.4" status="stable" />
 </div>
 
 La implementación de Gemini experimentó una transformación arquitectónica fundamental entre versiones:
 
 * **En `v0.3.4` (Estable):** El motor importaba el SDK oficial `google-genai` de Google (`from google import genai`), requiriendo la instalación de librerías cliente externas.
-* **En `v0.4.0rc1` (Pre-lanzamiento):** El motor se reescribió por completo utilizando `httpx` asíncrono nativo directamente contra `https://generativelanguage.googleapis.com/v1beta`. Esto elimina dependencias pesadas y habilita un **pool de conexiones persistentes (keepalive)** entre turnos del agente:
+* **En `v0.4.0` (Última Estable):** El motor se reescribió por completo utilizando `httpx` asíncrono nativo directamente contra `https://generativelanguage.googleapis.com/v1beta`. Esto elimina dependencias pesadas y habilita un **pool de conexiones persistentes (keepalive)** entre turnos del agente:
 
 ```python
-# [min-version: 0.4.0rc1]
+# [min-version: 0.4.0]
 # [no-exec: requires real gemini api key]
 import asyncio
 from chatflow_agent import Agent, Runner
@@ -139,7 +139,7 @@ editor = Agent(
 * **Demora Base:** 1.0 segundo.
 * **Demora Máxima:** 10.0 segundos.
 
-Estos valores son fijos en v0.4.0rc1; no son parámetros del constructor. Cuando una respuesta reintentada incluye un encabezado `Retry-After` numérico, ese valor sustituye a la demora exponencial, pero la espera sigue limitada a 10 segundos, por lo que una demora solicitada mayor no se respeta por completo.
+Estos valores son fijos en v0.4.0; no son parámetros del constructor. Cuando una respuesta reintentada incluye un encabezado `Retry-After` numérico, ese valor sustituye a la demora exponencial, pero la espera sigue limitada a 10 segundos, por lo que una demora solicitada mayor no se respeta por completo.
 
 ---
 

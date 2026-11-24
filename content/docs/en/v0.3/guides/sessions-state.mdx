@@ -164,7 +164,7 @@ else:
 
 ---
 
-## Version Differences & Prerelease Features
+## Version Differences (v0.3.4 vs v0.4.0)
 
 Session management introduces high-concurrency optimizations in newer versions:
 
@@ -173,11 +173,11 @@ Session management introduces high-concurrency optimizations in newer versions:
 * In-memory `SessionStore` and persistent `SQLiteSessionStore`.
 * 8-day message deduplication TTL (`DEFAULT_DEDUP_TTL_HOURS = 192`).
 
-### Prerelease Enhancements (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Dedicated Blocking I/O Worker Pool:** For file-backed `SQLiteSessionStore`, disk read and write operations are offloaded to a private 4-worker thread pool (`_BLOCKING_IO_WORKERS = 4`) via `_run_blocking`. This prevents disk latency and file locks from stalling the asynchronous event loop.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`SessionDeletedError`:** If an active task attempts to commit or read from a session that was deleted via `store.delete(session_id)`, `chatflow-agent` raises an explicit `SessionDeletedError`.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Strict Parameter Validation:** Passing `max_turns <= 0` or `default_max_turns <= 0` raises an immediate `ValueError`.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Ephemeral SQLite Detection:** The store automatically detects `:memory:` and shared-memory URIs, keeping them directly on the event loop for maximum performance without thread overhead.
+### Enhancements in `v0.4.0`
+* <VersionBadge version="0.4.0" status="stable" /> **Dedicated Blocking I/O Worker Pool:** For file-backed `SQLiteSessionStore`, disk read and write operations are offloaded to a private 4-worker thread pool (`_BLOCKING_IO_WORKERS = 4`) via `_run_blocking`. This prevents disk latency and file locks from stalling the asynchronous event loop.
+* <VersionBadge version="0.4.0" status="stable" /> **`SessionDeletedError`:** If an active task attempts to commit or read from a session that was deleted via `store.delete(session_id)`, `chatflow-agent` raises an explicit `SessionDeletedError`.
+* <VersionBadge version="0.4.0" status="stable" /> **Strict Parameter Validation:** Passing `max_turns <= 0` or `default_max_turns <= 0` raises an immediate `ValueError`.
+* <VersionBadge version="0.4.0" status="stable" /> **Ephemeral SQLite Detection:** The store automatically detects `:memory:` and shared-memory URIs, keeping them directly on the event loop for maximum performance without thread overhead.
 
 ---
 

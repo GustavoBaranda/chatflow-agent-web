@@ -201,11 +201,11 @@ export function CodeShowcase() {
           <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
             <span className="inline-flex items-center gap-1.5 shrink-0">
               <Zap className="h-3.5 w-3.5 text-amber-400" />
-              <span>Native asyncio</span>
+              <span>{t('highlightAsync')}</span>
             </span>
             <span className="inline-flex items-center gap-1.5 shrink-0">
               <Database className="h-3.5 w-3.5 text-blue-400" />
-              <span>SQLite State & Rollback</span>
+              <span>{t('highlightSqlite')}</span>
             </span>
           </div>
           <span className="font-mono text-slate-500 shrink-0">Python &gt;= 3.10</span>
@@ -215,7 +215,7 @@ export function CodeShowcase() {
       {/* Deep-link to full quickstart guide */}
       <div className="mt-4 mx-auto max-w-4xl flex items-center justify-end px-2">
         <Link
-          href="/docs/v0.3/getting-started/quickstart"
+          href="/docs/v0.4/getting-started/quickstart"
           className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-primary transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-primary"
         >
           <span>{t('viewFullQuickstart')}</span>

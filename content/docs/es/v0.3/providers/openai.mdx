@@ -1,8 +1,8 @@
 ---
 title: "OpenAI y Endpoints Compatibles"
 description: "Configuración, preajustes, pasarelas personalizadas y políticas de seguridad para OpenAI, Groq, DeepSeek y xAI Grok."
-sourceRevision: "3c5ab27"
-sourceHash: "f5aef0a3913ca6c7e0b80c44726b72c6398290f3b546a967bf7d35f98d3d9f23"
+sourceRevision: "321461a"
+sourceHash: "f5ef448f1f7ea3d9cd0d6f256ba818e39d1c734aacf0535f5945692bf28d3073"
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
@@ -171,9 +171,9 @@ open_engine = OpenAIEngine(
 )
 ```
 
-## Restricciones y Normalización de IDs de Llamadas a Herramientas (Prerelease)
+## Restricciones y Normalización de IDs de Llamadas a Herramientas (v0.4.0)
 
-<VersionBadge version="0.4.0rc1" status="prerelease" /> agrega normalización determinista para valores `tool_call_id` de OpenAI superiores a 40 caracteres. La versión estable v0.3.4 no ofrece esta garantía entre proveedores:
+<VersionBadge version="0.4.0" status="stable" /> agrega normalización determinista para valores `tool_call_id` de OpenAI superiores a 40 caracteres. La versión estable v0.3.4 no ofrece esta garantía entre proveedores:
 
 1. **Truncamiento y Hashing:** Si un mensaje histórico existente contiene un ID de llamada a herramienta superior a 40 caracteres, `OpenAIEngine` lo sustituye de forma segura por un identificador determinista derivado mediante SHA-256 (`call_` + 24 caracteres hexadecimales).
 2. **Normalización de Tipos de Esquema:** El motor normaliza automáticamente los tipos de parámetros JSON Schema (`_lowercase_schema_types`) preservando al mismo tiempo esquemas de propiedades personalizadas, garantizando la compatibilidad entre distintas versiones de modelos de OpenAI.

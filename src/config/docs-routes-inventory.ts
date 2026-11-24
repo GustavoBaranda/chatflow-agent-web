@@ -5,7 +5,7 @@
  * legacy path, and its canonical target path in the v0.3 stable track.
  */
 
-import { DEFAULT_STABLE_TRACK } from './docs-versions';
+import { DEFAULT_STABLE_TRACK, PREVIOUS_STABLE_TRACK } from './docs-versions';
 
 export interface RouteMappingEntry {
   /** Unversioned documentation path (relative to locale, without leading slash) */
@@ -21,6 +21,8 @@ export const DOCUMENTATION_ROUTE_INVENTORY: readonly RouteMappingEntry[] = [
   { unversionedSubpath: 'getting-started/installation', section: 'getting-started', title: 'Installation' },
   { unversionedSubpath: 'getting-started/quickstart', section: 'getting-started', title: 'Quickstart' },
   { unversionedSubpath: 'getting-started/core-concepts', section: 'getting-started', title: 'Core Concepts' },
+  { unversionedSubpath: 'getting-started/whats-new', section: 'getting-started', title: "What's New in 0.4.0" },
+  { unversionedSubpath: 'getting-started/migration', section: 'getting-started', title: 'Migrating from 0.3.4 to 0.4.0' },
   { unversionedSubpath: 'guides/agents', section: 'guides', title: 'Agents Guide' },
   { unversionedSubpath: 'guides/tools', section: 'guides', title: 'Tools Guide' },
   { unversionedSubpath: 'guides/multi-agent-handoffs', section: 'guides', title: 'Multi-Agent Handoffs' },
@@ -53,10 +55,23 @@ export function getRouteRedirectMap(locale: string = 'en', targetTrack: string =
   return map;
 }
 
+const LEGACY_V04_ALIASES = new Set([
+  'v0.4.0',
+  'v0.4.0rc1',
+  'v0.4.0rc2',
+  'v0.4.0rc3',
+  '0.4.0',
+  '0.4.0rc1',
+  '0.4.0rc2',
+  '0.4.0rc3',
+]);
+
+const LEGACY_V03_ALIASES = new Set(['v0.3.4', '0.3.4']);
+
 /**
- * Resolve a valid unversioned documentation path to its stable canonical path.
+ * Resolve a valid unversioned, RC, or full patch documentation path to its canonical track path.
  *
- * Versioned paths and unknown paths return undefined so they continue through
+ * Canonical versioned paths and unknown paths return undefined so they continue through
  * the regular Next.js and Fumadocs routing pipeline.
  */
 export function getLegacyDocumentationRedirect(
@@ -64,8 +79,21 @@ export function getLegacyDocumentationRedirect(
   locales: readonly string[],
   targetTrack: string = DEFAULT_STABLE_TRACK,
 ): string | undefined {
-  for (const locale of locales) {
-    const targetPath = getRouteRedirectMap(locale, targetTrack)[pathname];
+  const normalized = pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+  const [, locale, section, firstSegment, ...rest] = normalized.split('/');
+
+  if (locale && section === 'docs' && locales.includes(locale) && firstSegment) {
+    const tail = rest.length > 0 ? `/${rest.join('/')}` : '';
+    if (LEGACY_V04_ALIASES.has(firstSegment)) {
+      return `/${locale}/docs/${DEFAULT_STABLE_TRACK}${tail}`;
+    }
+    if (LEGACY_V03_ALIASES.has(firstSegment)) {
+      return `/${locale}/docs/${PREVIOUS_STABLE_TRACK}${tail}`;
+    }
+  }
+
+  for (const loc of locales) {
+    const targetPath = getRouteRedirectMap(loc, targetTrack)[normalized];
     if (targetPath) {
       return targetPath;
     }

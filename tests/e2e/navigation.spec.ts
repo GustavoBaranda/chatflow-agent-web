@@ -50,8 +50,8 @@ test.describe('Navigation, Home, and About Suite', () => {
       'Build Chatflows and Contextual Multi-Agent Systems in Python',
     );
 
-    // Release badge with v0.3.4
-    const badge = page.locator('text=chatflow-agent v0.3.4').first();
+    // Release badge with v0.4.0
+    const badge = page.locator('text=chatflow-agent v0.4.0').first();
     await expect(badge).toBeVisible();
 
     // Primary CTA buttons (no broken internal links)
@@ -62,7 +62,7 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(docsBtn).toBeVisible();
 
     const chatflowConceptsLink = page.locator(
-      'section[aria-labelledby="hero-title"] a[href="/en/docs/v0.3/getting-started/core-concepts"]',
+      'section[aria-labelledby="hero-title"] a[href="/en/docs/v0.4/getting-started/core-concepts"]',
     );
     await expect(chatflowConceptsLink).toBeVisible();
 
@@ -82,11 +82,11 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(codeShowcase).toContainText(
       'from chatflow_agent import Agent, Runner, SQLiteSessionStore',
     );
-    await expect(codeShowcase).toContainText('chatflow-agent v0.3.4');
+    await expect(codeShowcase).toContainText('chatflow-agent v0.4.0');
 
     // Quickstart deep-link
     const quickstartLink = codeShowcase.locator(
-      'a[href="/en/docs/v0.3/getting-started/quickstart"]',
+      'a[href="/en/docs/v0.4/getting-started/quickstart"]',
     );
     await expect(quickstartLink).toBeVisible();
 
@@ -95,11 +95,11 @@ test.describe('Navigation, Home, and About Suite', () => {
     await expect(docsDiscovery).toBeVisible();
     await expect(docsDiscovery.locator('article')).toHaveCount(3);
     await expect(
-      docsDiscovery.locator('a[href="/en/docs/v0.3/getting-started/installation"]'),
+      docsDiscovery.locator('a[href="/en/docs/v0.4/getting-started/installation"]'),
     ).toBeVisible();
-    await expect(docsDiscovery.locator('a[href="/en/docs/v0.3/guides/agents"]')).toBeVisible();
+    await expect(docsDiscovery.locator('a[href="/en/docs/v0.4/guides/agents"]')).toBeVisible();
     await expect(
-      docsDiscovery.locator('a[href="/en/docs/v0.3/integrations/webhook"]'),
+      docsDiscovery.locator('a[href="/en/docs/v0.4/integrations/webhook"]'),
     ).toBeVisible();
 
     // Features Section (6 verified capabilities)
@@ -565,7 +565,7 @@ test.describe('Navigation, Home, and About Suite', () => {
     await page.goto('/en/docs');
     await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
       'content',
-      'https://chatflowagent.org/en/docs/v0.3',
+      'https://chatflowagent.org/en/docs/v0.4',
     );
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
       'content',

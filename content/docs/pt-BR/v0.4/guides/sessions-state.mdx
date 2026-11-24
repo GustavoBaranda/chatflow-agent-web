@@ -1,8 +1,8 @@
 ---
 title: "Sessões e Estado da Conversação"
 description: "Guia completo sobre memória de sessão, poda por janela deslizante, persistência em memória e SQLite e deduplicação de mensagens no chatflow-agent."
-sourceRevision: "f8f8bac"
-sourceHash: "73dd721edf6a91204667ccf6ce46cf82b9d7a713f1e0eca2bd31fa886c2f4573"
+sourceRevision: "90324d3"
+sourceHash: "e61d90d503429912c3a79b8ebe94101e4c9d58b0aaa22b4dc8539eb7a81c7236"
 ---
 
 import { VersionBadge } from '@/components/docs/VersionBadge';
@@ -45,7 +45,7 @@ assert session.metadata["channel"] == "whatsapp"
 | `max_turns` | Quantidade máxima de turnos conversacionais completos mantidos em memória antes da poda. |
 | `history` | Lista de objetos tipados `Message` (`Role.SYSTEM`, `Role.USER`, `Role.MODEL`, `Role.TOOL`). |
 | `metadata` | Dicionário flexível para contexto do usuário, tokens, cabeçalhos de canal e flags. |
-| `lock` | `asyncio.Lock` assíncrono mantido pelo `Runner` durante um turno. Na v0.4.0rc1, ele é compartilhado por store, ID de sessão e event loop em ambos os stores, de modo que os turnos de uma sessão rodam um de cada vez. |
+| `lock` | `asyncio.Lock` assíncrono mantido pelo `Runner` durante um turno. Na v0.4.0, ele é compartilhado por store, ID de sessão e event loop em ambos os stores, de modo que os turnos de uma sessão rodam um de cada vez. |
 | `rollback_to(len)` | Trunca o histórico até o comprimento de um ponto de controle anterior. O próprio `Runner` reverte turnos com `restore_history(...)`, que também restaura o agente ativo e os metadados. |
 
 ---
@@ -168,7 +168,7 @@ else:
 
 ---
 
-## Diferenças entre Versões e Recursos de Pré-lançamento
+## Diferenças entre Versões (v0.3.4 vs v0.4.0)
 
 O gerenciamento de sessões introduz otimizações de alta concorrência nas versões recentes:
 
@@ -177,21 +177,21 @@ O gerenciamento de sessões introduz otimizações de alta concorrência nas ver
 * Armazenamento `SessionStore` em memória e `SQLiteSessionStore` persistente.
 * TTL de deduplicação de mensagens de 8 dias (`DEFAULT_DEDUP_TTL_HOURS = 192`).
 
-### Melhorias de Pré-lançamento (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Pool Dedicado de Threads para E/S Bloqueante:** No `SQLiteSessionStore` em arquivo, operações de leitura e gravação em disco são descarregadas para um pool privado de 4 threads trabalhadoras (`_BLOCKING_IO_WORKERS = 4`) via `_run_blocking`. Isso impede que a latência de disco trave o loop de eventos assíncrono.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **`SessionDeletedError`:** Se um turno em execução armazenar uma mensagem depois que sua sessão SQLite foi excluída via `store.delete(session_id)`, o turno falha com `SessionDeletedError` em vez de gravar linhas órfãs. Leituras não o lançam, e um turno que ainda aguardava o bloqueio da sessão inicia uma sessão nova e vazia.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Serialização por Sessão para SQLite:** Os turnos de uma mesma sessão SQLite compartilham um bloqueio por event loop e rodam um de cada vez; com um store em arquivo, eles começam na ordem de chegada. Depois de adquirir o bloqueio, o `Runner` chama `session.refresh()`, que recarrega o histórico, o agente ativo e os metadados confirmados por turnos anteriores (sem efeito para sessões em memória).
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Ciclo de Vida do Store:** `SQLiteSessionStore.close()` e `with SQLiteSessionStore(...) as store:` liberam as conexões e as threads trabalhadoras do store.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Metadados em Todo Turno:** Os `metadata` passados para `run_async()` são mesclados na sessão a cada turno (na v0.3.4, eles apenas inicializavam sessões novas).
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Validação Estrita de Parâmetros:** Passar `max_turns <= 0` ou `default_max_turns <= 0` lança imediatamente um `ValueError`.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **SQLite em Memória:** `SQLiteSessionStore(db_path=":memory:")` mantém seus dados durante o tempo de vida do store através de uma única conexão compartilhada e protegida por bloqueio, e suas chamadas permanecem no event loop. Somente a string exata `":memory:"` é tratada dessa forma; qualquer outro caminho, incluindo uma URI `file:...?mode=memory`, usa as threads trabalhadoras.
+### Melhorias da Versão Estável (`v0.4.0`)
+* <VersionBadge version="0.4.0" status="stable" /> **Pool Dedicado de Threads para E/S Bloqueante:** No `SQLiteSessionStore` em arquivo, operações de leitura e gravação em disco são descarregadas para um pool privado de 4 threads trabalhadoras (`_BLOCKING_IO_WORKERS = 4`) via `_run_blocking`. Isso impede que a latência de disco trave o loop de eventos assíncrono.
+* <VersionBadge version="0.4.0" status="stable" /> **`SessionDeletedError`:** Se um turno em execução armazenar uma mensagem depois que sua sessão SQLite foi excluída via `store.delete(session_id)`, o turno falha com `SessionDeletedError` em vez de gravar linhas órfãs. Leituras não o lançam, e um turno que ainda aguardava o bloqueio da sessão inicia uma sessão nova e vazia.
+* <VersionBadge version="0.4.0" status="stable" /> **Serialização por Sessão para SQLite:** Os turnos de uma mesma sessão SQLite compartilham um bloqueio por event loop e rodam um de cada vez; com um store em arquivo, eles começam na ordem de chegada. Depois de adquirir o bloqueio, o `Runner` chama `session.refresh()`, que recarrega o histórico, o agente ativo e os metadados confirmados por turnos anteriores (sem efeito para sessões em memória).
+* <VersionBadge version="0.4.0" status="stable" /> **Ciclo de Vida do Store:** `SQLiteSessionStore.close()` e `with SQLiteSessionStore(...) as store:` liberam as conexões e as threads trabalhadoras do store.
+* <VersionBadge version="0.4.0" status="stable" /> **Metadados em Todo Turno:** Os `metadata` passados para `run_async()` são mesclados na sessão a cada turno (na v0.3.4, eles apenas inicializavam sessões novas).
+* <VersionBadge version="0.4.0" status="stable" /> **Validação Estrita de Parâmetros:** Passar `max_turns <= 0` ou `default_max_turns <= 0` lança imediatamente um `ValueError`.
+* <VersionBadge version="0.4.0" status="stable" /> **SQLite em Memória:** `SQLiteSessionStore(db_path=":memory:")` mantém seus dados durante o tempo de vida do store através de uma única conexão compartilhada e protegida por bloqueio, e suas chamadas permanecem no event loop. Somente a string exata `":memory:"` é tratada dessa forma; qualquer outro caminho, incluindo uma URI `file:...?mode=memory`, usa as threads trabalhadoras.
 
 ---
 
 ## Exemplo Completo: Sessão de Webhook com Deduplicação
 
 ```python
-# [min-version: 0.4.0rc1]
+# [min-version: 0.4.0]
 # [no-exec: illustrative async webhook handler]
 import asyncio
 from chatflow_agent import Agent, Runner, SQLiteSessionStore, tool

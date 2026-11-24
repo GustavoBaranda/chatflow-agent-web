@@ -62,15 +62,15 @@ runner = Runner(starting_agent=support)
 assert "Billing" in runner._agents_registry
 ```
 
-If an agent is instantiated outside the root handoff graph, you can register it with `runner.register_agent(agent)`, but in v0.4.0rc1 that does not make it a handoff target: an agent can only hand off to peers in its own `handoffs`. Peers added later with `add_handoff()` are registered automatically on first use.
+If an agent is instantiated outside the root handoff graph, you can register it with `runner.register_agent(agent)`, but in v0.4.0 that does not make it a handoff target: an agent can only hand off to peers in its own `handoffs`. Peers added later with `add_handoff()` are registered automatically on first use.
 
-Indexing also validates names. In v0.4.0rc1, two distinct `Agent` instances with the same `name` anywhere in the handoff graph raise `ValueError` when the `Runner` is created (a breaking change from v0.3.4, which silently kept the first one).
+Indexing also validates names. In v0.4.0, two distinct `Agent` instances with the same `name` anywhere in the handoff graph raise `ValueError` when the `Runner` is created (a breaking change from v0.3.4, which silently kept the first one).
 
 ---
 
 ## The Turn Execution Lifecycle
 
-Every call to `runner.run_async()` follows a deterministic, transactionally protected sequence in v0.4.0rc1:
+Every call to `runner.run_async()` follows a deterministic, transactionally protected sequence in v0.4.0:
 
 ```
 1. Session Lock Acquisition & Refresh
@@ -98,7 +98,7 @@ Every call to `runner.run_async()` follows a deterministic, transactionally prot
    ├── D. If Model Requests Tools:
    │      ├── Append Message(role=Role.MODEL, tool_calls=[...])
    │      ├── Execute tools / evaluate synthetic handoffs
-   │      ├── If Handoff: swap active agent & check max_handoffs_per_turn
+   │      ├── If Handoff: check max_handoffs_per_turn, then swap active agent
    │      └── Append Message(role=Role.TOOL, tool_results=[...])
    │      └── Continue loop for next agent evaluation
    └── E. If Final Text Generated:
@@ -114,23 +114,25 @@ Every call to `runner.run_async()` follows a deterministic, transactionally prot
 
 ## Transactional State Safety & Rollback
 
-Network dropouts, rate limits, and tool exceptions can leave conversational state corrupted (such as an orphaned tool call without a corresponding tool result). In v0.4.0rc1, `Runner` makes each turn all-or-nothing:
+Network dropouts, rate limits, and tool exceptions can leave conversational state corrupted (such as an orphaned tool call without a corresponding tool result). In v0.4.0, `Runner` makes each turn all-or-nothing:
 
-* **Pre-turn Checkpoint:** After acquiring the lock and refreshing the session, `Runner` checkpoints a copy of the history, the active agent, and a deep copy of the metadata.
+* **Pre-turn Checkpoint:** After acquiring the lock, `Runner` obtains the current `SessionContext` via `get_or_create()` and immediately checkpoints a copy of the history, the active agent, and a deep copy of the metadata (starting an in-memory rollback journal without a redundant second SQLite query).
 * **Automatic Rollback:** If an exception escapes the turn (for example a `ProviderError` or an unexpected tool error), the turn is cancelled (`asyncio.CancelledError`), or `turn_timeout` expires, `Runner` restores all three through `session.restore_history(...)` and then re-raises. With SQLite, a write that is already running is allowed to finish first, so the rollback never overlaps it.
 * **Integrity Guarantee:** History, active agent, and metadata return to their state before the turn, so orphaned tool calls never reach subsequent provider requests. A rollback that fails is reported as an error, never as a success.
 * **Limits:** A rollback cannot undo a tool's external side effects (payments, emails, API calls). A synchronous tool that is still running in a worker thread after a timeout keeps running; later turns of the same session wait for it.
 
-### `run_async()` and `spawn_turn()` Parameters
+### `run_async()`, `spawn_turn()`, and `reset_session_async()` Parameters
 
 | Method | Signature | Notes |
 | :--- | :--- | :--- |
-| `run_async` | `run_async(session_id, user_message, metadata=None, *, turn_timeout=None)` | `turn_timeout` is keyword-only and must be a positive finite number. It starts once the turn holds the session lock. On expiry the turn is rolled back and `TimeoutError` (`asyncio.TimeoutError`) is raised. |
-| `run` | `run(session_id, user_message, metadata=None)` | Synchronous wrapper; raises `RuntimeError` if called from a running event loop. |
+| `run_async` | `run_async(session_id, user_message, metadata=None, *, turn_timeout=None) -> AgentResponse` | `turn_timeout` is keyword-only and must be a positive finite number (booleans are rejected with `ValueError`). It starts once the turn holds the session lock. On expiry the turn is rolled back and `TimeoutError` (`asyncio.TimeoutError`) is raised. |
+| `run` | `run(session_id, user_message, metadata=None) -> AgentResponse` | Synchronous convenience wrapper (does **not** accept `turn_timeout`); raises `RuntimeError` if called from a running event loop. |
 | `spawn_turn` | `spawn_turn(session_id, user_message, metadata=None) -> asyncio.Task[AgentResponse]` | Starts a turn as an independent task, for example a follow-up queued by a tool for its own session. It runs after the current turn ends; do not await it inside that turn (it would deadlock). |
+| `reset_session_async` | `reset_session_async(session_id) -> bool` | Clears session history under the session turn lock, waits for any escaping synchronous thread work, rejects reentrant calls with `ReentrantTurnError`, and offloads file-backed SQLite writes via the store's dedicated 4-worker `ThreadPoolExecutor` (`_run_blocking`). Returns `True` if an existing session was cleared, or `False` if no session existed for `session_id`. |
+| `reset_session` | `reset_session(session_id) -> bool` | Synchronous wrapper around `reset_session_async()`; returns `True` if an existing session was cleared or `False` if none existed, and raises `RuntimeError` inside an active event loop. |
 
 ```python
-# [min-version: 0.4.0rc1]
+# [min-version: 0.4.0]
 # [no-exec: requires a live model provider]
 import asyncio
 
@@ -204,19 +206,19 @@ Do not call <code>runner.run()</code> from inside an active asyncio event loop (
 
 ---
 
-## Version Differences & Prerelease Features
+## Version Evolution (`v0.3.4` → `v0.4.0`)
 
-The `Runner` execution engine includes major concurrency and performance upgrades across releases:
+The `Runner` execution engine includes major concurrency, session-safety, and performance upgrades in `v0.4.0`:
 
-### Stable Release (`v0.3.4`)
+### Previous Stable Baseline (`v0.3.4`)
 * <VersionBadge version="0.3.4" status="stable" /> Core multi-agent loop with `max_handoffs_per_turn` and `max_tool_iterations`.
 * Session locking via `session.lock` serializing messages per session.
 * Checkpoint-based rollback on turn exceptions.
 
-### Prerelease Enhancements (`v0.4.0rc1`)
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Connection Pooling (`async with runner:`):** Inside the scope, the Gemini requests the runner makes on that event loop share one pooled `httpx` client, closed when the scope exits. `OpenAIEngine` and `AnthropicEngine` still open a client per request attempt. `Runner.run()`, `TelegramChannel.run()`, and the `WhatsAppChannel` app open this scope automatically:
+### Latest Stable Enhancements (`v0.4.0`)
+* <VersionBadge version="0.4.0" status="stable" /> **Connection Pooling (`async with runner:`):** Inside the scope, the Gemini requests the runner makes on that event loop share one pooled `httpx` client, closed automatically when the scope exits. `Runner.run()`, `TelegramChannel.run()`, and the `WhatsAppChannel` app open this scope automatically:
 ```python
-# [min-version: 0.4.0rc1]
+# [min-version: 0.4.0]
 # [no-exec: illustrative async connection pool pattern]
 from chatflow_agent import Agent, Runner
 
@@ -229,9 +231,10 @@ async def handle_requests():
         res1 = await runner.run_async("s1", "First query")
         res2 = await runner.run_async("s1", "Second query")
 ```
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Reentrant Turn Prevention:** Calling `runner.run_async()` recursively on the same session (for example, if a tool invokes the runner on its own session) is detected and blocked with a `ReentrantTurnError`.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Worker Thread Cancellation Tracking:** When an async turn is cancelled while a synchronous tool is executing in a thread, `chatflow-agent` tracks the worker thread to ensure the rollback never races with pending writes.
-* <VersionBadge version="0.4.0rc1" status="prerelease" /> **Event Loop Guard on `run()`:** Calling synchronous `run()` inside an active event loop raises an explicit `RuntimeError` rather than hanging indefinitely.
+* <VersionBadge version="0.4.0" status="stable" /> **Reentrant Turn Prevention:** Calling `runner.run_async()` or `runner.reset_session_async()` recursively on the same session (for example, if a tool invokes the runner on its own session) is detected and blocked with a `ReentrantTurnError`.
+* <VersionBadge version="0.4.0" status="stable" /> **Session-Safe Reset (`reset_session_async` / `reset_session`):** Coordinates history clearing with the session turn lock, sync-work barrier, reentrancy check, and background thread offloading for SQLite stores.
+* <VersionBadge version="0.4.0" status="stable" /> **Worker Thread Cancellation Tracking:** When an async turn is cancelled while a synchronous tool is executing in a thread, `chatflow-agent` tracks the worker thread to ensure the rollback and subsequent turns never race with pending writes.
+* <VersionBadge version="0.4.0" status="stable" /> **Event Loop Guard on `run()` & `reset_session()`:** Calling synchronous `run()` or `reset_session()` inside an active event loop raises an explicit `RuntimeError` rather than hanging indefinitely.
 
 ---
 
